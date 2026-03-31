@@ -55,13 +55,14 @@ async function saveNotion(env: Bindings, d: any) {
   if (!env.NOTION_API_KEY || !env.NOTION_DATABASE_ID) return false
   const catLabel: Record<string, string> = { learn:'학습 활동', fine:'벌금', shop:'보상 교환' }
   const itemList = d.items.map((x: any) => `${x.icon} ${x.label} × ${x.qty}`).join(', ')
+  const costText = d.totalCost === 0 ? '무료' : d.totalCost < 0 ? `+${Math.abs(d.totalCost)} ${d.currency}` : `-${d.totalCost} ${d.currency}`
   const payload = {
     parent: { database_id: env.NOTION_DATABASE_ID },
     properties: {
       '학생 이름': { title: [{ text:{ content: d.name } }] },
       '항목':      { rich_text: [{ text:{ content: itemList } }] },
-      '금액':      { number: Math.abs(d.totalCost) },
-      '구분':      { select:{ name: catLabel[d.category] || d.category } },
+      '금액':      { rich_text: [{ text:{ content: costText } }] },
+      '구분':      { multi_select: [{ name: catLabel[d.category] || d.category }] },
       '접수 일시': { date:{ start: new Date().toISOString() } },
       '상태':      { select:{ name: '접수 완료' } },
     },
@@ -71,7 +72,10 @@ async function saveNotion(env: Bindings, d: any) {
     headers:{ Authorization:`Bearer ${env.NOTION_API_KEY}`, 'Content-Type':'application/json', 'Notion-Version':'2022-06-28' },
     body: JSON.stringify(payload),
   })
-  if (!res.ok) throw new Error(`Notion ${res.status}`)
+  if (!res.ok) {
+    const errBody = await res.text()
+    throw new Error(`Notion ${res.status}: ${errBody}`)
+  }
   return true
 }
 
