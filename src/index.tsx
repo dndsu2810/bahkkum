@@ -115,6 +115,9 @@ app.get('/api/health', (c) => c.json({
 //  API: 관리자 전용
 // ══════════════════════════════════════════════════════════════════════════════
 
+// 관리자 인증 확인용 엔드포인트 (로그인 검증)
+app.get('/api/admin/auth', (c) => c.json({ success: true, message: '인증 성공' }))
+
 app.post('/api/admin/students', async (c) => {
   const { name } = await c.req.json()
   if (!name) return c.json({ success: false, error: '이름 필요' }, 400)
@@ -663,7 +666,7 @@ function renderStudents(){
       ?'<img class="stu-photo" src="'+escHtml(s.photo_url)+'" alt="'+escHtml(s.name)+'"/>'
       :'<div class="stu-av">'+escHtml(s.name[0])+'</div>'
     const fineBadge=s.fine_count>0
-      ?'<div class="stu-fine-badge">⚠️ 미납 '+s.fine_count+'건</div>':''
+      ?'<div class="stu-fine-badge">\u26A0 미납 '+s.fine_count+'건</div>':''
     return '<button class="stu-btn" data-name="'+escHtml(s.name)+'" onclick="selectStudent('+s.id+')">'+
       photoEl+
       '<div class="stu-name">'+escHtml(s.name)+'</div>'+
@@ -707,7 +710,7 @@ function updateBannerStats(s){
   const c=CFG.currency
   const stats=document.getElementById('bannerStats')
   let html='<div class="stat-chip">'+c.symbol+' '+s.points+' '+c.unit+'</div>'
-  if(s.fine_count>0) html+='<div class="stat-chip red-chip">⚠️ 미납 벌금 '+s.fine_count+'건</div>'
+  if(s.fine_count>0) html+='<div class="stat-chip red-chip">\u26A0 미납 벌금 '+s.fine_count+'건</div>'
   if(s.unpaid_fines>0) html+='<div class="stat-chip red-chip">📋 미납 누적 '+s.unpaid_fines+'건</div>'
   stats.innerHTML=html
 }
@@ -844,7 +847,7 @@ function renderDone(slackOk,notionOk,ts,tc){
   const c=CFG.currency
   const hasFine=ST.sessionOrders.at(-1)?.category==='fine'
   const hasShop=ST.sessionOrders.at(-1)?.category==='shop'
-  document.getElementById('doneEmoji').textContent=hasFine?'😅':hasShop?'🛍️':'🎉'
+  document.getElementById('doneEmoji').textContent=hasFine?'\uD83D\uDE05':hasShop?'\uD83D\uDECD':'\uD83C\uDF89'
   document.getElementById('doneTitle').textContent=hasFine?'기록 완료!':hasShop?'교환 완료! 🎊':'잘했어요! 🌟'
   const newPts=ST.student?ST.student.points:0
   document.getElementById('doneSub').innerHTML='<strong>'+escHtml(ST.student.name)+'</strong>님 기록 완료!<br/>'+(tc<0?'<span style="color:var(--green)">+'+Math.abs(tc)+' '+c.symbol+' 획득! 🎊</span>':tc>0?'<span style="color:var(--red)">-'+tc+' '+c.unit+' 차감</span>':'<span style="color:var(--green)">무료 활동 ✅</span>')
@@ -1068,11 +1071,10 @@ const ADMIN_HTML = `<!DOCTYPE html>
       학생들은 이 페이지에 접근할 수 없어요
     </div>
     <div class="pw-wrap">
-      <input class="pw-inp" id="pwInp" type="password" placeholder="••••" maxlength="20"
-             onkeydown="if(event.key==='Enter')doLogin()"/>
-      <span class="pw-eye" onclick="togglePw()"><i class="fas fa-eye" id="eyeIc"></i></span>
+      <input class="pw-inp" id="pwInp" type="password" placeholder="••••" maxlength="20"/>
+      <span class="pw-eye" id="eyeBtn"><i class="fas fa-eye" id="eyeIc"></i></span>
     </div>
-    <button class="btn-login" onclick="doLogin()"><i class="fas fa-unlock" style="margin-right:6px"></i>관리자 입장</button>
+    <button class="btn-login" id="loginBtn"><i class="fas fa-unlock" style="margin-right:6px"></i>관리자 입장</button>
     <div class="login-err" id="loginErr">🙈 비밀번호가 틀렸어요. 다시 입력해주세요.</div>
     <div class="login-hint">기본 비밀번호: 1234</div>
   </div>
@@ -1086,16 +1088,16 @@ const ADMIN_HTML = `<!DOCTYPE html>
       <div class="hdr-ttl">⚙️ 관리자</div>
     </div>
     <div class="hdr-r">
-      <a href="/" class="btn-kiosk"><i class="fas fa-display"></i> 키오스크</a>
-      <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
+      <button class="btn-kiosk" id="kioskBtn"><i class="fas fa-display"></i> 키오스크</button>
+      <button class="btn-logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
     </div>
   </header>
 
   <nav class="nav-tabs">
-    <button class="nav-tab active" onclick="showTab('students')" id="ntab-students"><i class="fas fa-users"></i> 학생 관리</button>
-    <button class="nav-tab" onclick="showTab('fines')" id="ntab-fines"><i class="fas fa-triangle-exclamation"></i> 벌금 관리</button>
-    <button class="nav-tab" onclick="showTab('menu')" id="ntab-menu"><i class="fas fa-list"></i> 메뉴 설정</button>
-    <button class="nav-tab" onclick="showTab('currency')" id="ntab-currency"><i class="fas fa-coins"></i> 화폐 설정</button>
+    <button class="nav-tab active" data-tab="students" id="ntab-students"><i class="fas fa-users"></i> 학생 관리</button>
+    <button class="nav-tab" data-tab="fines" id="ntab-fines"><i class="fas fa-triangle-exclamation"></i> 벌금 관리</button>
+    <button class="nav-tab" data-tab="menu" id="ntab-menu"><i class="fas fa-list"></i> 메뉴 설정</button>
+    <button class="nav-tab" data-tab="currency" id="ntab-currency"><i class="fas fa-coins"></i> 화폐 설정</button>
   </nav>
 
   <div class="wrap">
@@ -1109,8 +1111,8 @@ const ADMIN_HTML = `<!DOCTYPE html>
         <div class="card-bd">
           <div class="stu-cards" id="stuCards"></div>
           <div class="add-row" style="margin-top:16px;">
-            <input class="add-inp" id="newStuInp" placeholder="새 학생 이름 입력..." maxlength="10" onkeydown="if(event.key==='Enter')addStudent()"/>
-            <button class="btn-add" onclick="addStudent()"><i class="fas fa-user-plus" style="margin-right:4px"></i>학생 추가</button>
+            <input class="add-inp" id="newStuInp" placeholder="새 학생 이름 입력..." maxlength="10"/>
+            <button class="btn-add" id="addStuBtn"><i class="fas fa-user-plus" style="margin-right:4px"></i>학생 추가</button>
           </div>
         </div>
       </div>
@@ -1122,9 +1124,9 @@ const ADMIN_HTML = `<!DOCTYPE html>
         <div class="card-hd">
           <div class="card-ttl"><div class="card-ic ic-red"><i class="fas fa-triangle-exclamation"></i></div>벌금 내역</div>
           <div style="display:flex;gap:6px;">
-            <button class="btn-sm blue" onclick="loadFines('all')">전체</button>
-            <button class="btn-sm red" onclick="loadFines('unpaid')">미납</button>
-            <button class="btn-sm green" onclick="loadFines('paid')">완납</button>
+            <button class="btn-sm blue btn-filter-fine" data-filter="all">전체</button>
+            <button class="btn-sm red btn-filter-fine" data-filter="unpaid">미납</button>
+            <button class="btn-sm green btn-filter-fine" data-filter="paid">완납</button>
           </div>
         </div>
         <div class="card-bd">
@@ -1146,8 +1148,8 @@ const ADMIN_HTML = `<!DOCTYPE html>
             <input class="add-inp" id="nLIc" placeholder="📖" maxlength="4" style="width:60px;flex:none;text-align:center;"/>
             <input class="add-inp" id="nLLbl" placeholder="항목 이름" maxlength="20" style="flex:2;"/>
             <input class="add-inp" id="nLRew" type="number" placeholder="보상P" min="0" style="width:80px;flex:none;text-align:center;"/>
-            <label class="photo-chk"><input type="checkbox" id="nLPhoto"/> 📸</label>
-            <button class="btn-add" onclick="addItem('learn')"><i class="fas fa-plus"></i></button>
+            <label class="photo-chk"><input type="checkbox" id="nLPhoto"/> 사진</label>
+            <button class="btn-add" id="addLearnBtn"><i class="fas fa-plus"></i></button>
           </div>
         </div>
       </div>
@@ -1161,13 +1163,13 @@ const ADMIN_HTML = `<!DOCTYPE html>
             <input class="add-inp" id="nFIc" placeholder="🔔" maxlength="4" style="width:60px;flex:none;text-align:center;"/>
             <input class="add-inp" id="nFLbl" placeholder="항목 이름" maxlength="20" style="flex:2;"/>
             <input class="add-inp" id="nFCost" type="number" placeholder="차감P" min="0" style="width:80px;flex:none;text-align:center;"/>
-            <button class="btn-add red" onclick="addItem('fine')"><i class="fas fa-plus"></i></button>
+            <button class="btn-add red" id="addFineBtn"><i class="fas fa-plus"></i></button>
           </div>
         </div>
       </div>
       <div class="card">
         <div class="card-hd">
-          <div class="card-ttl"><div class="card-ic ic-purple"><i class="fas fa-store"></i></div>🛍️ 보상 상점</div>
+          <div class="card-ttl"><div class="card-ic ic-purple"><i class="fas fa-store"></i></div>보상 상점</div>
         </div>
         <div class="card-bd">
           <div id="shopItems"></div>
@@ -1175,15 +1177,15 @@ const ADMIN_HTML = `<!DOCTYPE html>
             <input class="add-inp" id="nSIc" placeholder="🎁" maxlength="4" style="width:60px;flex:none;text-align:center;"/>
             <input class="add-inp" id="nSLbl" placeholder="항목 이름" maxlength="20" style="flex:2;"/>
             <input class="add-inp" id="nSCost" type="number" placeholder="비용P" min="0" style="width:80px;flex:none;text-align:center;"/>
-            <button class="btn-add purple" onclick="addItem('shop')"><i class="fas fa-plus"></i></button>
+            <button class="btn-add purple" id="addShopBtn"><i class="fas fa-plus"></i></button>
           </div>
         </div>
       </div>
       <div class="save-bar">
         <div class="save-hint">💾 변경사항은 저장 버튼을 눌러야 키오스크에 반영됩니다</div>
         <div class="save-btns">
-          <button class="btn-reset" onclick="resetMenu()"><i class="fas fa-rotate-left" style="margin-right:4px"></i>기본값</button>
-          <button class="btn-save" onclick="saveMenu()"><i class="fas fa-floppy-disk"></i>저장</button>
+          <button class="btn-reset" id="resetmenuBtn"><i class="fas fa-rotate-left" style="margin-right:4px"></i>기본값</button>
+          <button class="btn-save" id="savemenuBtn"><i class="fas fa-floppy-disk"></i>저장</button>
         </div>
       </div>
     </div>
@@ -1195,20 +1197,20 @@ const ADMIN_HTML = `<!DOCTYPE html>
         <div class="card-bd">
           <div class="preset-grid" id="presets"></div>
           <div class="cur-row">
-            <div><label class="lbl">단위 이름</label><input class="inp" id="curUnit" placeholder="포인트" maxlength="10" oninput="updateCurPreview()"/></div>
-            <div><label class="lbl">기호 이모지</label><input class="inp" id="curSymbol" placeholder="🏅" maxlength="4" oninput="updateCurPreview()"/></div>
+            <div><label class="lbl">단위 이름</label><input class="inp" id="curUnit" placeholder="포인트" maxlength="10"/></div>
+            <div><label class="lbl">기호/기호문자</label><input class="inp" id="curSymbol" placeholder="P" maxlength="4"/></div>
             <div class="span2"><label class="lbl">스플래시 문구</label><input class="inp" id="curDesc" placeholder="포인트를 모아서 간식이랑 교환해요!" maxlength="50"/></div>
           </div>
           <div style="background:linear-gradient(135deg,var(--blue),var(--blue-d));color:white;border-radius:14px;padding:14px 18px;margin-top:14px;display:flex;align-items:center;gap:12px;">
-            <div style="font-size:32px" id="pvSym">🏅</div>
-            <div><div style="font-size:15px;font-weight:900" id="pvTitle">포인트 (🏅)</div><div style="font-size:12px;opacity:.8" id="pvSub">포인트를 모아서 간식이랑 교환해요!</div></div>
+            <div style="font-size:32px" id="pvSym">P</div>
+            <div><div style="font-size:15px;font-weight:900" id="pvTitle">포인트 (P)</div><div style="font-size:12px;opacity:.8" id="pvSub">포인트를 모아서 간식이랑 교환해요!</div></div>
           </div>
         </div>
       </div>
       <div class="save-bar">
         <div class="save-hint">💾 저장 후 키오스크에 즉시 반영됩니다</div>
         <div class="save-btns">
-          <button class="btn-save" onclick="saveCurrency()"><i class="fas fa-floppy-disk"></i>저장</button>
+          <button class="btn-save" id="savecurBtn"><i class="fas fa-floppy-disk"></i>저장</button>
         </div>
       </div>
     </div>
@@ -1218,7 +1220,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
 <!-- 포인트 이력 모달 -->
 <div class="modal-ov" id="hist-modal">
   <div class="modal-box">
-    <div class="modal-ttl"><span id="histTitle">포인트 이력</span><button class="modal-close" onclick="closeHistModal()">✕</button></div>
+    <div class="modal-ttl"><span id="histTitle">포인트 이력</span><button class="modal-close" id="closeHistBtn">✕</button></div>
     <div class="modal-scroll"><div class="hist-list" id="histList"></div></div>
   </div>
 </div>
@@ -1226,60 +1228,52 @@ const ADMIN_HTML = `<!DOCTYPE html>
 <div class="toast" id="toast"></div>
 
 <script>
-(function(){
-const PRESETS=[
-  {unit:'포인트',symbol:'🏅',desc:'포인트를 모아서 간식이랑 교환해요!'},
-  {unit:'별',symbol:'⭐',desc:'열심히 공부하면 별을 받아요!'},
-  {unit:'코인',symbol:'🪙',desc:'코인을 모아서 보상을 받아요!'},
-  {unit:'학습지',symbol:'📄',desc:'학습지로 교환할 수 있어요!'},
-  {unit:'시간',symbol:'⏰',desc:'자유시간을 획득해요!'},
-  {unit:'하트',symbol:'❤️',desc:'하트를 모아봐요!'},
-  {unit:'스티커',symbol:'🌟',desc:'스티커를 모아봐요!'},
-  {unit:'도장',symbol:'🔖',desc:'도장을 모아요!'},
+/* ---- 전역 상태 ---- */
+var PW_TOKEN = ''
+var students = []
+var allFines = []
+var PRESETS = [
+  {unit:'포인트', symbol:'P', desc:'포인트를 모아서 간식이랑 교환해요!'},
+  {unit:'별', symbol:'*', desc:'열심히 공부하면 별을 받아요!'},
+  {unit:'코인', symbol:'C', desc:'코인을 모아서 보상을 받아요!'},
+  {unit:'학습지', symbol:'S', desc:'학습지로 교환할 수 있어요!'},
+  {unit:'시간', symbol:'T', desc:'시간을 모아서 사용하세요!'},
+  {unit:'하트', symbol:'H', desc:'하트로 보상을 받아요!'},
+  {unit:'스티커', symbol:'ST', desc:'스티커를 모아요!'},
+  {unit:'도장', symbol:'D', desc:'도장을 모아요!'}
 ]
-const DEFAULT_MENU={
+var DEFAULT_MENU = {
   learn:[
-    {id:'study',icon:'📖',label:'자습 인증하기',cost:0,reward:2,requirePhoto:true},
-    {id:'homework',icon:'✏️',label:'숙제 제출하기',cost:0,reward:1,requirePhoto:false},
-    {id:'question',icon:'🙋',label:'질문하기',cost:0,reward:1,requirePhoto:false},
-    {id:'record',icon:'📝',label:'모르는 문제 기록하기',cost:0,reward:2,requirePhoto:true},
-    {id:'material',icon:'📄',label:'추가 학습지 요청',cost:0,reward:0,requirePhoto:false},
-    {id:'makeup',icon:'📅',label:'보강 신청',cost:0,reward:0,requirePhoto:false},
-    {id:'consult',icon:'💬',label:'상담 요청',cost:0,reward:0,requirePhoto:false},
+    {id:'study',    icon:'[책]', label:'자습 인증하기',        cost:0, reward:2, requirePhoto:true},
+    {id:'homework', icon:'[연필]', label:'숙제 제출하기',      cost:0, reward:1, requirePhoto:false},
+    {id:'question', icon:'[질문]', label:'질문하기',           cost:0, reward:1, requirePhoto:false},
+    {id:'record',   icon:'[기록]', label:'모르는 문제 기록하기',cost:0, reward:2, requirePhoto:true},
+    {id:'material', icon:'[학습지]', label:'추가 학습지 요청', cost:0, reward:0, requirePhoto:false},
+    {id:'makeup',   icon:'[보강]', label:'보강 신청',          cost:0, reward:0, requirePhoto:false},
+    {id:'consult',  icon:'[상담]', label:'상담 요청',          cost:0, reward:0, requirePhoto:false}
   ],
   fine:[
-    {id:'helpme',icon:'🆘',label:'지현쌤 Help me!',cost:3,reward:0,requirePhoto:false},
-    {id:'lostwork',icon:'😰',label:'숙제 분실',cost:4,reward:0,requirePhoto:false},
-    {id:'nohomework',icon:'🚫',label:'숙제 안함',cost:5,reward:0,requirePhoto:false},
+    {id:'helpme',     icon:'[SOS]',  label:'지현쌤 Help me!', cost:3, reward:0, requirePhoto:false},
+    {id:'lostwork',   icon:'[분실]', label:'숙제 분실',        cost:4, reward:0, requirePhoto:false},
+    {id:'nohomework', icon:'[X]',    label:'숙제 안함',        cost:5, reward:0, requirePhoto:false}
   ],
   shop:[
-    {id:'choco',icon:'🍫',label:'초콜릿(달달구리)',cost:3,reward:0,requirePhoto:false},
-    {id:'jelly',icon:'🍬',label:'젤리',cost:2,reward:0,requirePhoto:false},
-    {id:'candy',icon:'🍭',label:'사탕',cost:2,reward:0,requirePhoto:false},
-    {id:'snack',icon:'🍿',label:'과자',cost:3,reward:0,requirePhoto:false},
-    {id:'saekkomdal',icon:'🍋',label:'새콤달콤',cost:2,reward:0,requirePhoto:false},
-    {id:'vitaminc',icon:'💊',label:'비타민C',cost:2,reward:0,requirePhoto:false},
-  ],
+    {id:'choco',      icon:'[초콜릿]', label:'초콜릿(달달구리)', cost:3, reward:0, requirePhoto:false},
+    {id:'jelly',      icon:'[젤리]',   label:'젤리',             cost:2, reward:0, requirePhoto:false},
+    {id:'candy',      icon:'[사탕]',   label:'사탕',             cost:2, reward:0, requirePhoto:false},
+    {id:'snack',      icon:'[과자]',   label:'과자',             cost:3, reward:0, requirePhoto:false},
+    {id:'saekkomdal', icon:'[새콤]',   label:'새콤달콤',         cost:2, reward:0, requirePhoto:false},
+    {id:'vitaminc',   icon:'[비타민]', label:'비타민C',          cost:2, reward:0, requirePhoto:false}
+  ]
 }
+var menuCfg = JSON.parse(JSON.stringify(DEFAULT_MENU))
+var curCfg = {unit:'포인트', symbol:'P', desc:''}
 
-let PW_TOKEN=''
-let menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))
-let curCfg={unit:'포인트',symbol:'🏅',desc:'포인트를 모아서 간식이랑 교환해요!'}
-let students=[]
-let allFines=[]
-
-/* ── 로그인 ── */
-window.togglePw=function(){
-  const inp=document.getElementById('pwInp');const ic=document.getElementById('eyeIc')
-  if(inp.type==='password'){inp.type='text';ic.className='fas fa-eye-slash'}
-  else{inp.type='password';ic.className='fas fa-eye'}
-}
-window.doLogin=async function(){
-  const pw=document.getElementById('pwInp').value.trim()
+async function doLogin(){
+  var pw=document.getElementById('pwInp').value.trim()
   if(!pw){document.getElementById('loginErr').classList.add('show');return}
-  // 서버에 인증 요청
-  const r=await fetch('/api/admin/students',{headers:{'X-Admin-Password':pw}})
-  if(r.ok||r.status!==401){
+  var res=await fetch('/api/admin/auth',{headers:{'X-Admin-Password':pw}})
+  if(res.ok){
     PW_TOKEN=pw
     document.getElementById('login-screen').classList.add('hidden')
     document.getElementById('main-screen').classList.remove('hidden')
@@ -1291,24 +1285,19 @@ window.doLogin=async function(){
     document.getElementById('pwInp').focus()
   }
 }
-window.doLogout=function(){
+function doLogout(){
   PW_TOKEN=''
   document.getElementById('main-screen').classList.add('hidden')
   document.getElementById('login-screen').classList.remove('hidden')
   document.getElementById('pwInp').value=''
 }
-function authHdr(){return{'X-Admin-Password':PW_TOKEN,'Content-Type':'application/json'}}
-
-/* ── 탭 ── */
-window.showTab=function(id){
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'))
-  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'))
+function showTab(id){
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')})
+  document.querySelectorAll('.nav-tab').forEach(function(b){b.classList.remove('active')})
   document.getElementById('tab-'+id).classList.add('active')
   document.getElementById('ntab-'+id).classList.add('active')
   if(id==='fines') loadFines('all')
 }
-
-/* ── 전체 로드 ── */
 async function loadAll(){
   await loadStudentData()
   loadMenuCfg()
@@ -1316,300 +1305,317 @@ async function loadAll(){
   renderPresets()
   renderCurInputs()
 }
-
 async function loadStudentData(){
-  const r=await fetch('/api/students');const d=await r.json()
-  if(d.success){students=d.students;renderStudentCards()}
+  try{
+    var res=await fetch('/api/students');var d=await res.json()
+    if(d.success){students=d.students;renderStudentCards()}
+  }catch(e){console.warn('학생 데이터 로드 실패:',e)}
   document.getElementById('stuCnt').textContent=students.length+'명'
 }
-
-/* ── 학생 카드 ── */
-function renderStudentCards(){
-  const g=document.getElementById('stuCards')
-  // onclick 내 따옴표 충돌 방지: 이름은 data-sname 속성에 저장 후 getElementById로 접근
-  g.innerHTML=students.map(s=>{
-    const photoEl=s.photo_url
-      ?'<img class="sc-photo" src="'+escH(s.photo_url)+'" alt="'+escH(s.name)+'"/>'
-      :'<div class="sc-av">'+escH(s.name[0])+'</div>'
-    const fineHtml=s.fine_count>0
-      ?'<div class="sc-fine-txt">&#9888; 미납 '+s.fine_count+'건</div>':''
-    return '<div class="stu-card" id="scard-'+s.id+'" data-sid="'+s.id+'" data-sname="'+escH(s.name)+'">'+
-      '<div class="stu-card-top">'+
-        '<div class="sc-photo-wrap">'+
-          photoEl+
-          '<label class="sc-photo-edit" title="사진 변경"><i class="fas fa-camera"></i>'+
-            '<input class="sc-photo-input" type="file" accept="image/*" onchange="uploadPhoto(event,'+s.id+')"/>'+
-          '</label>'+
-        '</div>'+
-        '<div class="sc-info">'+
-          '<div class="sc-name">'+escH(s.name)+'</div>'+
-          '<div class="sc-pts" id="pts-'+s.id+'">&#127885; '+s.points+' 포인트</div>'+
-          fineHtml+
-        '</div>'+
-        '<div class="sc-top-r">'+
-          '<button class="btn-del" onclick="delStudentById('+s.id+')" title="학생 삭제"><i class="fas fa-trash-can"></i></button>'+
-        '</div>'+
-      '</div>'+
-      '<div class="sc-body">'+
-        '<div>'+
-          '<div class="sc-sec-lbl">&#9889; 빠른 포인트 조정</div>'+
-          '<div class="preset-pts">'+
-            '<button class="ppt-btn add" onclick="quickPt('+s.id+',1)">+1</button>'+
-            '<button class="ppt-btn add" onclick="quickPt('+s.id+',2)">+2</button>'+
-            '<button class="ppt-btn add" onclick="quickPt('+s.id+',5)">+5</button>'+
-            '<button class="ppt-btn add" onclick="quickPt('+s.id+',10)">+10</button>'+
-            '<button class="ppt-btn sub" onclick="quickPt('+s.id+',-1)">-1</button>'+
-            '<button class="ppt-btn sub" onclick="quickPt('+s.id+',-2)">-2</button>'+
-            '<button class="ppt-btn sub" onclick="quickPt('+s.id+',-5)">-5</button>'+
-          '</div>'+
-        '</div>'+
-        '<div>'+
-          '<div class="sc-sec-lbl">&#9999; 직접 입력</div>'+
-          '<div class="sc-row">'+
-            '<input class="sc-adj-inp" id="adj-'+s.id+'" type="number" placeholder="+/-숫자"/>'+
-            '<input class="sc-rsn-inp" id="adjr-'+s.id+'" placeholder="사유 (선택)"/>'+
-          '</div>'+
-          '<div class="btn-row" style="margin-top:5px;">'+
-            '<button class="btn-sm green" style="flex:1" onclick="adjustPoints('+s.id+',1)"><i class="fas fa-plus"></i> 포인트 추가</button>'+
-            '<button class="btn-sm red" style="flex:1" onclick="adjustPoints('+s.id+',-1)"><i class="fas fa-minus"></i> 포인트 차감</button>'+
-          '</div>'+
-        '</div>'+
-        '<button class="btn-sm gray" style="width:100%" onclick="showHistoryById('+s.id+')"><i class="fas fa-history" style="margin-right:4px"></i>포인트 이력 보기</button>'+
-      '</div>'+
-    '</div>'
-  }).join('')
-}
-
+function authHdr(){return{'X-Admin-Password':PW_TOKEN,'Content-Type':'application/json'}}
 function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2500)}
 
-/* ── 학생 추가/삭제 ── */
-window.addStudent=async function(){
-  const inp=document.getElementById('newStuInp');const name=inp.value.trim()
-  if(!name){toast('이름을 입력하세요');return}
-  const r=await fetch('/api/admin/students',{method:'POST',headers:authHdr(),body:JSON.stringify({name})})
-  const d=await r.json()
-  if(d.success){inp.value='';await loadStudentData();toast('학생 추가: '+name)}
-  else toast('오류: '+d.error)
-}
-// ID만으로 삭제 (onclick에서 따옴표 충돌 방지)
-window.delStudentById=async function(id){
-  const card=document.getElementById('scard-'+id)
-  const name=card?card.getAttribute('data-sname'):id
-  if(!confirm(name+' 학생을 삭제할까요? (포인트 이력도 모두 삭제됩니다)'))return
-  await fetch('/api/admin/students/'+id,{method:'DELETE',headers:authHdr()})
-  await loadStudentData();toast('삭제됨: '+name)
-}
-window.delStudent=async function(id,name){
-  if(!confirm(name+' 학생을 삭제할까요? (포인트 이력도 모두 삭제됩니다)'))return
-  await fetch('/api/admin/students/'+id,{method:'DELETE',headers:authHdr()})
-  await loadStudentData();toast('삭제됨: '+name)
-}
-
-/* ── 사진 업로드 ── */
-window.uploadPhoto=async function(e,id){
-  const file=e.target.files[0];if(!file)return
-  // 이미지 리사이즈 (최대 400px)
-  const img=new Image()
-  const url=URL.createObjectURL(file)
-  img.onload=async function(){
-    const MAX=400;let w=img.width,h=img.height
-    if(w>MAX||h>MAX){const r=MAX/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r)}
-    const cv=document.createElement('canvas');cv.width=w;cv.height=h
-    cv.getContext('2d').drawImage(img,0,0,w,h)
-    const b64=cv.toDataURL('image/jpeg',0.85)
-    URL.revokeObjectURL(url)
-    const r=await fetch('/api/admin/students/'+id+'/photo',{method:'POST',headers:authHdr(),body:JSON.stringify({photoBase64:b64})})
-    if((await r.json()).success){await loadStudentData();toast('📸 사진 등록 완료!')}
-  };img.src=url
-}
-
-/* ── 포인트 빠른 조정 ── */
-window.quickPt=async function(id,delta){
-  const r=await fetch('/api/admin/students/'+id+'/points',{method:'POST',headers:authHdr(),body:JSON.stringify({delta,reason:'관리자 빠른 조정'})})
-  if((await r.json()).success){
-    await loadStudentData()
-    toast((delta>0?'+'  :'')+delta+' 포인트 조정 완료')
-  }
-}
-
-/* ── 포인트 직접 입력 조정 ── */
-window.adjustPoints=async function(id,sign){
-  const adjInp=document.getElementById('adj-'+id);const rsnInp=document.getElementById('adjr-'+id)
-  const val=parseInt(adjInp.value)||0
-  if(val===0){toast('조정할 포인트 값을 입력하세요');return}
-  const delta=Math.abs(val)*sign
-  const reason=rsnInp.value.trim()||'관리자 조정'
-  const r=await fetch('/api/admin/students/'+id+'/points',{method:'POST',headers:authHdr(),body:JSON.stringify({delta,reason})})
-  if((await r.json()).success){
-    adjInp.value='';rsnInp.value=''
-    await loadStudentData()
-    toast((delta>0?'+':'')+delta+' 포인트 조정 완료')
-  }
-}
-
-/* ── 포인트 이력 모달 ── */
-// ID만으로 이력 보기 (onclick에서 따옴표 충돌 방지)
-window.showHistoryById=async function(id){
-  const card=document.getElementById('scard-'+id)
-  const name=card?card.getAttribute('data-sname'):'학생'
-  window.showHistory(id,name)
-}
-window.showHistory=async function(id,name){
-  document.getElementById('histTitle').textContent='📊 '+name+' 포인트 이력'
-  document.getElementById('histList').innerHTML='<div style="text-align:center;padding:20px;color:var(--g400)">불러오는 중...</div>'
-  document.getElementById('hist-modal').classList.add('open')
-  const r=await fetch('/api/students/'+id);const d=await r.json()
-  if(!d.success){document.getElementById('histList').innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">오류 발생</div>';return}
-  const hist=d.history
-  if(hist.length===0){document.getElementById('histList').innerHTML='<div style="text-align:center;padding:20px;color:var(--g400)">이력이 없어요 🌱</div>';return}
-  document.getElementById('histList').innerHTML=hist.map(h=>{
-    const pos=h.delta>0
-    const cat={learn:'학습',fine:'벌금',shop:'보상',admin:'관리자'}[h.category]||h.category
-    return '<div class="hist-item">'+
-      '<div class="hist-delta '+(pos?'pos':'neg')+'">'+(pos?'+':'')+h.delta+'</div>'+
-      '<div class="hist-info">'+
-        '<div class="hist-reason">'+escH(h.reason)+'</div>'+
-        '<div class="hist-date">'+cat+' · '+new Date(h.created_at).toLocaleString('ko-KR')+'</div>'+
-      '</div>'+
-    '</div>'
+function renderStudentCards(){
+  var g=document.getElementById('stuCards')
+  g.innerHTML=students.map(function(s){
+    var photoEl=s.photo_url
+      ?'<img class="sc-photo" src="'+escH(s.photo_url)+'" alt="'+escH(s.name)+'">'
+      :'<div class="sc-av">'+s.name[0]+'</div>'
+    var fineHtml=s.fine_count>0?'<div class="sc-fine-txt">미납 '+s.fine_count+'건</div>':''
+    return '<div class="stu-card" id="scard-'+s.id+'">'
+      +'<div class="stu-card-top">'
+        +'<div class="sc-photo-wrap">'
+          +photoEl
+          +'<label class="sc-photo-edit" title="사진 변경"><i class="fas fa-camera"></i>'
+            +'<input class="sc-photo-input" type="file" accept="image/*">'
+          +'</label>'
+        +'</div>'
+        +'<div class="sc-info">'
+          +'<div class="sc-name">'+escH(s.name)+'</div>'
+          +'<div class="sc-pts" id="pts-'+s.id+'">'+s.points+' 포인트</div>'
+          +fineHtml
+        +'</div>'
+        +'<div class="sc-top-r">'
+          +'<button class="btn-del btn-del-stu" data-id="'+s.id+'" data-name="'+escH(s.name)+'" title="삭제"><i class="fas fa-trash-can"></i></button>'
+        +'</div>'
+      +'</div>'
+      +'<div class="sc-body">'
+        +'<div class="sc-sec-lbl">빠른 포인트 조정</div>'
+        +'<div class="preset-pts">'
+          +'<button class="ppt-btn add btn-qpt" data-id="'+s.id+'" data-delta="1">+1</button>'
+          +'<button class="ppt-btn add btn-qpt" data-id="'+s.id+'" data-delta="2">+2</button>'
+          +'<button class="ppt-btn add btn-qpt" data-id="'+s.id+'" data-delta="5">+5</button>'
+          +'<button class="ppt-btn add btn-qpt" data-id="'+s.id+'" data-delta="10">+10</button>'
+          +'<button class="ppt-btn sub btn-qpt" data-id="'+s.id+'" data-delta="-1">-1</button>'
+          +'<button class="ppt-btn sub btn-qpt" data-id="'+s.id+'" data-delta="-2">-2</button>'
+          +'<button class="ppt-btn sub btn-qpt" data-id="'+s.id+'" data-delta="-5">-5</button>'
+        +'</div>'
+        +'<div class="sc-sec-lbl" style="margin-top:8px">직접 입력</div>'
+        +'<div class="sc-row">'
+          +'<input class="sc-adj-inp" id="adj-'+s.id+'" type="number" placeholder="+/-숫자">'
+          +'<input class="sc-rsn-inp" id="adjr-'+s.id+'" placeholder="사유">'
+        +'</div>'
+        +'<div class="btn-row" style="margin-top:5px">'
+          +'<button class="btn-sm green btn-adjpt" style="flex:1" data-id="'+s.id+'" data-sign="1">+ 추가</button>'
+          +'<button class="btn-sm red btn-adjpt" style="flex:1" data-id="'+s.id+'" data-sign="-1">- 차감</button>'
+        +'</div>'
+        +'<button class="btn-sm gray btn-hist" style="width:100%;margin-top:6px" data-id="'+s.id+'" data-name="'+escH(s.name)+'">이력 보기</button>'
+      +'</div>'
+    +'</div>'
   }).join('')
-}
-window.closeHistModal=function(){document.getElementById('hist-modal').classList.remove('open')}
 
-/* ── 벌금 목록 ── */
-window.loadFines=async function(filter){
-  const r=await fetch('/api/students');const d=await r.json()
+  /* 카드별 이벤트 직접 바인딩 */
+  g.querySelectorAll('.sc-photo-input').forEach(function(inp,idx){
+    inp.addEventListener('change',function(e){
+      var id=students[idx].id
+      var file=e.target.files[0];if(!file)return
+      var img2=new Image()
+      var url=URL.createObjectURL(file)
+      img2.onload=async function(){
+        var MAX=400,w=img2.width,h=img2.height
+        if(w>MAX||h>MAX){var ratio=MAX/Math.max(w,h);w=Math.round(w*ratio);h=Math.round(h*ratio)}
+        var cv=document.createElement('canvas');cv.width=w;cv.height=h
+        cv.getContext('2d').drawImage(img2,0,0,w,h)
+        var b64=cv.toDataURL('image/jpeg',0.85)
+        URL.revokeObjectURL(url)
+        var res=await fetch('/api/admin/students/'+id+'/photo',{method:'POST',headers:authHdr(),body:JSON.stringify({photoBase64:b64})})
+        if((await res.json()).success){await loadStudentData();toast('사진 등록 완료!')}
+      };img2.src=url
+    })
+  })
+  g.querySelectorAll('.btn-del-stu').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var id=btn.getAttribute('data-id'),name=btn.getAttribute('data-name')
+      if(!confirm(name+' 학생을 삭제할까요?'))return
+      await fetch('/api/admin/students/'+id,{method:'DELETE',headers:authHdr()})
+      await loadStudentData();toast('삭제됨: '+name)
+    })
+  })
+  g.querySelectorAll('.btn-qpt').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var id=btn.getAttribute('data-id'),delta=parseInt(btn.getAttribute('data-delta'))
+      var res=await fetch('/api/admin/students/'+id+'/points',{method:'POST',headers:authHdr(),body:JSON.stringify({delta:delta,reason:'관리자 빠른 조정'})})
+      if((await res.json()).success){await loadStudentData();toast((delta>0?'+':'')+delta+' 포인트')}
+    })
+  })
+  g.querySelectorAll('.btn-adjpt').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var id=btn.getAttribute('data-id'),sign=parseInt(btn.getAttribute('data-sign'))
+      var adjInp=document.getElementById('adj-'+id),rsnInp=document.getElementById('adjr-'+id)
+      var val=parseInt(adjInp.value)||0
+      if(!val){toast('포인트 값을 입력하세요');return}
+      var delta=Math.abs(val)*sign
+      var reason=rsnInp.value.trim()||'관리자 조정'
+      var res=await fetch('/api/admin/students/'+id+'/points',{method:'POST',headers:authHdr(),body:JSON.stringify({delta:delta,reason:reason})})
+      if((await res.json()).success){adjInp.value='';rsnInp.value='';await loadStudentData();toast((delta>0?'+':'')+delta+' 포인트')}
+    })
+  })
+  g.querySelectorAll('.btn-hist').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      var id=btn.getAttribute('data-id'),name=btn.getAttribute('data-name')
+      document.getElementById('histTitle').textContent=name+' 포인트 이력'
+      document.getElementById('histList').innerHTML='<div style="text-align:center;padding:20px">불러오는 중...</div>'
+      document.getElementById('hist-modal').classList.add('open')
+      var res=await fetch('/api/students/'+id);var d=await res.json()
+      if(!d.success){document.getElementById('histList').innerHTML='<div>오류 발생</div>';return}
+      if(!d.history.length){document.getElementById('histList').innerHTML='<div style="text-align:center;padding:20px">이력 없음</div>';return}
+      document.getElementById('histList').innerHTML=d.history.map(function(h){
+        var pos=h.delta>0
+        var cat={learn:'학습',fine:'벌금',shop:'보상',admin:'관리자'}[h.category]||h.category
+        return '<div class="hist-item">'
+          +'<div class="hist-delta '+(pos?'pos':'neg')+'">'+(pos?'+':'')+h.delta+'</div>'
+          +'<div class="hist-info">'
+            +'<div class="hist-reason">'+escH(h.reason)+'</div>'
+            +'<div class="hist-date">'+cat+' - '+new Date(h.created_at).toLocaleString('ko-KR')+'</div>'
+          +'</div></div>'
+      }).join('')
+    })
+  })
+}
+
+async function loadFines(filter){
+  try{
+  var res=await fetch('/api/students');var d=await res.json()
   if(!d.success)return
   allFines=[]
-  for(const s of d.students){
-    if(s.fine_count>0||filter==='paid'||filter==='all'){
-      const sr=await fetch('/api/students/'+s.id);const sd=await sr.json()
-      if(sd.success){sd.fines.forEach(f=>{allFines.push({...f,studentName:s.name})})}
-    }
+  for(var i=0;i<d.students.length;i++){
+    var s=d.students[i]
+    try{var sr=await fetch('/api/students/'+s.id);var sd=await sr.json()
+    if(sd.success){sd.fines.forEach(function(f){allFines.push(Object.assign({},f,{studentName:s.name}))})}}catch(e){}
   }
-  // filter=all 면 위 루프에서 fine_count>0만 가져왔으므로, all이면 전체 재로드
-  if(filter==='all'){
-    allFines=[]
-    for(const s of d.students){
-      const sr=await fetch('/api/students/'+s.id);const sd=await sr.json()
-      if(sd.success){sd.fines.forEach(f=>{allFines.push({...f,studentName:s.name})})}
-    }
-  }
-  let filtered=allFines
-  if(filter==='unpaid') filtered=allFines.filter(f=>!f.paid&&f.paid!==1)
-  if(filter==='paid') filtered=allFines.filter(f=>f.paid===1||f.paid===true)
+  }catch(e){console.warn('벌금 로드 실패:',e);return}
+  var filtered=allFines
+  if(filter==='unpaid') filtered=allFines.filter(function(f){return !f.paid&&f.paid!==1})
+  if(filter==='paid') filtered=allFines.filter(function(f){return f.paid===1||f.paid===true})
   renderFines(filtered)
 }
-
 function renderFines(fines){
-  const el=document.getElementById('fineList')
-  if(fines.length===0){el.innerHTML='<div style="text-align:center;color:var(--g400);padding:30px;font-size:14px;">벌금 내역이 없어요 🎉</div>';return}
-  el.innerHTML=fines.map(f=>{
-    const paid=f.paid===1||f.paid===true
-    return '<div class="fine-item'+(paid?' paid':'')+'">'+
-      '<div class="fine-stu">'+escH(f.studentName)+'</div>'+
-      '<div class="fine-lbl">'+escH(f.label)+'</div>'+
-      '<div class="fine-date">'+new Date(f.created_at).toLocaleDateString('ko-KR')+'</div>'+
-      '<div class="fine-badge '+(paid?'paid':'unpaid')+'">'+(paid?'완납':'미납')+'</div>'+
-      (!paid?'<button class="btn-sm green" onclick="payFine('+f.id+')">납부</button>':'')+
-      '<button class="btn-sm red" onclick="delFine('+f.id+')"><i class="fas fa-trash-can"></i></button>'+
-    '</div>'
+  var el=document.getElementById('fineList')
+  if(!fines.length){el.innerHTML='<div style="text-align:center;color:var(--g400);padding:30px">벌금 내역이 없어요</div>';return}
+  el.innerHTML=fines.map(function(f){
+    var paid=f.paid===1||f.paid===true
+    return '<div class="fine-item'+(paid?' paid':'')+'"><div class="fine-stu">'+escH(f.studentName)+'</div><div class="fine-lbl">'+escH(f.label)+'</div><div class="fine-date">'+new Date(f.created_at).toLocaleDateString('ko-KR')+'</div><div class="fine-badge '+(paid?'paid':'unpaid')+'">'+(paid?'완납':'미납')+'</div>'+(!paid?'<button class="btn-sm green btn-payfine" data-id="'+f.id+'">납부</button>':'')+'<button class="btn-sm red btn-delfine" data-id="'+f.id+'">삭제</button></div>'
   }).join('')
-}
-window.payFine=async function(id){
-  await fetch('/api/admin/fines/'+id+'/pay',{method:'POST',headers:authHdr()})
-  loadFines('all');toast('✅ 벌금 납부 처리 완료')
-}
-window.delFine=async function(id){
-  if(!confirm('이 벌금 항목을 삭제할까요?'))return
-  await fetch('/api/admin/fines/'+id,{method:'DELETE',headers:authHdr()})
-  loadFines('all');toast('🗑️ 삭제 완료')
+  el.querySelectorAll('.btn-payfine').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      await fetch('/api/admin/fines/'+btn.getAttribute('data-id')+'/pay',{method:'POST',headers:authHdr()})
+      loadFines('all');toast('벌금 납부 처리 완료')
+    })
+  })
+  el.querySelectorAll('.btn-delfine').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      if(!confirm('이 벌금 항목을 삭제할까요?'))return
+      await fetch('/api/admin/fines/'+btn.getAttribute('data-id'),{method:'DELETE',headers:authHdr()})
+      loadFines('all');toast('삭제 완료')
+    })
+  })
 }
 
-/* ── 메뉴 설정 ── */
 function loadMenuCfg(){
-  const sv=localStorage.getItem('kiosk_cfg_ver');const lc=localStorage.getItem('kiosk_config')
-  if(lc&&sv==='2025-v3'){try{const p=JSON.parse(lc);if(p.menu)menuCfg=p.menu}catch{}}
+  var sv=localStorage.getItem('kiosk_cfg_ver'),lc=localStorage.getItem('kiosk_config')
+  if(lc&&sv==='2025-v3'){try{var p=JSON.parse(lc);if(p.menu)menuCfg=p.menu}catch(e){}}
   renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop')
 }
 function renderMenuItems(type){
-  const el=document.getElementById(type+'Items')
-  const cols=type==='learn'?'42px 1fr 70px 70px 32px':'42px 1fr 80px 32px'
-  el.innerHTML=menuCfg[type].map((m,i)=>{
-    const costFld=type==='learn'
-      ?'<div><input class="mi-inp" type="number" value="'+(m.reward||0)+'" min="0" onchange="updMenu(\''+type+'\','+i+',\'reward\',+this.value)" style="text-align:right"/><div class="cost-hint">획득P</div></div>'+
-        '<label class="photo-chk" style="justify-content:center"><input type="checkbox" '+(m.requirePhoto?'checked':'')+' onchange="updMenu(\''+type+'\','+i+',\'requirePhoto\',this.checked)"/> 📸</label>'
-      :'<input class="mi-inp" type="number" value="'+(m.cost||0)+'" min="0" onchange="updMenu(\''+type+'\','+i+',\'cost\',+this.value)" style="text-align:right"/>'
-    return '<div class="mi" style="grid-template-columns:'+cols+'">'+
-      '<input class="mi-inp" value="'+escH(m.icon)+'" maxlength="4" onchange="updMenu(\''+type+'\','+i+',\'icon\',this.value)" style="text-align:center"/>'+
-      '<input class="mi-inp" value="'+escH(m.label)+'" maxlength="20" onchange="updMenu(\''+type+'\','+i+',\'label\',this.value)"/>'+
-      costFld+
-      '<button class="btn-del" onclick="delMenuItem(\''+type+'\','+i+')"><i class="fas fa-trash-can"></i></button>'+
-    '</div>'
+  var el=document.getElementById(type+'Items')
+  el.innerHTML=menuCfg[type].map(function(m,i){
+    var costFld
+    if(type==='learn'){
+      costFld='<input class="mi-inp mi-num" type="number" value="'+(m.reward||0)+'" min="0" data-type="'+type+'" data-idx="'+i+'" data-field="reward" style="text-align:right"><label class="photo-chk"><input type="checkbox" class="mi-chk" '+(m.requirePhoto?'checked':'')+' data-type="'+type+'" data-idx="'+i+'" data-field="requirePhoto"> 사진</label>'
+    } else {
+      costFld='<input class="mi-inp mi-num" type="number" value="'+(m.cost||0)+'" min="0" data-type="'+type+'" data-idx="'+i+'" data-field="cost" style="text-align:right">'
+    }
+    var cols=type==='learn'?'40px 1fr 60px 50px 30px':'40px 1fr 70px 30px'
+    return '<div class="mi" style="grid-template-columns:'+cols+'">'
+      +'<input class="mi-inp mi-txt" value="'+escH(m.icon)+'" maxlength="10" data-type="'+type+'" data-idx="'+i+'" data-field="icon" style="text-align:center">'
+      +'<input class="mi-inp mi-txt" value="'+escH(m.label)+'" maxlength="20" data-type="'+type+'" data-idx="'+i+'" data-field="label">'
+      +costFld
+      +'<button class="btn-del btn-delmenu" data-type="'+type+'" data-idx="'+i+'"><i class="fas fa-trash-can"></i></button>'
+    +'</div>'
   }).join('')
+  el.querySelectorAll('.mi-txt,.mi-num').forEach(function(inp){
+    inp.addEventListener('change',function(){
+      var t=inp.getAttribute('data-type'),idx=parseInt(inp.getAttribute('data-idx')),f=inp.getAttribute('data-field')
+      menuCfg[t][idx][f]=inp.type==='number'?+inp.value:inp.value
+    })
+  })
+  el.querySelectorAll('.mi-chk').forEach(function(chk){
+    chk.addEventListener('change',function(){
+      var t=chk.getAttribute('data-type'),idx=parseInt(chk.getAttribute('data-idx')),f=chk.getAttribute('data-field')
+      menuCfg[t][idx][f]=chk.checked
+    })
+  })
+  el.querySelectorAll('.btn-delmenu').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var t=btn.getAttribute('data-type'),idx=parseInt(btn.getAttribute('data-idx'))
+      if(!confirm(menuCfg[t][idx].label+' 삭제?'))return
+      menuCfg[t].splice(idx,1);renderMenuItems(t)
+    })
+  })
 }
-window.updMenu=function(t,i,f,v){menuCfg[t][i][f]=v}
-window.delMenuItem=function(t,i){if(!confirm(menuCfg[t][i].label+' 삭제?'))return;menuCfg[t].splice(i,1);renderMenuItems(t)}
-window.addItem=function(type){
-  const pfx={learn:'nL',fine:'nF',shop:'nS'}[type]
-  const ic=(document.getElementById(pfx+'Ic')?.value||'').trim()||(type==='learn'?'📋':type==='fine'?'⚠️':'🎁')
-  const lbl=document.getElementById(pfx+'Lbl')?.value.trim()
-  if(!lbl){toast('항목 이름을 입력하세요');return}
-  const cost=parseInt(document.getElementById(type==='learn'?'nLRew':type==='fine'?'nFCost':'nSCost')?.value||'0')||0
-  const id=type+'_'+Date.now()
-  if(type==='learn'){
-    const photo=document.getElementById('nLPhoto')?.checked||false
-    menuCfg.learn.push({id,icon:ic,label:lbl,cost:0,reward:cost,requirePhoto:photo})
-  } else menuCfg[type].push({id,icon:ic,label:lbl,cost,reward:0,requirePhoto:false})
-  ;['nLIc','nLLbl','nLRew','nFIc','nFLbl','nFCost','nSIc','nSLbl','nSCost'].forEach(x=>{const el=document.getElementById(x);if(el)el.value=''})
-  renderMenuItems(type);toast('✅ 추가: '+lbl)
-}
-window.saveMenu=function(){
-  const sv=localStorage.getItem('kiosk_cfg_ver');const lc=localStorage.getItem('kiosk_config')
-  let cfg={currency:curCfg,menu:menuCfg}
-  if(lc&&sv==='2025-v3'){try{const p=JSON.parse(lc);cfg={...p,menu:menuCfg}}catch{}}
-  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
-  toast('✅ 메뉴 저장 완료! 키오스크에 반영됩니다')
-}
-window.resetMenu=function(){if(!confirm('기본값으로 초기화할까요?'))return;menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU));renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop');toast('기본값으로 초기화됨')}
 
-/* ── 화폐 ── */
 function loadCurrencyCfg(){
-  const lc=localStorage.getItem('kiosk_config');if(lc){try{const p=JSON.parse(lc);if(p.currency)curCfg=p.currency}catch{}}
+  var lc=localStorage.getItem('kiosk_config')
+  if(lc){try{var p=JSON.parse(lc);if(p.currency)curCfg=p.currency}catch(e){}}
 }
 function renderPresets(){
-  const g=document.getElementById('presets')
-  g.innerHTML=PRESETS.map((p,i)=>{
-    const s=curCfg.unit===p.unit&&curCfg.symbol===p.symbol
-    return '<div class="preset-btn'+(s?' sel':'')+'" onclick="selPreset('+i+')"><span class="preset-emoji">'+p.symbol+'</span>'+p.unit+'</div>'
+  var g=document.getElementById('presets')
+  g.innerHTML=PRESETS.map(function(p,i){
+    var sel=curCfg.unit===p.unit&&curCfg.symbol===p.symbol
+    return '<div class="preset-btn'+(sel?' sel':'')+'" data-pidx="'+i+'">'+p.symbol+' '+p.unit+'</div>'
   }).join('')
+  g.querySelectorAll('.preset-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var i=parseInt(btn.getAttribute('data-pidx'))
+      curCfg=Object.assign({},PRESETS[i]);renderPresets();renderCurInputs();toast('화폐: '+PRESETS[i].unit)
+    })
+  })
 }
 function renderCurInputs(){
   document.getElementById('curUnit').value=curCfg.unit||'포인트'
-  document.getElementById('curSymbol').value=curCfg.symbol||'🏅'
+  document.getElementById('curSymbol').value=curCfg.symbol||'P'
   document.getElementById('curDesc').value=curCfg.desc||''
   updateCurPreview()
 }
-window.selPreset=function(i){curCfg=Object.assign({},PRESETS[i]);renderPresets();renderCurInputs();toast('화폐: '+PRESETS[i].symbol+' '+PRESETS[i].unit)}
-window.updateCurPreview=function(){
-  const sym=document.getElementById('curSymbol')?.value||'🏅'
-  const unit=document.getElementById('curUnit')?.value||'포인트'
+function updateCurPreview(){
+  var sym=document.getElementById('curSymbol').value||'P'
+  var unit=document.getElementById('curUnit').value||'포인트'
   document.getElementById('pvSym').textContent=sym
   document.getElementById('pvTitle').textContent=unit+' ('+sym+')'
-  document.getElementById('pvSub').textContent=document.getElementById('curDesc')?.value||''
-}
-window.saveCurrency=function(){
-  curCfg.unit=document.getElementById('curUnit').value.trim()||'포인트'
-  curCfg.symbol=document.getElementById('curSymbol').value.trim()||'🏅'
-  curCfg.desc=document.getElementById('curDesc').value.trim()
-  const lc=localStorage.getItem('kiosk_config');let cfg={currency:curCfg,menu:menuCfg}
-  if(lc){try{const p=JSON.parse(lc);cfg={...p,currency:curCfg}}catch{}}
-  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
-  renderPresets();toast('✅ 화폐 설정 저장 완료!')
+  document.getElementById('pvSub').textContent=document.getElementById('curDesc').value||''
 }
 
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
-})()
+/* 버튼 이벤트 직접 바인딩 */
+document.getElementById('eyeBtn').addEventListener('click',function(){
+  var inp=document.getElementById('pwInp'),ic=document.getElementById('eyeIc')
+  if(inp.type==='password'){inp.type='text';ic.className='fas fa-eye-slash'}
+  else{inp.type='password';ic.className='fas fa-eye'}
+})
+document.getElementById('loginBtn').addEventListener('click',doLogin)
+document.getElementById('pwInp').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()})
+document.getElementById('logoutBtn').addEventListener('click',doLogout)
+document.getElementById('kioskBtn').addEventListener('click',function(){window.location.href='/'})
+document.getElementById('newStuInp').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('addStuBtn').click()})
+document.getElementById('addStuBtn').addEventListener('click',async function(){
+  var inp=document.getElementById('newStuInp'),name=inp.value.trim()
+  if(!name){toast('이름을 입력하세요');return}
+  var res=await fetch('/api/admin/students',{method:'POST',headers:authHdr(),body:JSON.stringify({name:name})})
+  var d=await res.json()
+  if(d.success){inp.value='';await loadStudentData();toast('학생 추가: '+name)}
+  else toast('오류: '+(d.error||'실패'))
+})
+document.querySelectorAll('.nav-tab').forEach(function(btn){
+  btn.addEventListener('click',function(){showTab(btn.getAttribute('data-tab'))})
+})
+document.querySelectorAll('.btn-filter-fine').forEach(function(btn){
+  btn.addEventListener('click',function(){loadFines(btn.getAttribute('data-filter'))})
+})
+document.getElementById('savemenuBtn').addEventListener('click',function(){
+  var lc=localStorage.getItem('kiosk_config'),cfg={currency:curCfg,menu:menuCfg}
+  if(lc){try{cfg=Object.assign({},JSON.parse(lc),{menu:menuCfg})}catch(e){}}
+  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
+  toast('메뉴 저장 완료!')
+})
+document.getElementById('resetmenuBtn').addEventListener('click',function(){
+  if(!confirm('기본값으로 초기화할까요?'))return
+  menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))
+  renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop');toast('초기화됨')
+})
+document.getElementById('addLearnBtn').addEventListener('click',function(){addMenuItem('learn')})
+document.getElementById('addFineBtn').addEventListener('click',function(){addMenuItem('fine')})
+document.getElementById('addShopBtn').addEventListener('click',function(){addMenuItem('shop')})
+function addMenuItem(type){
+  var pfx={learn:'nL',fine:'nF',shop:'nS'}[type]
+  var ic=(document.getElementById(pfx+'Ic').value||'').trim()||'[항목]'
+  var lbl=document.getElementById(pfx+'Lbl').value.trim()
+  if(!lbl){toast('항목 이름을 입력하세요');return}
+  var costEl=document.getElementById(type==='learn'?'nLRew':type==='fine'?'nFCost':'nSCost')
+  var cost=parseInt(costEl.value||'0')||0
+  var newId=type+'_'+Date.now()
+  if(type==='learn'){
+    var photo=document.getElementById('nLPhoto').checked||false
+    menuCfg.learn.push({id:newId,icon:ic,label:lbl,cost:0,reward:cost,requirePhoto:photo})
+  } else {
+    menuCfg[type].push({id:newId,icon:ic,label:lbl,cost:cost,reward:0,requirePhoto:false})
+  }
+  document.getElementById(pfx+'Ic').value=''
+  document.getElementById(pfx+'Lbl').value=''
+  costEl.value=''
+  renderMenuItems(type);toast('추가: '+lbl)
+}
+document.getElementById('savecurBtn').addEventListener('click',function(){
+  curCfg.unit=document.getElementById('curUnit').value.trim()||'포인트'
+  curCfg.symbol=document.getElementById('curSymbol').value.trim()||'P'
+  curCfg.desc=document.getElementById('curDesc').value.trim()
+  var lc=localStorage.getItem('kiosk_config'),cfg={currency:curCfg,menu:menuCfg}
+  if(lc){try{cfg=Object.assign({},JSON.parse(lc),{currency:curCfg})}catch(e){}}
+  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
+  renderPresets();toast('화폐 설정 저장 완료!')
+})
+document.getElementById('curUnit').addEventListener('input',updateCurPreview)
+document.getElementById('curSymbol').addEventListener('input',updateCurPreview)
+document.getElementById('closeHistBtn').addEventListener('click',function(){document.getElementById('hist-modal').classList.remove('open')})
 </script>
 </body>
 </html>`
