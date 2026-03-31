@@ -13,1014 +13,1124 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/static/*', serveStatic({ root: './' }))
 app.use('/api/*', cors())
 
-// ─── API: 폼 제출 처리 ───────────────────────────────────────────────────────
+// ─── API: 제출 처리 ────────────────────────────────────────────────────────────
 app.post('/api/submit', async (c) => {
   try {
     const body = await c.req.json()
-    const { name, phone, course, level, message, timestamp } = body
+    const { name, item, price, timestamp } = body
 
-    // 필수 필드 검증
-    if (!name || !phone || !course) {
-      return c.json({ success: false, error: '이름, 연락처, 수강 과목은 필수입니다.' }, 400)
+    if (!name || !item) {
+      return c.json({ success: false, error: '이름과 항목은 필수입니다.' }, 400)
     }
 
     const results = await Promise.allSettled([
-      sendSlackNotification(c.env, { name, phone, course, level, message, timestamp }),
-      saveToNotion(c.env, { name, phone, course, level, message, timestamp }),
+      sendSlackNotification(c.env, { name, item, price, timestamp }),
+      saveToNotion(c.env, { name, item, price, timestamp }),
     ])
 
-    const slackResult = results[0]
-    const notionResult = results[1]
+    const slackOk  = results[0].status === 'fulfilled' && results[0].value
+    const notionOk = results[1].status === 'fulfilled' && results[1].value
 
-    const slackOk = slackResult.status === 'fulfilled' && slackResult.value
-    const notionOk = notionResult.status === 'fulfilled' && notionResult.value
-
-    return c.json({
-      success: true,
-      slack: slackOk,
-      notion: notionOk,
-      slackError: slackResult.status === 'rejected' ? slackResult.reason?.message : null,
-      notionError: notionResult.status === 'rejected' ? notionResult.reason?.message : null,
-    })
+    return c.json({ success: true, slack: slackOk, notion: notionOk })
   } catch (err: any) {
     console.error('Submit error:', err)
     return c.json({ success: false, error: err.message }, 500)
   }
 })
 
-// ─── Slack 알림 전송 ──────────────────────────────────────────────────────────
+// ─── Slack 알림 ────────────────────────────────────────────────────────────────
 async function sendSlackNotification(
   env: Bindings,
-  data: { name: string; phone: string; course: string; level: string; message: string; timestamp: string }
+  data: { name: string; item: string; price: number; timestamp: string }
 ): Promise<boolean> {
-  if (!env.SLACK_WEBHOOK_URL) {
-    console.warn('SLACK_WEBHOOK_URL not configured')
-    return false
-  }
+  if (!env.SLACK_WEBHOOK_URL) { console.warn('SLACK_WEBHOOK_URL not set'); return false }
 
-  const levelLabel: Record<string, string> = {
-    beginner: '🟢 입문',
-    intermediate: '🟡 중급',
-    advanced: '🔴 고급',
-  }
+  const isFine = data.price > 0
+  const emoji  = isFine ? '🚨' : '✅'
+  const color  = isFine ? '#ef4444' : '#22c55e'
+  const header = isFine
+    ? `${emoji} 벌금 항목이 기록되었습니다`
+    : `${emoji} 학습 활동이 기록되었습니다`
 
-  const courseLabel: Record<string, string> = {
-    coding: '💻 코딩/프로그래밍',
-    math: '📐 수학/과학',
-    english: '🔤 영어/어학',
-    art: '🎨 예술/디자인',
-    business: '📊 비즈니스/경영',
-    other: '📚 기타',
-  }
-
-  const slackPayload = {
+  const payload = {
     blocks: [
       {
         type: 'header',
-        text: {
-          type: 'plain_text',
-          text: '🎓 새로운 학습 신청이 접수되었습니다!',
-          emoji: true,
-        },
+        text: { type: 'plain_text', text: `바꿈수학 키오스크 알림`, emoji: true },
       },
       {
         type: 'section',
-        fields: [
-          { type: 'mrkdwn', text: `*👤 이름*\n${data.name}` },
-          { type: 'mrkdwn', text: `*📞 연락처*\n${data.phone}` },
-          { type: 'mrkdwn', text: `*📚 수강 과목*\n${courseLabel[data.course] || data.course}` },
-          { type: 'mrkdwn', text: `*📊 학습 수준*\n${levelLabel[data.level] || data.level || '미선택'}` },
-        ],
+        text: {
+          type: 'mrkdwn',
+          text: `${header}\n\n*👤 학생 이름:* ${data.name}\n*📋 항목:* ${data.item}\n*💰 금액:* ${data.price > 0 ? `₩${data.price.toLocaleString()}` : '무료'}`,
+        },
+        accessory: {
+          type: 'image',
+          image_url: isFine
+            ? 'https://em-content.zobj.net/source/microsoft/319/warning_26a0-fe0f.png'
+            : 'https://em-content.zobj.net/source/microsoft/319/check-mark-button_2705.png',
+          alt_text: 'status',
+        },
       },
-      ...(data.message
-        ? [
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: `*💬 추가 메시지*\n${data.message}`,
-              },
-            },
-          ]
-        : []),
       {
         type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: `⏰ 접수 시각: ${data.timestamp || new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
-          },
-        ],
+        elements: [{ type: 'mrkdwn', text: `⏰ ${data.timestamp}` }],
       },
-      {
-        type: 'divider',
-      },
+      { type: 'divider' },
     ],
   }
 
-  const response = await fetch(env.SLACK_WEBHOOK_URL, {
+  const res = await fetch(env.SLACK_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(slackPayload),
+    body: JSON.stringify(payload),
   })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Slack API error: ${response.status} - ${text}`)
-  }
+  if (!res.ok) { const t = await res.text(); throw new Error(`Slack: ${res.status} ${t}`) }
   return true
 }
 
-// ─── Notion DB 저장 ───────────────────────────────────────────────────────────
+// ─── Notion 저장 ───────────────────────────────────────────────────────────────
 async function saveToNotion(
   env: Bindings,
-  data: { name: string; phone: string; course: string; level: string; message: string; timestamp: string }
+  data: { name: string; item: string; price: number; timestamp: string }
 ): Promise<boolean> {
   if (!env.NOTION_API_KEY || !env.NOTION_DATABASE_ID) {
-    console.warn('Notion credentials not configured')
-    return false
+    console.warn('Notion credentials not set'); return false
   }
 
-  const courseLabel: Record<string, string> = {
-    coding: '코딩/프로그래밍',
-    math: '수학/과학',
-    english: '영어/어학',
-    art: '예술/디자인',
-    business: '비즈니스/경영',
-    other: '기타',
-  }
+  const isFine  = data.price > 0
+  const category = isFine ? '벌금' : '학습 활동'
 
-  const levelLabel: Record<string, string> = {
-    beginner: '입문',
-    intermediate: '중급',
-    advanced: '고급',
-  }
-
-  const notionPayload = {
+  const payload = {
     parent: { database_id: env.NOTION_DATABASE_ID },
     properties: {
-      이름: {
-        title: [{ text: { content: data.name } }],
-      },
-      연락처: {
-        rich_text: [{ text: { content: data.phone } }],
-      },
-      '수강 과목': {
-        select: { name: courseLabel[data.course] || data.course },
-      },
-      '학습 수준': {
-        select: { name: levelLabel[data.level] || data.level || '미선택' },
-      },
-      '추가 메시지': {
-        rich_text: [{ text: { content: data.message || '' } }],
-      },
-      '접수 일시': {
-        date: { start: new Date().toISOString() },
-      },
-      상태: {
-        select: { name: '신청 완료' },
-      },
+      '학생 이름': { title: [{ text: { content: data.name } }] },
+      '항목':     { rich_text: [{ text: { content: data.item } }] },
+      '금액':     { number: data.price },
+      '구분':     { select: { name: category } },
+      '접수 일시': { date: { start: new Date().toISOString() } },
+      '상태':     { select: { name: '접수 완료' } },
     },
   }
 
-  const response = await fetch('https://api.notion.com/v1/pages', {
+  const res = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${env.NOTION_API_KEY}`,
       'Content-Type': 'application/json',
       'Notion-Version': '2022-06-28',
     },
-    body: JSON.stringify(notionPayload),
+    body: JSON.stringify(payload),
   })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Notion API error: ${response.status} - ${text}`)
-  }
+  if (!res.ok) { const t = await res.text(); throw new Error(`Notion: ${res.status} ${t}`) }
   return true
 }
 
 // ─── 헬스 체크 ────────────────────────────────────────────────────────────────
-app.get('/api/health', (c) => {
-  return c.json({
-    status: 'ok',
-    slack: !!c.env.SLACK_WEBHOOK_URL,
-    notion: !!(c.env.NOTION_API_KEY && c.env.NOTION_DATABASE_ID),
-    timestamp: new Date().toISOString(),
-  })
-})
+app.get('/api/health', (c) => c.json({
+  status: 'ok',
+  slack:  !!c.env.SLACK_WEBHOOK_URL,
+  notion: !!(c.env.NOTION_API_KEY && c.env.NOTION_DATABASE_ID),
+  timestamp: new Date().toISOString(),
+}))
 
-// ─── 메인 HTML 페이지 ──────────────────────────────────────────────────────────
+// ─── 메인 HTML ────────────────────────────────────────────────────────────────
 app.get('/', (c) => {
   const html = `<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>학습 키오스크</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>바꿈수학 키오스크</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>"/>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap" rel="stylesheet"/>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
-
-    * { font-family: 'Noto Sans KR', sans-serif; }
-
-    body {
-      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
-      min-height: 100vh;
+    :root {
+      --bg:        #0d0d14;
+      --surface:   #16161f;
+      --surface2:  #1e1e2a;
+      --border:    rgba(255,255,255,0.08);
+      --accent:    #7c6af7;
+      --accent2:   #a78bfa;
+      --green:     #34d399;
+      --red:       #f87171;
+      --yellow:    #fbbf24;
+      --text:      #f0f0f5;
+      --text-sub:  rgba(240,240,245,0.5);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
     }
 
-    .kiosk-card {
-      background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 24px;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    .step-dot {
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.2);
-      transition: all 0.4s ease;
-    }
-    .step-dot.active {
-      background: #6366f1;
-      box-shadow: 0 0 12px #6366f1;
-      transform: scale(1.3);
-    }
-    .step-dot.done {
-      background: #22c55e;
-      box-shadow: 0 0 10px #22c55e;
-    }
-
-    .course-btn {
-      background: rgba(255,255,255,0.07);
-      border: 2px solid rgba(255,255,255,0.15);
-      border-radius: 20px;
-      padding: 28px 20px;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-    }
-    .course-btn:hover {
-      background: rgba(99,102,241,0.25);
-      border-color: #6366f1;
-      transform: translateY(-4px);
-      box-shadow: 0 12px 30px rgba(99,102,241,0.3);
-    }
-    .course-btn.selected {
-      background: rgba(99,102,241,0.35);
-      border-color: #818cf8;
-      box-shadow: 0 0 0 3px rgba(99,102,241,0.3), 0 12px 30px rgba(99,102,241,0.4);
-      transform: translateY(-4px);
-    }
-
-    .level-btn {
-      background: rgba(255,255,255,0.07);
-      border: 2px solid rgba(255,255,255,0.15);
-      border-radius: 16px;
-      padding: 24px 16px;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-    }
-    .level-btn:hover { transform: translateY(-4px); }
-    .level-btn.beginner.selected {
-      background: rgba(34,197,94,0.25);
-      border-color: #22c55e;
-      box-shadow: 0 0 0 3px rgba(34,197,94,0.3);
-      transform: translateY(-4px);
-    }
-    .level-btn.intermediate.selected {
-      background: rgba(234,179,8,0.25);
-      border-color: #eab308;
-      box-shadow: 0 0 0 3px rgba(234,179,8,0.3);
-      transform: translateY(-4px);
-    }
-    .level-btn.advanced.selected {
-      background: rgba(239,68,68,0.25);
-      border-color: #ef4444;
-      box-shadow: 0 0 0 3px rgba(239,68,68,0.3);
-      transform: translateY(-4px);
-    }
-
-    .kiosk-input {
-      background: rgba(255,255,255,0.07);
-      border: 2px solid rgba(255,255,255,0.15);
-      border-radius: 14px;
-      color: white;
-      font-size: 20px;
-      padding: 18px 20px;
-      width: 100%;
-      transition: all 0.25s ease;
-      outline: none;
-    }
-    .kiosk-input:focus {
-      border-color: #6366f1;
-      background: rgba(99,102,241,0.1);
-      box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
-    }
-    .kiosk-input::placeholder { color: rgba(255,255,255,0.3); }
-
-    .kiosk-input-phone {
-      background: rgba(255,255,255,0.07);
-      border: 2px solid rgba(255,255,255,0.15);
-      border-radius: 14px;
-      color: white;
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: 4px;
-      padding: 20px 24px;
-      width: 100%;
-      transition: all 0.25s ease;
-      outline: none;
-      text-align: center;
-    }
-    .kiosk-input-phone:focus {
-      border-color: #6366f1;
-      background: rgba(99,102,241,0.1);
-      box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
-    }
-    .kiosk-input-phone::placeholder { color: rgba(255,255,255,0.3); font-size: 18px; letter-spacing: 1px; }
-
-    .numpad-btn {
-      background: rgba(255,255,255,0.08);
-      border: 2px solid rgba(255,255,255,0.12);
-      border-radius: 14px;
-      color: white;
-      font-size: 28px;
-      font-weight: 700;
-      padding: 20px;
-      cursor: pointer;
-      transition: all 0.15s ease;
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      overflow: hidden;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
-    .numpad-btn:hover {
-      background: rgba(99,102,241,0.3);
-      border-color: #6366f1;
-      transform: scale(1.05);
+
+    /* ── 공통 레이아웃 ── */
+    .screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
     }
-    .numpad-btn:active { transform: scale(0.95); }
-    .numpad-btn.del {
-      background: rgba(239,68,68,0.15);
-      border-color: rgba(239,68,68,0.3);
+    .screen.active { opacity: 1; pointer-events: all; }
+
+    /* ── 배경 그래디언트 파티클 ── */
+    .bg-glow {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 15%, rgba(124,106,247,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 35% at 80% 80%, rgba(167,139,250,0.08) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(52,211,153,0.04) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* ── 상단 헤더 바 ── */
+    .top-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      height: 72px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 36px;
+      background: rgba(13,13,20,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .top-bar .logo {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .top-bar .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
       font-size: 20px;
     }
-    .numpad-btn.del:hover { background: rgba(239,68,68,0.3); border-color: #ef4444; }
-    .numpad-btn.clear {
-      background: rgba(234,179,8,0.15);
-      border-color: rgba(234,179,8,0.3);
-      font-size: 16px;
+    .top-bar .logo-text {
+      font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+      background: linear-gradient(90deg, var(--text), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .numpad-btn.clear:hover { background: rgba(234,179,8,0.3); border-color: #eab308; }
+    .top-bar .logo-sub { font-size: 13px; color: var(--text-sub); margin-top: 1px; }
+    .top-bar .clock {
+      font-size: 18px; font-weight: 600; color: var(--text-sub);
+      font-variant-numeric: tabular-nums;
+    }
 
-    .btn-primary {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border-radius: 16px;
-      color: white;
-      font-size: 22px;
-      font-weight: 700;
-      padding: 22px 40px;
+    /* ── [화면 0] 스플래시 ── */
+    #splash { cursor: pointer; z-index: 5; }
+    .splash-inner {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 32px; text-align: center;
+    }
+    .splash-ring {
+      width: 160px; height: 160px; border-radius: 50%;
+      background: linear-gradient(135deg, rgba(124,106,247,0.2), rgba(167,139,250,0.1));
+      border: 2px solid rgba(124,106,247,0.4);
+      display: flex; align-items: center; justify-content: center;
+      animation: breathe 3s ease-in-out infinite;
+      box-shadow: 0 0 60px rgba(124,106,247,0.2);
+    }
+    .splash-ring i { font-size: 60px; color: var(--accent2); }
+    @keyframes breathe {
+      0%,100% { transform: scale(1);   box-shadow: 0 0 60px rgba(124,106,247,0.2); }
+      50%      { transform: scale(1.06); box-shadow: 0 0 80px rgba(124,106,247,0.35); }
+    }
+    .splash-title {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 900; line-height: 1.15; letter-spacing: -1px;
+    }
+    .splash-title span {
+      background: linear-gradient(135deg, var(--accent2), #c4b5fd, var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .splash-sub { font-size: 18px; color: var(--text-sub); }
+    .tap-hint {
+      display: flex; align-items: center; gap-x: 10px;
+      padding: 14px 36px;
+      border: 1.5px solid rgba(124,106,247,0.4);
+      border-radius: 100px;
+      font-size: 17px; font-weight: 500; color: var(--accent2);
+      animation: pulse-border 2s ease-in-out infinite;
+      margin-top: 8px;
+    }
+    .tap-hint i { animation: tap-anim 2s ease-in-out infinite; margin-right: 10px; }
+    @keyframes pulse-border {
+      0%,100% { border-color: rgba(124,106,247,0.4); box-shadow: none; }
+      50%      { border-color: rgba(124,106,247,0.8); box-shadow: 0 0 20px rgba(124,106,247,0.2); }
+    }
+    @keyframes tap-anim {
+      0%,100% { transform: scale(1); }
+      40%      { transform: scale(1.25); }
+      60%      { transform: scale(0.9); }
+    }
+
+    /* ── [화면 1] 이름 입력 ── */
+    #name-screen { z-index: 5; }
+    .name-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 48px 52px;
+      width: min(580px, 92vw);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    }
+    .screen-title {
+      font-size: 30px; font-weight: 800; letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .screen-sub { font-size: 16px; color: var(--text-sub); margin-bottom: 36px; }
+
+    .kiosk-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 26px; font-weight: 700;
+      padding: 22px 24px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      caret-color: var(--accent2);
+    }
+    .kiosk-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(124,106,247,0.15);
+    }
+    .kiosk-input::placeholder { color: rgba(255,255,255,0.2); font-size: 18px; font-weight: 400; }
+
+    /* 키보드 그리드 */
+    .kbd-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 24px;
+    }
+    .kbd-row-3 { grid-template-columns: repeat(3, 1fr); }
+
+    .kbd-btn {
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 20px; font-weight: 700;
+      padding: 18px 10px;
       cursor: pointer;
-      transition: all 0.25s ease;
-      border: none;
-      box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+      transition: all 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
     }
-    .btn-primary:hover:not(:disabled) {
-      transform: translateY(-3px);
-      box-shadow: 0 14px 32px rgba(99,102,241,0.5);
-    }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .kbd-btn:hover  { background: rgba(124,106,247,0.15); border-color: var(--accent); }
+    .kbd-btn:active { transform: scale(0.93); }
+    .kbd-btn.wide  { grid-column: span 2; }
+    .kbd-btn.del   { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.25); font-size: 16px; }
+    .kbd-btn.del:hover { background: rgba(248,113,113,0.25); }
+    .kbd-btn.space { grid-column: span 2; font-size: 14px; color: var(--text-sub); }
 
-    .btn-secondary {
-      background: rgba(255,255,255,0.08);
-      border: 2px solid rgba(255,255,255,0.2);
-      border-radius: 16px;
-      color: rgba(255,255,255,0.7);
-      font-size: 20px;
-      font-weight: 600;
-      padding: 20px 36px;
+    .btn-next {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: var(--radius-lg);
+      color: white; font-family: inherit;
+      font-size: 20px; font-weight: 700;
+      padding: 22px;
       cursor: pointer;
-      transition: all 0.25s ease;
+      margin-top: 20px;
+      transition: all 0.2s ease;
+      box-shadow: 0 8px 30px rgba(124,106,247,0.35);
     }
-    .btn-secondary:hover {
-      background: rgba(255,255,255,0.15);
-      color: white;
+    .btn-next:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(124,106,247,0.5); }
+    .btn-next:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-next:active:not(:disabled) { transform: translateY(0); }
+
+    /* ── [화면 2] 메뉴 선택 ── */
+    #menu-screen { padding-top: 72px; align-items: stretch; justify-content: flex-start; z-index: 5; overflow-y: auto; }
+    .menu-wrap {
+      width: 100%; max-width: 980px;
+      padding: 32px 28px 40px;
+      margin: 0 auto;
+    }
+    .menu-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .menu-greeting { font-size: 26px; font-weight: 800; }
+    .menu-greeting span { color: var(--accent2); }
+    .btn-back {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      color: var(--text-sub);
+      font-family: inherit;
+      font-size: 14px; font-weight: 600;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-back:hover { border-color: var(--accent); color: var(--accent2); }
+
+    .section-label {
+      font-size: 12px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text-sub);
+      margin-bottom: 14px; padding-left: 4px;
     }
 
-    .slide-in { animation: slideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(30px) scale(0.96); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
+    /* 메뉴 그리드 */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 18px;
     }
 
-    .pulse-ring {
-      animation: pulseRing 2s infinite;
+    .menu-btn {
+      position: relative;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 28px 20px 24px;
+      cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 14px;
+      transition: all 0.22s ease;
+      text-align: center;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
     }
-    @keyframes pulseRing {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.5); }
-      50% { box-shadow: 0 0 0 18px rgba(99,102,241,0); }
+    .menu-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.03));
+      pointer-events: none;
+    }
+    .menu-btn:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    }
+    .menu-btn:active { transform: translateY(-1px) scale(0.98); }
+
+    /* 학습 활동 - 퍼플/그린 계열 */
+    .menu-btn.type-learn {
+      border-color: rgba(124,106,247,0.25);
+      background: linear-gradient(160deg, #16161f, #1a1825);
+    }
+    .menu-btn.type-learn:hover {
+      border-color: rgba(124,106,247,0.6);
+      background: linear-gradient(160deg, #1c1b2e, #201d32);
+      box-shadow: 0 16px 48px rgba(124,106,247,0.15);
+    }
+    /* 벌금 항목 - 레드/오렌지 계열 */
+    .menu-btn.type-fine {
+      border-color: rgba(248,113,113,0.2);
+      background: linear-gradient(160deg, #1c1616, #1f1718);
+    }
+    .menu-btn.type-fine:hover {
+      border-color: rgba(248,113,113,0.55);
+      background: linear-gradient(160deg, #221b1b, #251c1c);
+      box-shadow: 0 16px 48px rgba(248,113,113,0.12);
     }
 
-    .success-animation {
-      animation: successPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+    .menu-icon-wrap {
+      width: 68px; height: 68px; border-radius: 22px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px;
+      flex-shrink: 0;
     }
-    @keyframes successPop {
-      from { opacity: 0; transform: scale(0.5); }
-      to   { opacity: 1; transform: scale(1); }
+    .type-learn .menu-icon-wrap {
+      background: rgba(124,106,247,0.15);
+      border: 1.5px solid rgba(124,106,247,0.3);
+    }
+    .type-fine .menu-icon-wrap {
+      background: rgba(248,113,113,0.12);
+      border: 1.5px solid rgba(248,113,113,0.25);
     }
 
-    .loading-spinner {
-      border: 4px solid rgba(255,255,255,0.2);
-      border-top: 4px solid white;
+    .menu-label {
+      font-size: 17px; font-weight: 800; line-height: 1.3;
+      letter-spacing: -0.3px;
+    }
+    .menu-price {
+      font-size: 15px; font-weight: 700;
+      padding: 5px 14px;
+      border-radius: 100px;
+    }
+    .type-learn .menu-price {
+      background: rgba(52,211,153,0.12);
+      color: var(--green);
+      border: 1px solid rgba(52,211,153,0.2);
+    }
+    .type-fine .menu-price {
+      background: rgba(248,113,113,0.12);
+      color: var(--red);
+      border: 1px solid rgba(248,113,113,0.2);
+    }
+
+    /* ── [화면 3] 확인/완료 ── */
+    #confirm-screen { z-index: 5; }
+    .confirm-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 44px 48px;
+      width: min(520px, 92vw);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+    .confirm-icon {
+      width: 96px; height: 96px; border-radius: 32px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 44px;
+      margin: 0 auto 24px;
+    }
+    .confirm-icon.fine-icon {
+      background: rgba(248,113,113,0.12);
+      border: 2px solid rgba(248,113,113,0.3);
+    }
+    .confirm-icon.learn-icon {
+      background: rgba(52,211,153,0.12);
+      border: 2px solid rgba(52,211,153,0.3);
+    }
+    .confirm-item-name {
+      font-size: 26px; font-weight: 900; margin-bottom: 8px;
+    }
+    .confirm-price-tag {
+      display: inline-flex; align-items: center;
+      font-size: 22px; font-weight: 800;
+      padding: 10px 24px; border-radius: 100px;
+      margin-bottom: 28px;
+    }
+    .confirm-price-tag.free  { background: rgba(52,211,153,0.12); color: var(--green); border: 1.5px solid rgba(52,211,153,0.25); }
+    .confirm-price-tag.paid  { background: rgba(248,113,113,0.12); color: var(--red);   border: 1.5px solid rgba(248,113,113,0.25); }
+
+    .confirm-detail {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 28px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .confirm-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .confirm-row-label { font-size: 14px; color: var(--text-sub); display: flex; align-items: center; gap: 8px; }
+    .confirm-row-value { font-size: 16px; font-weight: 700; }
+
+    .confirm-btns { display: flex; gap: 12px; }
+    .btn-cancel {
+      flex: 1; background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      color: var(--text-sub); font-family: inherit;
+      font-size: 17px; font-weight: 600;
+      padding: 18px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-cancel:hover { border-color: var(--red); color: var(--red); }
+    .btn-submit {
+      flex: 2; background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: var(--radius-lg);
+      color: white; font-family: inherit;
+      font-size: 17px; font-weight: 700;
+      padding: 18px;
+      cursor: pointer; transition: all 0.2s;
+      box-shadow: 0 8px 24px rgba(124,106,247,0.35);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(124,106,247,0.5); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
       border-radius: 50%;
-      width: 32px; height: 32px;
-      animation: spin 0.8s linear infinite;
+      animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .tag-badge {
-      background: rgba(99,102,241,0.2);
-      border: 1px solid rgba(99,102,241,0.4);
-      border-radius: 9999px;
-      padding: 6px 16px;
-      font-size: 14px;
-      color: #a5b4fc;
+    /* ── [화면 4] 완료 ── */
+    #done-screen { z-index: 5; }
+    .done-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 52px 48px;
+      width: min(500px, 92vw);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+    .done-icon {
+      width: 110px; height: 110px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 28px;
+      animation: pop-in 0.6s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .done-icon.success {
+      background: radial-gradient(circle, rgba(52,211,153,0.25), rgba(52,211,153,0.05));
+      border: 2.5px solid rgba(52,211,153,0.5);
+      font-size: 50px;
+      box-shadow: 0 0 50px rgba(52,211,153,0.2);
+    }
+    @keyframes pop-in {
+      from { transform: scale(0.3); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .done-title { font-size: 34px; font-weight: 900; margin-bottom: 10px; }
+    .done-sub   { font-size: 17px; color: var(--text-sub); line-height: 1.6; margin-bottom: 32px; }
+
+    .status-chips {
+      display: flex; gap: 10px; justify-content: center;
+      margin-bottom: 32px; flex-wrap: wrap;
+    }
+    .chip {
+      display: flex; align-items: center; gap: 7px;
+      padding: 10px 18px; border-radius: 100px;
+      font-size: 14px; font-weight: 600;
+    }
+    .chip.ok   { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.25); }
+    .chip.fail { background: rgba(248,113,113,0.1); color: var(--red);   border: 1px solid rgba(248,113,113,0.25); }
+    .chip.skip { background: rgba(255,255,255,0.05); color: var(--text-sub); border: 1px solid var(--border); }
+
+    .btn-home {
+      width: 100%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      color: var(--text); font-family: inherit;
+      font-size: 18px; font-weight: 700;
+      padding: 20px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-home:hover { border-color: var(--accent); color: var(--accent2); background: rgba(124,106,247,0.08); }
+
+    .done-summary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 22px;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+    .done-sum-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+    .done-sum-label { font-size: 13px; color: var(--text-sub); }
+    .done-sum-val   { font-size: 15px; font-weight: 700; }
+
+    /* ── 전환 애니메이션 ── */
+    .fade-in  { animation: fadeIn  0.35s ease both; }
+    .slide-up { animation: slideUp 0.4s cubic-bezier(0.34,1.3,0.64,1) both; }
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(28px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
     }
   </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body>
 
-  <div id="app" class="w-full max-w-2xl">
-    <!-- 동적으로 렌더링됨 -->
+<!-- 배경 글로우 -->
+<div class="bg-glow"></div>
+
+<!-- 상단 헤더 -->
+<div class="top-bar">
+  <div class="logo">
+    <div class="logo-icon">📐</div>
+    <div>
+      <div class="logo-text">바꿈수학</div>
+      <div class="logo-sub">학습 지원 키오스크</div>
+    </div>
   </div>
+  <div class="clock" id="clock">--:--:--</div>
+</div>
 
-  <script>
-  (function() {
-    // ── 상태 관리 ──────────────────────────────────────────────────────────
-    const state = {
-      step: 0,         // 0:시작, 1:이름, 2:전화번호, 3:과목, 4:수준, 5:메시지, 6:확인, 7:완료
-      name: '',
-      phone: '',
-      course: '',
-      level: '',
-      message: '',
-      submitting: false,
-    }
+<!-- ── 화면 0: 스플래시 ── -->
+<div class="screen active" id="splash" onclick="goToName()">
+  <div class="splash-inner slide-up">
+    <div class="splash-ring">
+      <i class="fas fa-graduation-cap"></i>
+    </div>
+    <div>
+      <div class="splash-title">바꿈수학<br/><span>학습 지원</span></div>
+      <div class="splash-sub" style="margin-top:10px">수학의 즐거움을 함께해요</div>
+    </div>
+    <div class="tap-hint">
+      <i class="fas fa-hand-pointer"></i>
+      화면을 탭해서 시작하세요
+    </div>
+  </div>
+</div>
 
-    const totalSteps = 6  // 1~6단계 (진행 표시용)
+<!-- ── 화면 1: 이름 입력 ── -->
+<div class="screen" id="name-screen">
+  <div class="name-card slide-up">
+    <div class="screen-title">👋 안녕하세요!</div>
+    <div class="screen-sub">이름을 입력하고 항목을 선택하세요</div>
 
-    const courseOptions = [
-      { value: 'coding',   icon: 'fa-laptop-code',   label: '코딩 / 프로그래밍', color: '#6366f1' },
-      { value: 'math',     icon: 'fa-square-root-variable', label: '수학 / 과학',  color: '#06b6d4' },
-      { value: 'english',  icon: 'fa-language',      label: '영어 / 어학',       color: '#f59e0b' },
-      { value: 'art',      icon: 'fa-palette',       label: '예술 / 디자인',     color: '#ec4899' },
-      { value: 'business', icon: 'fa-chart-line',    label: '비즈니스 / 경영',   color: '#22c55e' },
-      { value: 'other',    icon: 'fa-book-open',     label: '기타',              color: '#8b5cf6' },
-    ]
+    <input id="nameInput" class="kiosk-input" type="text"
+           placeholder="이름을 입력하세요" maxlength="10" readonly
+           oninput="onNameChange()"/>
 
-    const levelOptions = [
-      { value: 'beginner',     icon: 'fa-seedling',  label: '입문',  sub: '처음 시작해요',    color: '#22c55e', cls: 'beginner' },
-      { value: 'intermediate', icon: 'fa-fire',      label: '중급',  sub: '기초는 알아요',    color: '#eab308', cls: 'intermediate' },
-      { value: 'advanced',     icon: 'fa-bolt',      label: '고급',  sub: '심화 학습 원해요', color: '#ef4444', cls: 'advanced' },
-    ]
+    <!-- 한글 가상 키보드 -->
+    <div id="kbd-wrap">
+      <div class="kbd-grid" style="grid-template-columns:repeat(5,1fr);margin-top:20px;">
+        ${['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ'].map(c=>`<button class="kbd-btn" onclick="appendChar('${c}')">${c}</button>`).join('')}
+      </div>
+      <div class="kbd-grid" style="grid-template-columns:repeat(5,1fr);margin-top:10px;">
+        ${['ㅋ','ㅌ','ㅍ','ㅎ','ㅏ','ㅑ','ㅓ','ㅕ','ㅗ','ㅛ'].map(c=>`<button class="kbd-btn" onclick="appendChar('${c}')">${c}</button>`).join('')}
+      </div>
+      <div class="kbd-grid" style="grid-template-columns:repeat(5,1fr);margin-top:10px;">
+        ${['ㅜ','ㅠ','ㅡ','ㅣ','ㅐ','ㅔ','1','2','3','4'].map(c=>`<button class="kbd-btn" onclick="appendChar('${c}')">${c}</button>`).join('')}
+      </div>
+      <div class="kbd-grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px;">
+        ${['5','6','7','8'].map(c=>`<button class="kbd-btn" onclick="appendChar('${c}')">${c}</button>`).join('')}
+      </div>
+      <div class="kbd-grid" style="grid-template-columns:2fr 2fr 1fr;margin-top:10px;">
+        <button class="kbd-btn" onclick="appendChar(' ')" style="font-size:14px;color:var(--text-sub)">space</button>
+        <button class="kbd-btn" onclick="clearName()" style="font-size:13px;color:var(--yellow)"><i class="fas fa-rotate-left"></i> 전체 지우기</button>
+        <button class="kbd-btn del" onclick="delChar()"><i class="fas fa-delete-left"></i></button>
+      </div>
+    </div>
 
-    // ── 렌더 헬퍼 ─────────────────────────────────────────────────────────
-    function render(html) {
-      const app = document.getElementById('app')
-      app.innerHTML = html
-      app.querySelectorAll('[data-animate]').forEach(el => el.classList.add('slide-in'))
-    }
+    <button id="nameNextBtn" class="btn-next" onclick="goToMenu()" disabled>
+      <i class="fas fa-arrow-right" style="margin-right:8px"></i>항목 선택하기
+    </button>
+  </div>
+</div>
 
-    function progressBar() {
-      if (state.step === 0 || state.step === 7) return ''
-      const pct = Math.round(((state.step - 1) / totalSteps) * 100)
-      const dots = Array.from({length: totalSteps}, (_, i) => {
-        const cls = i < state.step - 1 ? 'done' : (i === state.step - 1 ? 'active' : '')
-        return \`<div class="step-dot \${cls}"></div>\`
-      }).join('')
-      return \`
-        <div class="mb-8">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-white/50 text-sm font-medium">단계 \${state.step} / \${totalSteps}</span>
-            <span class="text-white/50 text-sm font-medium">\${pct}%</span>
-          </div>
-          <div class="w-full bg-white/10 rounded-full h-2 mb-4 overflow-hidden">
-            <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                 style="width:\${pct}%"></div>
-          </div>
-          <div class="flex items-center gap-2 justify-center">\${dots}</div>
-        </div>
-      \`
-    }
+<!-- ── 화면 2: 메뉴 선택 ── -->
+<div class="screen" id="menu-screen">
+  <div class="menu-wrap">
+    <div class="menu-header">
+      <div>
+        <div class="menu-greeting"><span id="greet-name">이름</span>님, 무엇을 기록할까요?</div>
+        <div style="font-size:14px;color:var(--text-sub);margin-top:4px">항목을 선택해 주세요</div>
+      </div>
+      <button class="btn-back" onclick="goToName()">
+        <i class="fas fa-chevron-left" style="margin-right:6px"></i>이름 변경
+      </button>
+    </div>
 
-    // ── 단계별 화면 ────────────────────────────────────────────────────────
+    <div class="section-label" style="color:rgba(52,211,153,0.7)">
+      <i class="fas fa-check-circle" style="margin-right:6px"></i>학습 활동
+    </div>
+    <div class="menu-grid" id="learn-grid"></div>
 
-    // 0단계: 시작 화면
-    function renderStart() {
-      render(\`
-        <div class="kiosk-card p-10 text-center" data-animate>
-          <div class="mb-8">
-            <div class="inline-flex items-center justify-center w-28 h-28 rounded-full
-                        bg-gradient-to-br from-indigo-500 to-purple-600
-                        shadow-2xl pulse-ring mb-6">
-              <i class="fas fa-graduation-cap text-5xl text-white"></i>
-            </div>
-            <h1 class="text-5xl font-black text-white mb-3">학습 키오스크</h1>
-            <p class="text-white/60 text-xl">원하는 학습 과정을 신청해 보세요</p>
-          </div>
+    <div class="section-label" style="color:rgba(248,113,113,0.7);margin-top:8px">
+      <i class="fas fa-triangle-exclamation" style="margin-right:6px"></i>벌금 항목
+    </div>
+    <div class="menu-grid" id="fine-grid"></div>
+  </div>
+</div>
 
-          <div class="grid grid-cols-3 gap-4 mb-10">
-            <div class="kiosk-card p-5 text-center">
-              <i class="fas fa-bolt text-yellow-400 text-2xl mb-2"></i>
-              <div class="text-white font-bold">빠른 신청</div>
-              <div class="text-white/50 text-sm">2분 내 완료</div>
-            </div>
-            <div class="kiosk-card p-5 text-center">
-              <i class="fas fa-bell text-indigo-400 text-2xl mb-2"></i>
-              <div class="text-white font-bold">즉시 알림</div>
-              <div class="text-white/50 text-sm">실시간 접수</div>
-            </div>
-            <div class="kiosk-card p-5 text-center">
-              <i class="fas fa-shield-halved text-green-400 text-2xl mb-2"></i>
-              <div class="text-white font-bold">안전 보관</div>
-              <div class="text-white/50 text-sm">데이터 저장</div>
-            </div>
-          </div>
+<!-- ── 화면 3: 확인 ── -->
+<div class="screen" id="confirm-screen">
+  <div class="confirm-card slide-up" id="confirm-card">
+    <div class="confirm-icon" id="confirm-icon"></div>
+    <div class="confirm-item-name" id="confirm-item-name"></div>
+    <div class="confirm-price-tag" id="confirm-price-tag"></div>
 
-          <button class="btn-primary w-full text-2xl py-6" onclick="nextStep()">
-            <i class="fas fa-play mr-3"></i>신청 시작하기
-          </button>
-        </div>
-      \`)
-    }
+    <div class="confirm-detail">
+      <div class="confirm-row">
+        <div class="confirm-row-label"><i class="fas fa-user"></i> 학생 이름</div>
+        <div class="confirm-row-value" id="cd-name"></div>
+      </div>
+      <div style="height:1px;background:var(--border)"></div>
+      <div class="confirm-row">
+        <div class="confirm-row-label"><i class="fas fa-clock"></i> 접수 시각</div>
+        <div class="confirm-row-value" id="cd-time"></div>
+      </div>
+    </div>
 
-    // 1단계: 이름 입력
-    function renderName() {
-      render(\`
-        <div class="kiosk-card p-10" data-animate>
-          \${progressBar()}
-          <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full
-                        bg-gradient-to-br from-indigo-500 to-purple-600 mb-5 shadow-xl">
-              <i class="fas fa-user text-3xl text-white"></i>
-            </div>
-            <h2 class="text-4xl font-black text-white mb-2">이름을 입력하세요</h2>
-            <p class="text-white/50 text-lg">실명을 입력해 주세요</p>
-          </div>
-          <div class="mb-8">
-            <input id="nameInput" type="text" class="kiosk-input text-center text-2xl"
-                   placeholder="홍길동" value="\${state.name}"
-                   maxlength="20" autocomplete="off" spellcheck="false"
-                   oninput="state.name=this.value.trim(); updateNameBtn()"
-                   onkeydown="if(event.key==='Enter' && this.value.trim()) nextStep()" />
-            <div class="text-center mt-3 text-white/40 text-sm">최대 20자</div>
-          </div>
-          <div class="flex gap-4">
-            <button class="btn-secondary flex-1" onclick="prevStep()">
-              <i class="fas fa-chevron-left mr-2"></i>이전
-            </button>
-            <button id="nameNextBtn" class="btn-primary flex-1"
-                    onclick="nextStep()" \${state.name ? '' : 'disabled'}>
-              다음 <i class="fas fa-chevron-right ml-2"></i>
-            </button>
-          </div>
-        </div>
-      \`)
-      const inp = document.getElementById('nameInput')
-      if (inp) {
-        inp.focus()
-        inp.setSelectionRange(inp.value.length, inp.value.length)
-      }
-    }
+    <div class="confirm-btns">
+      <button class="btn-cancel" onclick="goToMenu()">
+        <i class="fas fa-xmark" style="margin-right:6px"></i>취소
+      </button>
+      <button class="btn-submit" id="submitBtn" onclick="doSubmit()">
+        <i class="fas fa-paper-plane"></i>
+        <span>확인 제출</span>
+      </button>
+    </div>
+  </div>
+</div>
 
-    function updateNameBtn() {
-      const btn = document.getElementById('nameNextBtn')
-      if (btn) btn.disabled = !state.name
-    }
+<!-- ── 화면 4: 완료 ── -->
+<div class="screen" id="done-screen">
+  <div class="done-card">
+    <div class="done-icon success" id="done-icon">✅</div>
+    <div class="done-title">기록 완료!</div>
+    <div class="done-sub" id="done-sub"></div>
 
-    // 2단계: 전화번호 (넘패드)
-    function renderPhone() {
-      render(\`
-        <div class="kiosk-card p-8" data-animate>
-          \${progressBar()}
-          <div class="text-center mb-6">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full
-                        bg-gradient-to-br from-cyan-500 to-blue-600 mb-5 shadow-xl">
-              <i class="fas fa-phone text-3xl text-white"></i>
-            </div>
-            <h2 class="text-4xl font-black text-white mb-2">전화번호 입력</h2>
-            <p class="text-white/50 text-lg">숫자만 입력해 주세요</p>
-          </div>
+    <div class="done-summary" id="done-summary"></div>
+    <div class="status-chips" id="done-chips"></div>
 
-          <div class="mb-6">
-            <input id="phoneDisplay" type="text" class="kiosk-input-phone"
-                   placeholder="010 - 0000 - 0000"
-                   value="\${formatPhone(state.phone)}"
-                   readonly />
-          </div>
+    <button class="btn-home" onclick="goToSplash()">
+      <i class="fas fa-house" style="margin-right:8px"></i>처음으로 돌아가기
+    </button>
+  </div>
+</div>
 
-          <div class="grid grid-cols-3 gap-3 mb-6">
-            \${['1','2','3','4','5','6','7','8','9'].map(n =>
-              \`<button class="numpad-btn" onclick="phoneInput('\${n}')">\${n}</button>\`
-            ).join('')}
-            <button class="numpad-btn clear" onclick="phoneClear()">
-              <i class="fas fa-rotate-left"></i><br/><span style="font-size:13px">전체삭제</span>
-            </button>
-            <button class="numpad-btn" onclick="phoneInput('0')">0</button>
-            <button class="numpad-btn del" onclick="phoneDel()">
-              <i class="fas fa-delete-left"></i>
-            </button>
-          </div>
+<script>
+(function(){
+  // ── 데이터 ─────────────────────────────────────────────────────────────────
+  const MENU = {
+    learn: [
+      { id:'study',    icon:'📖', label:'자습 인증하기',       price:0 },
+      { id:'homework', icon:'✏️', label:'숙제 제출 완료',      price:0 },
+      { id:'question', icon:'🙋', label:'질문하기',            price:0 },
+      { id:'record',   icon:'📝', label:'모르는 문제 기록하기', price:0 },
+      { id:'material', icon:'📄', label:'추가 학습지 요청',    price:0 },
+    ],
+    fine: [
+      { id:'callteacher', icon:'🔔', label:'지현쌤 호출',   price:3500 },
+      { id:'lostwork',    icon:'😰', label:'숙제 분실',     price:4000 },
+      { id:'nohomework',  icon:'🚫', label:'숙제 안함',     price:5500 },
+    ],
+  }
 
-          <div class="flex gap-4">
-            <button class="btn-secondary flex-1" onclick="prevStep()">
-              <i class="fas fa-chevron-left mr-2"></i>이전
-            </button>
-            <button id="phoneNextBtn" class="btn-primary flex-1"
-                    onclick="nextStep()" \${state.phone.length >= 10 ? '' : 'disabled'}>
-              다음 <i class="fas fa-chevron-right ml-2"></i>
-            </button>
-          </div>
-        </div>
-      \`)
-    }
+  // ── 상태 ────────────────────────────────────────────────────────────────────
+  let state = {
+    name:       '',
+    selected:   null,   // { id, icon, label, price }
+    submitting: false,
+    screen:     'splash',  // splash | name | menu | confirm | done
+  }
 
-    function formatPhone(raw) {
-      const d = raw.replace(/\\D/g,'')
-      if (d.length <= 3) return d
-      if (d.length <= 7) return d.slice(0,3) + ' - ' + d.slice(3)
-      return d.slice(0,3) + ' - ' + d.slice(3,7) + ' - ' + d.slice(7,11)
-    }
+  // ── 시계 ────────────────────────────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date()
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+  }
+  setInterval(updateClock, 1000); updateClock()
 
-    function phoneInput(digit) {
-      if (state.phone.length >= 11) return
-      state.phone += digit
-      const el = document.getElementById('phoneDisplay')
-      if (el) el.value = formatPhone(state.phone)
-      const btn = document.getElementById('phoneNextBtn')
-      if (btn) btn.disabled = state.phone.length < 10
-    }
+  // ── 화면 전환 ───────────────────────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => {
+      s.classList.remove('active')
+    })
+    const target = document.getElementById(id)
+    target.classList.add('active')
+    state.screen = id
+  }
 
-    function phoneDel() {
-      state.phone = state.phone.slice(0,-1)
-      const el = document.getElementById('phoneDisplay')
-      if (el) el.value = formatPhone(state.phone)
-      const btn = document.getElementById('phoneNextBtn')
-      if (btn) btn.disabled = state.phone.length < 10
-    }
+  // ── 스플래시 → 이름 입력 ───────────────────────────────────────────────────
+  window.goToName = function() {
+    showScreen('name-screen')
+    setTimeout(()=>{ document.getElementById('nameInput').focus() }, 200)
+  }
 
-    function phoneClear() {
-      state.phone = ''
-      const el = document.getElementById('phoneDisplay')
-      if (el) el.value = ''
-      const btn = document.getElementById('phoneNextBtn')
-      if (btn) btn.disabled = true
-    }
+  // ── 이름 입력 → 메뉴 ───────────────────────────────────────────────────────
+  window.goToMenu = function() {
+    if (!state.name.trim()) return
+    document.getElementById('greet-name').textContent = state.name
+    renderMenuGrid()
+    showScreen('menu-screen')
+  }
 
-    // 3단계: 과목 선택
-    function renderCourse() {
-      const btns = courseOptions.map(c => \`
-        <button class="course-btn \${state.course===c.value?'selected':''}"
-                onclick="selectCourse('\${c.value}')">
-          <i class="fas \${c.icon} text-4xl" style="color:\${c.color}"></i>
-          <span class="text-white font-bold text-lg leading-tight text-center">\${c.label}</span>
-          \${state.course===c.value ? '<i class="fas fa-check-circle text-indigo-400 text-xl"></i>' : ''}
-        </button>
-      \`).join('')
+  // ── 메뉴 → 확인 화면 ───────────────────────────────────────────────────────
+  window.selectItem = function(id) {
+    const all = [...MENU.learn, ...MENU.fine]
+    state.selected = all.find(m => m.id === id)
+    if (!state.selected) return
 
-      render(\`
-        <div class="kiosk-card p-8" data-animate>
-          \${progressBar()}
-          <div class="text-center mb-6">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full
-                        bg-gradient-to-br from-purple-500 to-pink-600 mb-5 shadow-xl">
-              <i class="fas fa-book text-3xl text-white"></i>
-            </div>
-            <h2 class="text-4xl font-black text-white mb-2">수강 과목 선택</h2>
-            <p class="text-white/50 text-lg">배우고 싶은 분야를 선택하세요</p>
-          </div>
-          <div class="grid grid-cols-3 gap-4 mb-8">\${btns}</div>
-          <div class="flex gap-4">
-            <button class="btn-secondary flex-1" onclick="prevStep()">
-              <i class="fas fa-chevron-left mr-2"></i>이전
-            </button>
-            <button id="courseNextBtn" class="btn-primary flex-1"
-                    onclick="nextStep()" \${state.course ? '' : 'disabled'}>
-              다음 <i class="fas fa-chevron-right ml-2"></i>
-            </button>
-          </div>
-        </div>
-      \`)
-    }
+    const isFine = state.selected.price > 0
+    const now = new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})
 
-    function selectCourse(val) {
-      state.course = val
-      renderCourse()
-    }
+    // 아이콘
+    const iconEl = document.getElementById('confirm-icon')
+    iconEl.textContent = state.selected.icon.trim()
+    iconEl.className = 'confirm-icon ' + (isFine ? 'fine-icon' : 'learn-icon')
 
-    // 4단계: 수준 선택
-    function renderLevel() {
-      const btns = levelOptions.map(l => \`
-        <button class="level-btn \${l.cls} \${state.level===l.value?'selected':''}"
-                onclick="selectLevel('\${l.value}')">
-          <div class="flex items-center justify-center w-16 h-16 rounded-full mb-2"
-               style="background:rgba(\${l.value==='beginner'?'34,197,94':l.value==='intermediate'?'234,179,8':'239,68,68'},0.2);border:2px solid \${l.color}">
-            <i class="fas \${l.icon} text-2xl" style="color:\${l.color}"></i>
-          </div>
-          <span class="text-white font-black text-2xl">\${l.label}</span>
-          <span class="text-white/60 text-sm">\${l.sub}</span>
-          \${state.level===l.value ? \`<i class="fas fa-check-circle text-xl" style="color:\${l.color}"></i>\` : ''}
-        </button>
-      \`).join('')
+    // 항목명
+    document.getElementById('confirm-item-name').textContent =
+      state.selected.label.replace('\\n',' ')
 
-      render(\`
-        <div class="kiosk-card p-8" data-animate>
-          \${progressBar()}
-          <div class="text-center mb-6">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full
-                        bg-gradient-to-br from-orange-500 to-red-600 mb-5 shadow-xl">
-              <i class="fas fa-signal text-3xl text-white"></i>
-            </div>
-            <h2 class="text-4xl font-black text-white mb-2">현재 학습 수준</h2>
-            <p class="text-white/50 text-lg">지금 나의 실력은 어느 정도인가요?</p>
-          </div>
-          <div class="grid grid-cols-3 gap-4 mb-8">\${btns}</div>
-          <div class="flex gap-4">
-            <button class="btn-secondary flex-1" onclick="prevStep()">
-              <i class="fas fa-chevron-left mr-2"></i>이전
-            </button>
-            <button id="levelNextBtn" class="btn-primary flex-1"
-                    onclick="nextStep()" \${state.level ? '' : 'disabled'}>
-              다음 <i class="fas fa-chevron-right ml-2"></i>
-            </button>
-          </div>
-        </div>
-      \`)
-    }
+    // 금액 태그
+    const priceEl = document.getElementById('confirm-price-tag')
+    priceEl.className = 'confirm-price-tag ' + (isFine ? 'paid' : 'free')
+    priceEl.innerHTML = isFine
+      ? \`<i class="fas fa-won-sign" style="margin-right:6px"></i>₩\${state.selected.price.toLocaleString()}\`
+      : \`<i class="fas fa-check-circle" style="margin-right:6px"></i>무료\`
 
-    function selectLevel(val) {
-      state.level = val
-      renderLevel()
-    }
+    // 상세
+    document.getElementById('cd-name').textContent = state.name
+    document.getElementById('cd-time').textContent = now
 
-    // 5단계: 추가 메시지
-    function renderMessage() {
-      render(\`
-        <div class="kiosk-card p-10" data-animate>
-          \${progressBar()}
-          <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full
-                        bg-gradient-to-br from-emerald-500 to-teal-600 mb-5 shadow-xl">
-              <i class="fas fa-comment-dots text-3xl text-white"></i>
-            </div>
-            <h2 class="text-4xl font-black text-white mb-2">추가 메시지</h2>
-            <p class="text-white/50 text-lg">궁금한 점이나 요청 사항을 입력하세요 (선택)</p>
-          </div>
-          <div class="mb-8">
-            <textarea id="msgInput" class="kiosk-input text-lg"
-                      style="min-height:140px;resize:none;line-height:1.7"
-                      placeholder="예) 주말 오전 수업 원합니다 / 개인 레슨 문의 / 기타 궁금한 점..."
-                      maxlength="300"
-                      oninput="state.message=this.value">\${state.message}</textarea>
-            <div class="flex justify-between mt-2 text-white/30 text-sm">
-              <span>선택 사항입니다</span>
-              <span id="msgCount">\${state.message.length}/300</span>
-            </div>
-          </div>
-          <div class="flex gap-4">
-            <button class="btn-secondary flex-1" onclick="prevStep()">
-              <i class="fas fa-chevron-left mr-2"></i>이전
-            </button>
-            <button class="btn-primary flex-1" onclick="nextStep()">
-              다음 <i class="fas fa-chevron-right ml-2"></i>
-            </button>
-          </div>
-        </div>
-      \`)
-      const ta = document.getElementById('msgInput')
-      if (ta) {
-        ta.addEventListener('input', () => {
-          const c = document.getElementById('msgCount')
-          if (c) c.textContent = ta.value.length + '/300'
-        })
-      }
-    }
+    // 제출 버튼 초기화
+    const sb = document.getElementById('submitBtn')
+    sb.disabled = false
+    sb.innerHTML = '<i class="fas fa-paper-plane"></i><span>확인 제출</span>'
 
-    // 6단계: 최종 확인
-    function renderConfirm() {
-      const cLabel = { coding:'💻 코딩/프로그래밍', math:'📐 수학/과학', english:'🔤 영어/어학', art:'🎨 예술/디자인', business:'📊 비즈니스/경영', other:'📚 기타' }
-      const lLabel = { beginner:'🟢 입문', intermediate:'🟡 중급', advanced:'🔴 고급' }
+    showScreen('confirm-screen')
+  }
 
-      render(\`
-        <div class="kiosk-card p-10" data-animate>
-          \${progressBar()}
-          <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full
-                        bg-gradient-to-br from-violet-500 to-indigo-600 mb-5 shadow-xl">
-              <i class="fas fa-clipboard-check text-3xl text-white"></i>
-            </div>
-            <h2 class="text-4xl font-black text-white mb-2">신청 내용 확인</h2>
-            <p class="text-white/50 text-lg">입력하신 내용을 확인해 주세요</p>
-          </div>
+  // ── 제출 ────────────────────────────────────────────────────────────────────
+  window.doSubmit = async function() {
+    if (state.submitting || !state.selected) return
+    state.submitting = true
 
-          <div class="space-y-4 mb-8">
-            <div class="flex items-center justify-between p-5 rounded-2xl"
-                 style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
-              <span class="text-white/60 text-lg flex items-center gap-2">
-                <i class="fas fa-user w-6 text-center text-indigo-400"></i>이름
-              </span>
-              <span class="text-white font-bold text-xl">\${state.name}</span>
-            </div>
-            <div class="flex items-center justify-between p-5 rounded-2xl"
-                 style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
-              <span class="text-white/60 text-lg flex items-center gap-2">
-                <i class="fas fa-phone w-6 text-center text-cyan-400"></i>연락처
-              </span>
-              <span class="text-white font-bold text-xl">\${formatPhone(state.phone)}</span>
-            </div>
-            <div class="flex items-center justify-between p-5 rounded-2xl"
-                 style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
-              <span class="text-white/60 text-lg flex items-center gap-2">
-                <i class="fas fa-book w-6 text-center text-purple-400"></i>수강 과목
-              </span>
-              <span class="text-white font-bold text-xl">\${cLabel[state.course]||state.course}</span>
-            </div>
-            <div class="flex items-center justify-between p-5 rounded-2xl"
-                 style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
-              <span class="text-white/60 text-lg flex items-center gap-2">
-                <i class="fas fa-signal w-6 text-center text-orange-400"></i>학습 수준
-              </span>
-              <span class="text-white font-bold text-xl">\${lLabel[state.level]||state.level||'미선택'}</span>
-            </div>
-            \${state.message ? \`
-            <div class="p-5 rounded-2xl"
-                 style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
-              <div class="text-white/60 text-lg flex items-center gap-2 mb-2">
-                <i class="fas fa-comment-dots w-6 text-center text-emerald-400"></i>추가 메시지
-              </div>
-              <div class="text-white text-lg leading-relaxed">\${state.message}</div>
-            </div>
-            \` : ''}
-          </div>
+    const sb = document.getElementById('submitBtn')
+    sb.disabled = true
+    sb.innerHTML = '<div class="spinner"></div><span>전송 중...</span>'
 
-          <div class="flex gap-4">
-            <button class="btn-secondary flex-1" onclick="prevStep()" \${state.submitting?'disabled':''}>
-              <i class="fas fa-chevron-left mr-2"></i>수정하기
-            </button>
-            <button id="submitBtn" class="btn-primary flex-1" onclick="submitForm()" \${state.submitting?'disabled':''}>
-              \${state.submitting
-                ? '<div class="loading-spinner mx-auto"></div>'
-                : '<i class="fas fa-paper-plane mr-2"></i>신청 완료'}
-            </button>
-          </div>
-        </div>
-      \`)
-    }
+    const timestamp = new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})
 
-    // 7단계: 완료
-    function renderDone(slackOk, notionOk) {
-      render(\`
-        <div class="kiosk-card p-10 text-center" data-animate>
-          <div class="mb-8">
-            <div class="inline-flex items-center justify-center w-32 h-32 rounded-full
-                        bg-gradient-to-br from-green-400 to-emerald-600
-                        shadow-2xl success-animation mb-6">
-              <i class="fas fa-check text-6xl text-white"></i>
-            </div>
-            <h2 class="text-5xl font-black text-white mb-3">신청 완료!</h2>
-            <p class="text-white/60 text-xl">학습 신청이 성공적으로 접수되었습니다</p>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4 mb-8">
-            <div class="p-5 rounded-2xl \${slackOk
-                ? 'bg-green-500/10 border border-green-500/30'
-                : 'bg-red-500/10 border border-red-500/30'}">
-              <i class="fab fa-slack text-3xl mb-2 block \${slackOk?'text-green-400':'text-red-400'}"></i>
-              <div class="text-white font-bold">슬랙 알림</div>
-              <div class="\${slackOk?'text-green-400':'text-red-400'} text-sm mt-1">
-                \${slackOk ? '✅ 전송 완료' : '❌ 전송 실패'}
-              </div>
-            </div>
-            <div class="p-5 rounded-2xl \${notionOk
-                ? 'bg-green-500/10 border border-green-500/30'
-                : 'bg-red-500/10 border border-red-500/30'}">
-              <i class="fas fa-database text-3xl mb-2 block \${notionOk?'text-green-400':'text-red-400'}"></i>
-              <div class="text-white font-bold">노션 저장</div>
-              <div class="\${notionOk?'text-green-400':'text-red-400'} text-sm mt-1">
-                \${notionOk ? '✅ 저장 완료' : '❌ 저장 실패'}
-              </div>
-            </div>
-          </div>
-
-          <div class="kiosk-card p-6 mb-8 text-left space-y-3">
-            <div class="text-white/50 text-sm font-semibold uppercase tracking-wider mb-3">접수 요약</div>
-            <div class="flex justify-between items-center">
-              <span class="text-white/60">이름</span>
-              <span class="text-white font-bold">\${state.name}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-white/60">연락처</span>
-              <span class="text-white font-bold">\${formatPhone(state.phone)}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-white/60">과목</span>
-              <span class="text-white font-bold">\${{ coding:'코딩/프로그래밍', math:'수학/과학', english:'영어/어학', art:'예술/디자인', business:'비즈니스/경영', other:'기타' }[state.course]||state.course}</span>
-            </div>
-          </div>
-
-          <button class="btn-primary w-full text-xl py-6" onclick="resetForm()">
-            <i class="fas fa-rotate-left mr-3"></i>새로운 신청 시작
-          </button>
-        </div>
-      \`)
-    }
-
-    // ── 네비게이션 ─────────────────────────────────────────────────────────
-    function nextStep() { state.step++; renderStep() }
-    function prevStep() { state.step--; renderStep() }
-
-    function renderStep() {
-      switch(state.step) {
-        case 0: renderStart();   break
-        case 1: renderName();    break
-        case 2: renderPhone();   break
-        case 3: renderCourse();  break
-        case 4: renderLevel();   break
-        case 5: renderMessage(); break
-        case 6: renderConfirm(); break
-        default: renderStart();
-      }
-    }
-
-    // ── 폼 제출 ────────────────────────────────────────────────────────────
-    async function submitForm() {
-      if (state.submitting) return
-      state.submitting = true
-      renderConfirm()
-
-      const timestamp = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-
-      try {
-        const res = await fetch('/api/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: state.name,
-            phone: state.phone,
-            course: state.course,
-            level: state.level,
-            message: state.message,
-            timestamp,
-          }),
-        })
-        const data = await res.json()
-        state.step = 7
-        renderDone(data.slack, data.notion)
-      } catch (err) {
-        state.submitting = false
-        alert('오류가 발생했습니다. 다시 시도해 주세요.')
-        renderConfirm()
-      }
-    }
-
-    function resetForm() {
-      state.step = 0
-      state.name = ''
-      state.phone = ''
-      state.course = ''
-      state.level = ''
-      state.message = ''
+    try {
+      const res = await fetch('/api/submit',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          name:  state.name,
+          item:  state.selected.label.replace('\\n',' '),
+          price: state.selected.price,
+          timestamp,
+        }),
+      })
+      const data = await res.json()
+      renderDone(data.slack, data.notion)
+    } catch(e) {
+      renderDone(false, false)
+    } finally {
       state.submitting = false
-      renderStep()
+    }
+  }
+
+  // ── 완료 화면 렌더링 ────────────────────────────────────────────────────────
+  function renderDone(slackOk, notionOk) {
+    const isFine = state.selected?.price > 0
+    const label  = (state.selected?.label||'').replace('\\n',' ')
+    const price  = state.selected?.price || 0
+
+    document.getElementById('done-sub').innerHTML =
+      \`<strong>\${state.name}</strong>님의\` +
+      (isFine
+        ? \`<br/><span style="color:var(--red)">\${label}</span> 항목이 기록되었어요\`
+        : \`<br/><span style="color:var(--green)">\${label}</span> 활동이 기록되었어요\`)
+
+    const summary = document.getElementById('done-summary')
+    summary.innerHTML = \`
+      <div class="done-sum-row">
+        <span class="done-sum-label">학생 이름</span>
+        <span class="done-sum-val">\${state.name}</span>
+      </div>
+      <div class="done-sum-row">
+        <span class="done-sum-label">항목</span>
+        <span class="done-sum-val">\${label}</span>
+      </div>
+      <div class="done-sum-row">
+        <span class="done-sum-label">금액</span>
+        <span class="done-sum-val" style="color:\${isFine?'var(--red)':'var(--green)'}">
+          \${isFine ? '₩'+price.toLocaleString() : '무료'}
+        </span>
+      </div>
+    \`
+
+    const chips = document.getElementById('done-chips')
+    chips.innerHTML = \`
+      <div class="chip \${slackOk?'ok':'fail'}">
+        <i class="fab fa-slack"></i>
+        슬랙 알림 \${slackOk?'전송됨':'실패'}
+      </div>
+      <div class="chip \${notionOk?'ok':'fail'}">
+        <i class="fas fa-database"></i>
+        노션 저장 \${notionOk?'완료':'실패'}
+      </div>
+    \`
+
+    showScreen('done-screen')
+    // 20초 후 자동 홈
+    setTimeout(goToSplash, 20000)
+  }
+
+  // ── 홈으로 ─────────────────────────────────────────────────────────────────
+  window.goToSplash = function() {
+    state.name = ''
+    state.selected = null
+    document.getElementById('nameInput').value = ''
+    document.getElementById('nameNextBtn').disabled = true
+    showScreen('splash')
+  }
+
+  // ── 메뉴 그리드 렌더링 ─────────────────────────────────────────────────────
+  function renderMenuGrid() {
+    const lg = document.getElementById('learn-grid')
+    const fg = document.getElementById('fine-grid')
+
+    lg.innerHTML = MENU.learn.map(m => \`
+      <button class="menu-btn type-learn" onclick="selectItem('\${m.id}')">
+        <div class="menu-icon-wrap">\${m.icon}</div>
+        <div class="menu-label">\${m.label.replace('\\n','<br/>')}</div>
+        <div class="menu-price">무료</div>
+      </button>
+    \`).join('')
+
+    fg.innerHTML = MENU.fine.map(m => \`
+      <button class="menu-btn type-fine" onclick="selectItem('\${m.id}')">
+        <div class="menu-icon-wrap">\${m.icon}</div>
+        <div class="menu-label">\${m.label}</div>
+        <div class="menu-price">₩\${m.price.toLocaleString()}</div>
+      </button>
+    \`).join('')
+  }
+
+  // ── 가상 키보드 ─────────────────────────────────────────────────────────────
+  // 한글 조합 로직 (간단 자모 조합)
+  const CHO  = ['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
+  const JUNG = ['ㅏ','ㅑ','ㅓ','ㅕ','ㅗ','ㅛ','ㅜ','ㅠ','ㅡ','ㅣ','ㅐ','ㅔ']
+  const CHO_IDX  = {ㄱ:0,ㄴ:2,ㄷ:3,ㄹ:5,ㅁ:6,ㅂ:7,ㅅ:9,ㅇ:11,ㅈ:12,ㅊ:14,ㅋ:15,ㅌ:16,ㅍ:17,ㅎ:18}
+  const JUNG_IDX = {ㅏ:0,ㅑ:1,ㅓ:2,ㅕ:3,ㅗ:4,ㅛ:5,ㅜ:6,ㅠ:7,ㅡ:8,ㅣ:9,ㅐ:10,ㅔ:11}
+  const JONG_LIST = ['','ㄱ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
+  const JONG_IDX = {'':0,ㄱ:1,ㄴ:3,ㄷ:6,ㄹ:7,ㅁ:15,ㅂ:16,ㅅ:18,ㅇ:19,ㅈ:20,ㅊ:21,ㅋ:22,ㅌ:23,ㅍ:24,ㅎ:25}
+
+  function combineHangul(cho, jung, jong) {
+    const base = 0xAC00
+    const c = CHO_IDX[cho] ?? null
+    const j = JUNG_IDX[jung] ?? null
+    if (c === null || j === null) return cho + (jung||'') + (jong||'')
+    const jj = JONG_IDX[jong||''] ?? 0
+    return String.fromCharCode(base + c*21*28 + j*28 + jj)
+  }
+
+  let compose = { cho:'', jung:'', jong:'' }
+  let composing = false
+
+  function getInputEl() { return document.getElementById('nameInput') }
+
+  window.appendChar = function(ch) {
+    const inp = getInputEl()
+    if (inp.value.length >= 10 && !composing) return
+    if (inp.value.length >= 10) {
+      flushCompose(); return
     }
 
-    // 전역 바인딩
-    window.nextStep    = nextStep
-    window.prevStep    = prevStep
-    window.selectCourse = selectCourse
-    window.selectLevel  = selectLevel
-    window.phoneInput   = phoneInput
-    window.phoneDel     = phoneDel
-    window.phoneClear   = phoneClear
-    window.submitForm   = submitForm
-    window.resetForm    = resetForm
-    window.state        = state
-    window.formatPhone  = formatPhone
-    window.updateNameBtn = updateNameBtn
+    const isCho  = CHO.includes(ch)
+    const isJung = JUNG.includes(ch)
+    const isNum  = /[0-9]/.test(ch)
+    const isSpace = ch === ' '
 
-    // 시작
-    renderStep()
-  })()
-  </script>
+    if (isNum || isSpace) {
+      flushCompose()
+      if (inp.value.length < 10) inp.value += ch
+    } else if (isCho) {
+      if (!composing) {
+        // 새 초성 시작
+        compose = { cho:ch, jung:'', jong:'' }
+        composing = true
+        inp.value += ch  // 임시 표시
+      } else {
+        if (!compose.jung) {
+          // 초성만 있는 상태에서 또 자음 → 완성 없이 새 자음
+          flushCompose()
+          compose = { cho:ch, jung:'', jong:'' }
+          composing = true
+          inp.value += ch
+        } else if (!compose.jong) {
+          // 초성+중성 있을 때 자음 → 종성 후보
+          compose.jong = ch
+          updateCompose()
+        } else {
+          // 이미 종성 있음 → 다음 글자 초성으로
+          flushCompose()
+          compose = { cho:ch, jung:'', jong:'' }
+          composing = true
+          inp.value += ch
+        }
+      }
+    } else if (isJung) {
+      if (!composing) {
+        // 모음만 단독
+        inp.value += ch
+      } else {
+        if (!compose.jung) {
+          compose.jung = ch
+          updateCompose()
+        } else if (compose.jong) {
+          // 종성을 다음 글자 초성으로 분리
+          const savedJong = compose.jong
+          compose.jong = ''
+          const prevChar = combineHangul(compose.cho, compose.jung, '')
+          inp.value = inp.value.slice(0, -1) + prevChar
+          compose = { cho:savedJong, jung:ch, jong:'' }
+          updateCompose()
+        } else {
+          // 이미 초성+중성 → 완성 후 모음 단독
+          flushCompose()
+          inp.value += ch
+        }
+      }
+    }
+
+    state.name = inp.value
+    updateNameBtn()
+  }
+
+  function updateCompose() {
+    const inp = getInputEl()
+    const ch = combineHangul(compose.cho, compose.jung, compose.jong)
+    inp.value = inp.value.slice(0,-1) + ch
+    state.name = inp.value
+  }
+
+  function flushCompose() {
+    composing = false
+    compose = { cho:'', jung:'', jong:'' }
+  }
+
+  window.delChar = function() {
+    const inp = getInputEl()
+    if (composing) {
+      if (compose.jong) {
+        compose.jong = ''
+        updateCompose()
+        return
+      } else if (compose.jung) {
+        compose.jung = ''
+        updateCompose()
+        return
+      } else {
+        inp.value = inp.value.slice(0,-1)
+        flushCompose()
+      }
+    } else {
+      inp.value = inp.value.slice(0,-1)
+    }
+    state.name = inp.value
+    updateNameBtn()
+  }
+
+  window.clearName = function() {
+    const inp = getInputEl()
+    inp.value = ''
+    state.name = ''
+    flushCompose()
+    updateNameBtn()
+  }
+
+  window.onNameChange = function() {
+    state.name = getInputEl().value.trim()
+    updateNameBtn()
+  }
+
+  function updateNameBtn() {
+    const btn = document.getElementById('nameNextBtn')
+    if (btn) btn.disabled = !state.name.trim()
+  }
+
+  // ── 초기화 ──────────────────────────────────────────────────────────────────
+  showScreen('splash')
+})()
+</script>
 </body>
 </html>`
   return c.html(html)
