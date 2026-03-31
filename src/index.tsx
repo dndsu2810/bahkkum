@@ -68,7 +68,7 @@ app.get('/api/students/:id', async (c) => {
 app.post('/api/submit', async (c) => {
   try {
     const body = await c.req.json()
-    const { name, items, totalCost, currency, category, timestamp } = body
+    const { name, items, totalCost, currency, category, timestamp, photoBase64, comment } = body
     if (!name || !items) return c.json({ success: false, error: '필수 값 누락' }, 400)
 
     // D1: 학생 찾기
@@ -90,8 +90,8 @@ app.post('/api/submit', async (c) => {
     }
 
     const [slackR, notionR] = await Promise.allSettled([
-      sendSlack(c.env, { name, items, totalCost, currency, category, timestamp }),
-      saveNotion(c.env, { name, items, totalCost, currency, category, timestamp }),
+      sendSlack(c.env, { name, items, totalCost, currency, category, timestamp, photoBase64, comment }),
+      saveNotion(c.env, { name, items, totalCost, currency, category, timestamp, photoBase64, comment }),
     ])
     return c.json({
       success: true,
@@ -194,7 +194,7 @@ async function sendSlack(env: Bindings, d: any) {
   const payload = {
     blocks: [
       { type: 'header', text: { type: 'plain_text', text: `바꿈수학 키오스크 ${catEmoji[d.category] || '📋'}`, emoji: true } },
-      { type: 'section', text: { type: 'mrkdwn', text: `*${catLabel[d.category] || d.category}* 기록\n\n*👤 학생:* ${d.name}\n*📋 항목:*\n${itemList}\n*🏅 합계:* ${costText}` } },
+      { type: 'section', text: { type: 'mrkdwn', text: `*${catLabel[d.category] || d.category}* 기록\n\n*👤 학생:* ${d.name}\n*📋 항목:*\n${itemList}\n*🏅 합계:* ${costText}${d.comment ? '\n*💬 코멘트:* '+d.comment : ''}${d.photoBase64 ? '\n*📸 인증사진:* 첨부됨 (노션 확인)' : ''}` } },
       { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${d.timestamp}` }] },
       { type: 'divider' },
     ],
@@ -208,11 +208,73 @@ async function sendSlack(env: Bindings, d: any) {
 async function saveNotion(env: Bindings, d: any) {
   if (!env.NOTION_API_KEY || !env.NOTION_DATABASE_ID) return false
   const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
-  const itemList = d.items.map((x: any) => `${x.icon} ${x.label} × ${x.qty}`).join(', ')
+  const itemList = d.items.map((x: any) => `${x.icon} ${x.label} × ${x.qty}${x.comment ? ' ('+x.comment+')' : ''}`).join(', ')
   const costText = d.totalCost === 0 ? '무료' : d.totalCost < 0
     ? `+${Math.abs(d.totalCost)} ${d.currency}`
     : `-${d.totalCost} ${d.currency}`
-  const payload = {
+
+  // 페이지 본문 블록: 코멘트 + 이미지
+  const children: any[] = []
+  if (d.comment) {
+    children.push({
+      object: 'block', type: 'callout',
+      callout: {
+        rich_text: [{ type: 'text', text: { content: `💬 ${d.comment}` } }],
+        icon: { emoji: '💬' }, color: 'blue_background'
+      }
+    })
+  }
+  if (d.photoBase64) {
+    // base64 이미지는 Notion external URL로 직접 삽입 불가 → 단락에 텍스트로 안내
+    // 실제 이미지: file_upload API 또는 외부 URL 필요
+    // → base64 자체를 data URI로 파일 블록에 넣으면 Notion이 거부하므로
+    //   대신 이미지가 첨부됐다는 안내 + items 각각의 comment에서 사진 정보 표시
+    children.push({
+      object: 'block', type: 'callout',
+      callout: {
+        rich_text: [{ type: 'text', text: { content: '📸 인증 사진이 첨부되었습니다 (키오스크 제출)' } }],
+        icon: { emoji: '📸' }, color: 'yellow_background'
+      }
+    })
+    // Notion File Upload API로 실제 이미지 업로드 시도
+    try {
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+      const ext = mime.split('/')[1] || 'jpg'
+      // Step1: 업로드 URL 발급
+      const uploadRes = await fetch('https://api.notion.com/v1/file_uploads', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+        body: JSON.stringify({ name: `photo.${ext}`, content_type: mime })
+      })
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json() as any
+        const uploadUrl = uploadData.upload_url
+        const fileId = uploadData.id
+        // Step2: 이미지 바이너리 업로드
+        const binStr = atob(imgData)
+        const binArr = new Uint8Array(binStr.length)
+        for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+        const uploadBinRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': mime },
+          body: binArr
+        })
+        if (uploadBinRes.ok) {
+          // Step3: 업로드된 파일 ID로 이미지 블록 추가
+          children.push({
+            object: 'block', type: 'image',
+            image: { type: 'file_upload', file_upload: { id: fileId } }
+          })
+          // 안내 블록은 제거 (이미지 성공)
+          children.splice(children.findIndex((b: any) => b.callout?.icon?.emoji === '📸'), 1)
+        }
+      }
+    } catch (_) { /* 실패시 안내 텍스트만 남김 */ }
+  }
+
+  const payload: any = {
     parent: { database_id: env.NOTION_DATABASE_ID },
     properties: {
       '학생 이름': { title: [{ text: { content: d.name } }] },
@@ -223,6 +285,8 @@ async function saveNotion(env: Bindings, d: any) {
       '상태': { select: { name: '접수 완료' } },
     },
   }
+  if (children.length > 0) payload.children = children
+
   const res = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
@@ -253,13 +317,45 @@ async function sendSlackRequest(env: Bindings, d: any) {
 async function saveNotionRequest(env: Bindings, d: any) {
   if (!env.NOTION_API_KEY || !env.NOTION_DATABASE_ID) return false
   const children: any[] = [
-    { object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: d.message } }] } },
+    { object: 'block', type: 'callout',
+      callout: { rich_text: [{ type: 'text', text: { content: d.message } }], icon: { emoji: '💬' }, color: 'blue_background' } },
   ]
   if (d.photoBase64) {
-    children.push({
-      object: 'block', type: 'image',
-      image: { type: 'external', external: { url: d.photoBase64 } }
-    })
+    // Notion File Upload API로 실제 이미지 업로드
+    let imgUploaded = false
+    try {
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+      const ext = mime.split('/')[1] || 'jpg'
+      const uploadRes = await fetch('https://api.notion.com/v1/file_uploads', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+        body: JSON.stringify({ name: `request_photo.${ext}`, content_type: mime })
+      })
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json() as any
+        const binStr = atob(imgData)
+        const binArr = new Uint8Array(binStr.length)
+        for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+        const uploadBinRes = await fetch(uploadData.upload_url, {
+          method: 'PUT', headers: { 'Content-Type': mime }, body: binArr
+        })
+        if (uploadBinRes.ok) {
+          children.push({
+            object: 'block', type: 'image',
+            image: { type: 'file_upload', file_upload: { id: uploadData.id } }
+          })
+          imgUploaded = true
+        }
+      }
+    } catch (_) {}
+    if (!imgUploaded) {
+      children.push({
+        object: 'block', type: 'callout',
+        callout: { rich_text: [{ type: 'text', text: { content: '📸 사진 첨부됨 (업로드 실패 - 키오스크에서 직접 확인)' } }], icon: { emoji: '📸' }, color: 'yellow_background' }
+      })
+    }
   }
   const payload = {
     parent: { database_id: env.NOTION_DATABASE_ID },
@@ -352,6 +448,8 @@ const MAIN_HTML = `<!DOCTYPE html>
     .hdr-logo img{height:clamp(28px,4vw,40px);width:auto;}
     .hdr-r{display:flex;align-items:center;gap:8px;}
     .clock{font-size:clamp(11px,1.5vw,14px);font-weight:800;color:var(--blue);background:var(--blue-soft);border:1.5px solid var(--blue-mid);padding:5px 12px;border-radius:100px;font-variant-numeric:tabular-nums;}
+    .home-btn{display:flex;align-items:center;gap:5px;background:var(--g100);border:1.5px solid var(--g200);color:var(--g600);font-family:inherit;font-size:clamp(11px,1.4vw,13px);font-weight:700;padding:6px 14px;border-radius:100px;cursor:pointer;transition:all .2s;}
+    .home-btn:hover{background:var(--blue-soft);border-color:var(--blue-mid);color:var(--blue);}
 
     /* 화면 */
     .screen{display:none;position:relative;z-index:5;}
@@ -550,6 +648,7 @@ const MAIN_HTML = `<!DOCTYPE html>
 <header class="hdr">
   <div class="hdr-logo"><img src="/static/logo_horizontal.png" alt="바꿈수학"/></div>
   <div class="hdr-r">
+    <button id="homeBtn" class="home-btn" onclick="goTo('splash')" style="display:none"><i class="fas fa-house"></i> 홈</button>
     <div class="clock" id="clock">--:--:--</div>
   </div>
 </header>
@@ -648,6 +747,7 @@ const MAIN_HTML = `<!DOCTYPE html>
       <img class="photo-prev" id="photoPrev" alt=""/>
       <div class="photo-ph" id="photoPh"><i class="fas fa-camera"></i><p>사진을 찍거나 갤러리에서 선택!</p><span>카메라 또는 앨범</span></div>
     </div>
+    <textarea id="photoComment" placeholder="선생님께 한마디 남겨도 좋아요! (선택)" style="width:100%;min-height:70px;border:2px solid var(--g200);border-radius:var(--r-md);padding:10px 12px;font-family:inherit;font-size:14px;outline:none;resize:none;margin-bottom:4px;transition:border-color .2s;" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--g200)'"></textarea>
     <div class="modal-btns">
       <button class="btn-mc" onclick="closePhotoModal()">취소</button>
       <button class="btn-mok" id="photoOk" onclick="confirmPhoto()" disabled><i class="fas fa-check"></i>인증 완료</button>
@@ -723,6 +823,9 @@ function goTo(id){
   const el=document.getElementById(MAP[id]);if(!el)return
   el.classList.add('active','fade-up');setTimeout(()=>el.classList.remove('fade-up'),350)
   document.getElementById('cartBar').classList.toggle('visible',id==='menu')
+  // 홈버튼: splash 제외 모든 화면에서 표시
+  const homeBtn=document.getElementById('homeBtn')
+  if(homeBtn) homeBtn.style.display=(id==='splash')?'none':'flex'
   if(id==='student'){document.getElementById('searchInp').value='';filterStudents('')}
   if(id==='splash'){ST.cart=[];ST.student=null;ST.sessionBalance=0;ST.sessionOrders=[];updateCartBar()}
 }
@@ -904,9 +1007,9 @@ window.addToCart=function(id,tab){
   if(item.requirePhoto){ST.pendingItem={item,tab};openPhotoModal(item.label);return}
   pushCart(item,tab,null)
 }
-function pushCart(item,tab,photo){
+function pushCart(item,tab,photo,comment){
   const ex=ST.cart.find(x=>x.id===item.id&&x.tab===tab)
-  if(ex){ex.qty++}else{ST.cart.push({id:item.id,tab,icon:item.icon,label:item.label,cost:item.cost,reward:item.reward||0,requirePhoto:item.requirePhoto,qty:1,photo})}
+  if(ex){ex.qty++}else{ST.cart.push({id:item.id,tab,icon:item.icon,label:item.label,cost:item.cost,reward:item.reward||0,requirePhoto:item.requirePhoto,qty:1,photo,comment:comment||''})}
   updateCartBar();renderMenu()
   showFb(item.icon,item.label)
 }
@@ -932,7 +1035,7 @@ function openPhotoModal(label){
   document.getElementById('photoOk').disabled=true
   ST.photoB64=null;document.getElementById('photo-modal').classList.add('open')
 }
-window.closePhotoModal=function(){document.getElementById('photo-modal').classList.remove('open');ST.pendingItem=null;ST.photoB64=null;document.getElementById('photoInput').value=''}
+window.closePhotoModal=function(){document.getElementById('photo-modal').classList.remove('open');ST.pendingItem=null;ST.photoB64=null;document.getElementById('photoInput').value='';document.getElementById('photoComment').value=''}
 window.triggerPhoto=function(){document.getElementById('photoInput').click()}
 window.onPhoto=function(e){
   const f=e.target.files[0];if(!f)return
@@ -946,7 +1049,10 @@ window.onPhoto=function(e){
 }
 window.confirmPhoto=function(){
   if(!ST.pendingItem||!ST.photoB64)return
-  const{item,tab}=ST.pendingItem;pushCart(item,tab,ST.photoB64);closePhotoModal()
+  const{item,tab}=ST.pendingItem
+  const comment=document.getElementById('photoComment').value.trim()
+  pushCart(item,tab,ST.photoB64,comment)
+  closePhotoModal()
 }
 
 // 확인 모달
@@ -997,7 +1103,16 @@ window.doSubmit=async function(){
   ST.sessionOrders.push({items:[...ST.cart],totalCost:tc,ts,category})
   try{
     const res=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:ST.student.name,items:ST.cart.map(x=>({icon:x.icon,label:x.label,qty:x.qty,tab:x.tab})),totalCost:tc,currency:CFG.currency.unit,category,photoBase64:ST.cart.find(x=>x.photo)?.photo||null,timestamp:ts})})
+      body:JSON.stringify({
+        name:ST.student.name,
+        items:ST.cart.map(x=>({icon:x.icon,label:x.label,qty:x.qty,tab:x.tab,comment:x.comment||''})),
+        totalCost:tc,
+        currency:CFG.currency.unit,
+        category,
+        photoBase64:ST.cart.find(x=>x.photo)?.photo||null,
+        comment:ST.cart.filter(x=>x.comment).map(x=>x.icon+x.label+': '+x.comment).join(' / ')||null,
+        timestamp:ts
+      })})
     const data=await res.json()
     if(ST.student){ST.student.points-=tc}
     await loadStudents()
