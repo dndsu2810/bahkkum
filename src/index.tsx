@@ -1326,13 +1326,14 @@ async function loadStudentData(){
 /* ── 학생 카드 ── */
 function renderStudentCards(){
   const g=document.getElementById('stuCards')
+  // onclick 내 따옴표 충돌 방지: 이름은 data-sname 속성에 저장 후 getElementById로 접근
   g.innerHTML=students.map(s=>{
     const photoEl=s.photo_url
       ?'<img class="sc-photo" src="'+escH(s.photo_url)+'" alt="'+escH(s.name)+'"/>'
       :'<div class="sc-av">'+escH(s.name[0])+'</div>'
     const fineHtml=s.fine_count>0
-      ?'<div class="sc-fine-txt">⚠️ 미납 '+s.fine_count+'건</div>':''
-    return '<div class="stu-card" id="scard-'+s.id+'">'+
+      ?'<div class="sc-fine-txt">&#9888; 미납 '+s.fine_count+'건</div>':''
+    return '<div class="stu-card" id="scard-'+s.id+'" data-sid="'+s.id+'" data-sname="'+escH(s.name)+'">'+
       '<div class="stu-card-top">'+
         '<div class="sc-photo-wrap">'+
           photoEl+
@@ -1342,16 +1343,16 @@ function renderStudentCards(){
         '</div>'+
         '<div class="sc-info">'+
           '<div class="sc-name">'+escH(s.name)+'</div>'+
-          '<div class="sc-pts" id="pts-'+s.id+'">🏅 '+s.points+' 포인트</div>'+
+          '<div class="sc-pts" id="pts-'+s.id+'">&#127885; '+s.points+' 포인트</div>'+
           fineHtml+
         '</div>'+
         '<div class="sc-top-r">'+
-          '<button class="btn-del" onclick="delStudent('+s.id+',\''+escH(s.name)+'\')" title="학생 삭제"><i class="fas fa-trash-can"></i></button>'+
+          '<button class="btn-del" onclick="delStudentById('+s.id+')" title="학생 삭제"><i class="fas fa-trash-can"></i></button>'+
         '</div>'+
       '</div>'+
       '<div class="sc-body">'+
         '<div>'+
-          '<div class="sc-sec-lbl">⚡ 빠른 포인트 조정</div>'+
+          '<div class="sc-sec-lbl">&#9889; 빠른 포인트 조정</div>'+
           '<div class="preset-pts">'+
             '<button class="ppt-btn add" onclick="quickPt('+s.id+',1)">+1</button>'+
             '<button class="ppt-btn add" onclick="quickPt('+s.id+',2)">+2</button>'+
@@ -1363,9 +1364,9 @@ function renderStudentCards(){
           '</div>'+
         '</div>'+
         '<div>'+
-          '<div class="sc-sec-lbl">✏️ 직접 입력</div>'+
+          '<div class="sc-sec-lbl">&#9999; 직접 입력</div>'+
           '<div class="sc-row">'+
-            '<input class="sc-adj-inp" id="adj-'+s.id+'" type="number" placeholder="±숫자"/>'+
+            '<input class="sc-adj-inp" id="adj-'+s.id+'" type="number" placeholder="+/-숫자"/>'+
             '<input class="sc-rsn-inp" id="adjr-'+s.id+'" placeholder="사유 (선택)"/>'+
           '</div>'+
           '<div class="btn-row" style="margin-top:5px;">'+
@@ -1373,7 +1374,7 @@ function renderStudentCards(){
             '<button class="btn-sm red" style="flex:1" onclick="adjustPoints('+s.id+',-1)"><i class="fas fa-minus"></i> 포인트 차감</button>'+
           '</div>'+
         '</div>'+
-        '<button class="btn-sm gray" style="width:100%" onclick="showHistory('+s.id+',\''+escH(s.name)+'\')"><i class="fas fa-history" style="margin-right:4px"></i>포인트 이력 보기</button>'+
+        '<button class="btn-sm gray" style="width:100%" onclick="showHistoryById('+s.id+')"><i class="fas fa-history" style="margin-right:4px"></i>포인트 이력 보기</button>'+
       '</div>'+
     '</div>'
   }).join('')
@@ -1387,13 +1388,21 @@ window.addStudent=async function(){
   if(!name){toast('이름을 입력하세요');return}
   const r=await fetch('/api/admin/students',{method:'POST',headers:authHdr(),body:JSON.stringify({name})})
   const d=await r.json()
-  if(d.success){inp.value='';await loadStudentData();toast('✅ 학생 추가: '+name)}
+  if(d.success){inp.value='';await loadStudentData();toast('학생 추가: '+name)}
   else toast('오류: '+d.error)
+}
+// ID만으로 삭제 (onclick에서 따옴표 충돌 방지)
+window.delStudentById=async function(id){
+  const card=document.getElementById('scard-'+id)
+  const name=card?card.getAttribute('data-sname'):id
+  if(!confirm(name+' 학생을 삭제할까요? (포인트 이력도 모두 삭제됩니다)'))return
+  await fetch('/api/admin/students/'+id,{method:'DELETE',headers:authHdr()})
+  await loadStudentData();toast('삭제됨: '+name)
 }
 window.delStudent=async function(id,name){
   if(!confirm(name+' 학생을 삭제할까요? (포인트 이력도 모두 삭제됩니다)'))return
   await fetch('/api/admin/students/'+id,{method:'DELETE',headers:authHdr()})
-  await loadStudentData();toast('🗑️ 삭제됨: '+name)
+  await loadStudentData();toast('삭제됨: '+name)
 }
 
 /* ── 사진 업로드 ── */
@@ -1439,6 +1448,12 @@ window.adjustPoints=async function(id,sign){
 }
 
 /* ── 포인트 이력 모달 ── */
+// ID만으로 이력 보기 (onclick에서 따옴표 충돌 방지)
+window.showHistoryById=async function(id){
+  const card=document.getElementById('scard-'+id)
+  const name=card?card.getAttribute('data-sname'):'학생'
+  window.showHistory(id,name)
+}
 window.showHistory=async function(id,name){
   document.getElementById('histTitle').textContent='📊 '+name+' 포인트 이력'
   document.getElementById('histList').innerHTML='<div style="text-align:center;padding:20px;color:var(--g400)">불러오는 중...</div>'
