@@ -103,6 +103,26 @@ app.post('/api/submit', async (c) => {
   }
 })
 
+// 학생 요청사항 제출
+app.post('/api/request', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { name, message, photoBase64, timestamp } = body
+    if (!name || !message) return c.json({ success: false, error: '이름과 메시지 필요' }, 400)
+    const [slackR, notionR] = await Promise.allSettled([
+      sendSlackRequest(c.env, { name, message, photoBase64, timestamp }),
+      saveNotionRequest(c.env, { name, message, photoBase64, timestamp }),
+    ])
+    return c.json({
+      success: true,
+      slack: slackR.status === 'fulfilled' && slackR.value,
+      notion: notionR.status === 'fulfilled' && notionR.value,
+    })
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500)
+  }
+})
+
 app.get('/api/health', (c) => c.json({
   status: 'ok',
   slack: !!c.env.SLACK_WEBHOOK_URL,
@@ -202,6 +222,56 @@ async function saveNotion(env: Bindings, d: any) {
       '접수 일시': { date: { start: new Date().toISOString() } },
       '상태': { select: { name: '접수 완료' } },
     },
+  }
+  const res = await fetch('https://api.notion.com/v1/pages', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) { const t = await res.text(); throw new Error(`Notion ${res.status}: ${t}`) }
+  return true
+}
+
+// ── 요청사항 Slack ─────────────────────────────────────────────────────────────
+async function sendSlackRequest(env: Bindings, d: any) {
+  if (!env.SLACK_WEBHOOK_URL) return false
+  const blocks: any[] = [
+    { type: 'header', text: { type: 'plain_text', text: '바꿈수학 - 선생님께 요청사항', emoji: true } },
+    { type: 'section', text: { type: 'mrkdwn', text: `*학생:* ${d.name}\n*메시지:*\n${d.message}` } },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${d.timestamp}` }] },
+    { type: 'divider' },
+  ]
+  if (d.photoBase64) {
+    blocks.splice(2, 0, { type: 'section', text: { type: 'mrkdwn', text: '📎 이미지 첨부 있음 (노션에서 확인)' } })
+  }
+  const res = await fetch(env.SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }) })
+  if (!res.ok) throw new Error(`Slack ${res.status}`)
+  return true
+}
+
+// ── 요청사항 Notion ────────────────────────────────────────────────────────────
+async function saveNotionRequest(env: Bindings, d: any) {
+  if (!env.NOTION_API_KEY || !env.NOTION_DATABASE_ID) return false
+  const children: any[] = [
+    { object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: d.message } }] } },
+  ]
+  if (d.photoBase64) {
+    children.push({
+      object: 'block', type: 'image',
+      image: { type: 'external', external: { url: d.photoBase64 } }
+    })
+  }
+  const payload = {
+    parent: { database_id: env.NOTION_DATABASE_ID },
+    properties: {
+      '학생 이름': { title: [{ text: { content: d.name } }] },
+      '항목': { rich_text: [{ text: { content: d.message.slice(0, 100) } }] },
+      '금액': { rich_text: [{ text: { content: '요청사항' } }] },
+      '구분': { multi_select: [{ name: '요청사항' }] },
+      '접수 일시': { date: { start: new Date().toISOString() } },
+      '상태': { select: { name: '검토 중' } },
+    },
+    children,
   }
   const res = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
@@ -370,10 +440,14 @@ const MAIN_HTML = `<!DOCTYPE html>
     .type-fine  .menu-cost-tag{background:var(--red-s);color:var(--red);border:1px solid rgba(239,68,68,.2);}
     .type-shop  .menu-cost-tag{background:var(--purple-s);color:var(--purple);border:1px solid rgba(168,85,247,.2);}
     .photo-badge-sm{position:absolute;top:-2px;right:-2px;background:var(--orange);color:white;font-size:9px;font-weight:900;padding:2px 6px;border-radius:100px;}
-    .qty-chip{position:absolute;top:-6px;right:-6px;background:var(--blue);color:white;font-size:11px;font-weight:900;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid white;}
-    .type-learn .qty-chip{background:var(--green);}
-    .type-fine  .qty-chip{background:var(--red);}
-    .type-shop  .qty-chip{background:var(--purple);}
+    .qty-ctrl{display:flex;align-items:center;border-radius:100px;overflow:hidden;border:2px solid var(--blue-d);background:var(--white);margin-top:4px;}
+    .type-learn .qty-ctrl{border-color:var(--green);}
+    .type-fine  .qty-ctrl{border-color:var(--red);}
+    .type-shop  .qty-ctrl{border-color:var(--purple);}
+    .qty-minus,.qty-plus{width:30px;height:30px;border:none;cursor:pointer;font-size:17px;font-weight:900;display:flex;align-items:center;justify-content:center;background:transparent;line-height:1;}
+    .qty-minus{color:var(--red);} .qty-plus{color:var(--green);}
+    .qty-num{font-size:14px;font-weight:900;min-width:24px;text-align:center;color:var(--g800);}
+    .menu-btn{cursor:pointer;}
 
     /* 장바구니 바 */
     .cart-bar{position:fixed;bottom:0;left:0;right:0;z-index:50;background:rgba(255,255,255,.97);backdrop-filter:blur(14px);border-top:1.5px solid var(--g200);box-shadow:0 -4px 24px rgba(0,0,0,.08);padding:clamp(9px,1.6vw,13px) clamp(14px,3vw,28px);display:none;align-items:center;justify-content:space-between;gap:10px;}
@@ -519,7 +593,10 @@ const MAIN_HTML = `<!DOCTYPE html>
         <div class="stu-banner-name" id="bannerName"></div>
         <div class="stu-banner-stats" id="bannerStats"></div>
       </div>
-      <button class="btn-change" onclick="goTo('student')"><i class="fas fa-exchange-alt" style="margin-right:3px"></i>변경</button>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn-change" onclick="openReqModal()" style="background:rgba(168,85,247,.25);border-color:rgba(168,85,247,.4);" title="요청하기"><i class="fas fa-comment-dots"></i></button>
+        <button class="btn-change" onclick="goTo('student')"><i class="fas fa-exchange-alt" style="margin-right:3px"></i>변경</button>
+      </div>
     </div>
     <div class="tab-row" id="tabRow">
       <button class="tab-btn active-learn" onclick="switchTab('learn')" id="tab-learn"><div class="tab-dot"></div>학습 활동</button>
@@ -556,6 +633,7 @@ const MAIN_HTML = `<!DOCTYPE html>
   </div>
   <div class="cart-btns">
     <button class="btn-cc" onclick="clearCart()"><i class="fas fa-trash"></i></button>
+    <button class="btn-cc" onclick="openReqModal()" style="background:var(--purple-s);border-color:rgba(168,85,247,.3);color:var(--purple);" title="선생님께 요청하기"><i class="fas fa-comment-dots"></i></button>
     <button class="btn-cs" onclick="openConfirm()"><i class="fas fa-paper-plane"></i>제출하기</button>
   </div>
 </div>
@@ -590,6 +668,24 @@ const MAIN_HTML = `<!DOCTYPE html>
     <div class="modal-btns">
       <button class="btn-mc" onclick="closeConfirm()"><i class="fas fa-xmark" style="margin-right:4px"></i>취소</button>
       <button class="btn-mok" id="confirmOk" onclick="doSubmit()"><i class="fas fa-paper-plane"></i><span id="confirmTxt">제출하기</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- 요청사항 모달 -->
+<div class="modal-ov" id="req-modal">
+  <div class="modal-box">
+    <div class="modal-title">💬 선생님께 요청해요</div>
+    <div class="modal-sub" style="margin-bottom:12px">이미지나 문자로 요청사항을 남겨드려요!</div>
+    <textarea id="reqMsg" placeholder="선생님께 하고 싶은 말을 써주세요..." style="width:100%;min-height:90px;border:2px solid var(--g200);border-radius:var(--r-md);padding:10px 12px;font-family:inherit;font-size:14px;outline:none;resize:vertical;transition:all .2s;" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--g200)'"></textarea>
+    <div class="photo-zone" style="margin:10px 0;" onclick="document.getElementById('reqPhoto').click()">
+      <input type="file" id="reqPhoto" accept="image/*" style="display:none" onchange="onReqPhoto(event)"/>
+      <img class="photo-prev" id="reqPrev" alt="" style="display:none;max-width:100%;max-height:160px;border-radius:var(--r-md);margin:0 auto;"/>
+      <div id="reqPh" class="photo-ph"><i class="fas fa-image"></i><p>사진 첨부 (선택)</p><span>탭해서 갤러리에서 선택</span></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-mc" onclick="closeReqModal()">취소</button>
+      <button class="btn-mok" id="reqOk" onclick="doRequest()"><i class="fas fa-paper-plane"></i><span id="reqTxt">전송하기</span></button>
     </div>
   </div>
 </div>
@@ -729,25 +825,77 @@ function renderMenu(){
   const g=document.getElementById('menuGrid')
   const c=CFG.currency
   g.innerHTML=items.map(m=>{
+    // 보강신청은 외부 링크
+    if(m.id==='makeup'||m.externalUrl){
+      const url=m.externalUrl||'https://forms.gle/XwZk3PdQk9HVPVfW6'
+      return '<div class="menu-btn type-'+ST.tab+' btn-menu-ext" data-url="'+url+'">'+
+        '<div class="menu-ic-wrap">'+m.icon+'</div>'+
+        '<div class="menu-lbl">'+escHtml(m.label)+'</div>'+
+        '<div class="menu-cost-tag" style="background:var(--blue-soft);color:var(--blue);border-color:var(--blue-mid)">외부링크</div>'+
+      '</div>'
+    }
     const ci=ST.cart.find(x=>x.id===m.id&&x.tab===ST.tab)
     const qty=ci?ci.qty:0
     const inCart=qty>0
-    let costTxt=ST.tab==='learn'?(m.reward>0?'+'+m.reward+' '+c.symbol:'무료'):ST.tab==='fine'?'-'+m.cost+' '+c.unit:m.cost+' '+c.symbol
-    const photoBadge=m.requirePhoto?'<div class="photo-badge-sm">📸</div>':''
-    const qtyChip=qty>0?'<div class="qty-chip">'+qty+'</div>':''
-    return '<button class="menu-btn type-'+ST.tab+(inCart?' in-cart':'')+' btn-menu-item" data-id="'+m.id+'" data-tab="'+ST.tab+'">'+
+    let costTxt
+    if(ST.tab==='learn'){
+      const netPts=(m.reward||0)-(m.cost||0)
+      costTxt=netPts>0?'+'+netPts+' '+c.symbol:netPts<0?netPts+' '+c.unit:'무료'
+    } else if(ST.tab==='fine'){
+      costTxt='-'+m.cost+' '+c.unit+(m.reward>0?' (+'+m.reward+c.symbol+')':'')
+    } else {
+      costTxt=m.cost+' '+c.symbol
+    }
+    const photoBadge=m.requirePhoto?'<div class="photo-badge-sm">cam</div>':''
+    let bottomHtml
+    if(qty>0){
+      bottomHtml='<div class="qty-ctrl" data-id="'+m.id+'" data-tab="'+ST.tab+'">'+
+        '<button class="qty-minus">-</button>'+
+        '<span class="qty-num">'+qty+'</span>'+
+        '<button class="qty-plus">+</button>'+
+      '</div>'
+    } else {
+      bottomHtml='<div class="menu-cost-tag">'+costTxt+'</div>'
+    }
+    return '<div class="menu-btn type-'+ST.tab+(inCart?' in-cart':'')+' btn-menu-item" data-id="'+m.id+'" data-tab="'+ST.tab+'">'+
       photoBadge+
-      '<div class="menu-ic-wrap">'+m.icon+qtyChip+'</div>'+
+      '<div class="menu-ic-wrap">'+m.icon+'</div>'+
       '<div class="menu-lbl">'+escHtml(m.label)+'</div>'+
-      '<div class="menu-cost-tag">'+costTxt+'</div>'+
-    '</button>'
+      bottomHtml+
+    '</div>'
   }).join('')
 }
 
-// 메뉴 그리드 이벤트 위임 (onclick 대신 data-* 속성 사용)
+// 메뉴 그리드 이벤트 위임
 document.addEventListener('click',function(e){
+  // 외부링크 버튼
+  const extBtn=e.target.closest('.btn-menu-ext')
+  if(extBtn){window.open(extBtn.dataset.url,'_blank');return}
+  // 수량 + 버튼
+  if(e.target.closest('.qty-plus')){
+    const ctrl=e.target.closest('.qty-ctrl')
+    if(ctrl){
+      const ex=ST.cart.find(x=>x.id===ctrl.dataset.id&&x.tab===ctrl.dataset.tab)
+      if(ex){ex.qty++;updateCartBar();renderMenu()}
+    }
+    return
+  }
+  // 수량 - 버튼
+  if(e.target.closest('.qty-minus')){
+    const ctrl=e.target.closest('.qty-ctrl')
+    if(ctrl){
+      const ex=ST.cart.find(x=>x.id===ctrl.dataset.id&&x.tab===ctrl.dataset.tab)
+      if(ex){
+        ex.qty--
+        if(ex.qty<=0)ST.cart.splice(ST.cart.indexOf(ex),1)
+        updateCartBar();renderMenu()
+      }
+    }
+    return
+  }
+  // 메뉴 카드 클릭 (수량 컨트롤 영역 제외)
   const btn=e.target.closest('.btn-menu-item')
-  if(btn){window.addToCart(btn.dataset.id,btn.dataset.tab)}
+  if(btn&&!e.target.closest('.qty-ctrl')){window.addToCart(btn.dataset.id,btn.dataset.tab)}
 })
 
 // 장바구니
@@ -821,7 +969,20 @@ window.openConfirm=function(){
   document.getElementById('confirm-modal').classList.add('open')
 }
 window.closeConfirm=function(){document.getElementById('confirm-modal').classList.remove('open')}
-function calcTotal(){return ST.cart.reduce((a,x)=>{if(x.tab==='learn')return a-(x.reward||0)*x.qty;return a+x.cost*x.qty},0)}
+function calcTotal(){
+  return ST.cart.reduce((a,x)=>{
+    if(x.tab==='learn'){
+      // learn: reward 있으면 획득(음수), cost 있으면 차감(양수)
+      return a - (x.reward||0)*x.qty + (x.cost||0)*x.qty
+    }
+    if(x.tab==='fine'){
+      // fine: cost 차감 - reward 획득 (벌점이지만 일부 보상 가능)
+      return a + (x.cost||0)*x.qty - (x.reward||0)*x.qty
+    }
+    // shop: cost 차감
+    return a + (x.cost||0)*x.qty
+  },0)
+}
 
 // 제출
 window.doSubmit=async function(){
@@ -884,6 +1045,45 @@ function launchConfetti(){
     },i*60)
   }
 }
+// 요청사항 모달
+let REQ_B64=null
+window.openReqModal=function(){
+  if(!ST.student){showFb('💬','먼저 학생을 선택해주세요!');return}
+  document.getElementById('reqMsg').value=''
+  document.getElementById('reqPrev').style.display='none'
+  document.getElementById('reqPh').style.display='block'
+  document.getElementById('reqPhoto').value=''
+  REQ_B64=null
+  document.getElementById('req-modal').classList.add('open')
+}
+window.closeReqModal=function(){
+  document.getElementById('req-modal').classList.remove('open')
+}
+window.onReqPhoto=function(e){
+  const f=e.target.files[0];if(!f)return
+  const reader=new FileReader()
+  reader.onload=function(ev){
+    REQ_B64=ev.target.result
+    const p=document.getElementById('reqPrev');p.src=REQ_B64;p.style.display='block'
+    document.getElementById('reqPh').style.display='none'
+  };reader.readAsDataURL(f)
+}
+window.doRequest=async function(){
+  const msg=document.getElementById('reqMsg').value.trim()
+  if(!msg&&!REQ_B64){showFb('💬','내용을 입력하거나 사진을 첨부해주세요!');return}
+  const btn=document.getElementById('reqOk')
+  btn.disabled=true;document.getElementById('reqTxt').textContent='전송 중...'
+  const ts=new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})
+  try{
+    const res=await fetch('/api/request',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:ST.student.name,message:msg||'(사진만 첨부)',photoBase64:REQ_B64,timestamp:ts})})
+    const d=await res.json()
+    closeReqModal()
+    showFb('💬','요청사항 전송 완료!')
+  }catch(err){showFb('💬','전송 실패. 다시 시도해주세요.')}
+  finally{btn.disabled=false;document.getElementById('reqTxt').textContent='전송하기'}
+}
+
 init()
 })()
 </script>
