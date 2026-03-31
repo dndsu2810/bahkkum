@@ -82,28 +82,30 @@ app.get('/admin', (c) => c.html(ADMIN_HTML))
 
 // ── 기본 설정 ──────────────────────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
-  currency: { unit: '별', symbol: '⭐', desc: '열심히 공부하면 별을 받아요!' },
-  students: ['김민준','이서연','박지우','최하은','정도윤','강서현','윤민서','장준혁','임지원','한소율','오현우','신예린','류재원','노은지','문성훈'],
+  currency: { unit: '포인트', symbol: '🏅', desc: '포인트를 모아서 간식이랑 교환해요!' },
+  students: ['민서준','김하린','박재이','정시우','정시원','최다연','안하윤'],
   menu: {
     learn: [
-      { id:'study',    icon:'📖', label:'자습 인증하기',    cost:0, reward:2, requirePhoto:false },
-      { id:'homework', icon:'✏️', label:'숙제 제출 완료',   cost:0, reward:1, requirePhoto:false },
-      { id:'question', icon:'🙋', label:'질문하기',         cost:0, reward:1, requirePhoto:false },
-      { id:'record',   icon:'📝', label:'모르는 문제 기록', cost:0, reward:2, requirePhoto:true  },
-      { id:'material', icon:'📄', label:'추가 학습지 요청', cost:0, reward:0, requirePhoto:false },
+      { id:'study',    icon:'📖', label:'자습 인증하기',        cost:0, reward:2, requirePhoto:true  },
+      { id:'homework', icon:'✏️', label:'숙제 제출하기',        cost:0, reward:1, requirePhoto:false },
+      { id:'question', icon:'🙋', label:'질문하기',             cost:0, reward:1, requirePhoto:false },
+      { id:'record',   icon:'📝', label:'모르는 문제 기록하기', cost:0, reward:2, requirePhoto:true  },
+      { id:'material', icon:'📄', label:'추가 학습지 요청',     cost:0, reward:0, requirePhoto:false },
+      { id:'makeup',   icon:'📅', label:'보강 신청',            cost:0, reward:0, requirePhoto:false },
+      { id:'consult',  icon:'💬', label:'상담 요청',            cost:0, reward:0, requirePhoto:false },
     ],
     fine: [
-      { id:'callteacher', icon:'🔔', label:'선생님 호출', cost:3, reward:0, requirePhoto:false },
-      { id:'lostwork',    icon:'😰', label:'숙제 분실',   cost:4, reward:0, requirePhoto:false },
-      { id:'nohomework',  icon:'🚫', label:'숙제 안함',   cost:5, reward:0, requirePhoto:false },
+      { id:'helpme',      icon:'🆘', label:'지현쌤 Help me!', cost:3, reward:0, requirePhoto:false },
+      { id:'lostwork',    icon:'😰', label:'숙제 분실',        cost:4, reward:0, requirePhoto:false },
+      { id:'nohomework',  icon:'🚫', label:'숙제 안함',        cost:5, reward:0, requirePhoto:false },
     ],
     shop: [
-      { id:'snack',     icon:'🍬', label:'간식 교환권',    cost:5,  reward:0, requirePhoto:false },
-      { id:'sticker',   icon:'🌟', label:'스티커 1장',     cost:2,  reward:0, requirePhoto:false },
-      { id:'pencil',    icon:'✏️', label:'연필 1자루',     cost:3,  reward:0, requirePhoto:false },
-      { id:'eraser',    icon:'🧹', label:'지우개',         cost:4,  reward:0, requirePhoto:false },
-      { id:'freetime',  icon:'⏱️', label:'자유시간 10분',  cost:10, reward:0, requirePhoto:false },
-      { id:'worksheet', icon:'📋', label:'학습지 2장',     cost:3,  reward:0, requirePhoto:false },
+      { id:'choco',    icon:'🍫', label:'초콜릿(달달구리)', cost:3, reward:0, requirePhoto:false },
+      { id:'jelly',    icon:'🍬', label:'젤리',             cost:2, reward:0, requirePhoto:false },
+      { id:'candy',    icon:'🍭', label:'사탕',             cost:2, reward:0, requirePhoto:false },
+      { id:'snack',    icon:'🍿', label:'과자',             cost:3, reward:0, requirePhoto:false },
+      { id:'saekkomdal',icon:'🍋',label:'새콤달콤',         cost:2, reward:0, requirePhoto:false },
+      { id:'vitaminc', icon:'💊', label:'비타민C',          cost:2, reward:0, requirePhoto:false },
     ],
   },
 }
@@ -743,10 +745,10 @@ const MAIN_HTML = `<!DOCTYPE html>
   <div class="splash-desc">초등수학 전용 · Made by 이지현 선생님</div>
   <div class="floating-icons" id="floatingIcons">
     <span class="fi">📖</span>
-    <span class="fi">✏️</span>
-    <span class="fi">🌟</span>
+    <span class="fi">🏅</span>
+    <span class="fi">🍫</span>
     <span class="fi">🏆</span>
-    <span class="fi">🎯</span>
+    <span class="fi">🍬</span>
     <span class="fi">🎉</span>
   </div>
   <button class="tap-pulse-btn">
@@ -907,8 +909,11 @@ const MAIN_HTML = `<!DOCTYPE html>
 
 <script>
 (function(){
+/* ─── 설정 버전 (이 값을 올리면 localStorage 캐시 무시하고 서버 기본값 사용) ─── */
+const CFG_VERSION = '2025-v2'
+
 /* ─── 상태 ─── */
-let CFG = { currency:{unit:'별',symbol:'⭐',desc:''}, students:[], menu:{learn:[],fine:[],shop:[]} }
+let CFG = { currency:{unit:'포인트',symbol:'🏅',desc:''}, students:[], menu:{learn:[],fine:[],shop:[]} }
 let ST = {
   student: null,
   tab: 'learn',
@@ -976,9 +981,17 @@ async function loadCfg(){
   try{
     const r=await fetch('/api/config')
     const d=await r.json()
+    const savedVer=localStorage.getItem('kiosk_config_version')
     const local=localStorage.getItem('kiosk_config')
-    if(local){ try{ CFG=JSON.parse(local) }catch{ CFG=d } }
-    else CFG=d
+    // 버전이 같고 로컬 데이터가 있으면 로컬 사용 (관리자 수정 유지)
+    if(local && savedVer===CFG_VERSION){
+      try{ CFG=JSON.parse(local) }catch{ CFG=d }
+    } else {
+      // 버전이 다르면 서버 기본값 사용 후 버전 갱신
+      CFG=d
+      localStorage.removeItem('kiosk_config')
+      localStorage.setItem('kiosk_config_version', CFG_VERSION)
+    }
   }catch{}
   applyCurrencyUI()
   renderStudents()
@@ -1514,9 +1527,9 @@ const ADMIN_HTML = `<!DOCTYPE html>
 <script>
 (function(){
 const PRESETS=[
+  {unit:'포인트',symbol:'🏅',desc:'포인트를 모아서 간식이랑 교환해요!'},
   {unit:'별',    symbol:'⭐',desc:'열심히 공부하면 별을 받아요!'},
   {unit:'코인',  symbol:'🪙',desc:'코인을 모아서 보상을 받아요!'},
-  {unit:'포인트',symbol:'💎',desc:'포인트를 쌓아보세요!'},
   {unit:'학습지',symbol:'📄',desc:'학습지로 교환할 수 있어요!'},
   {unit:'시간',  symbol:'⏰',desc:'자유시간을 획득해요!'},
   {unit:'하트',  symbol:'❤️',desc:'하트를 모아봐요!'},
@@ -1524,27 +1537,30 @@ const PRESETS=[
   {unit:'도장',  symbol:'🔖',desc:'도장을 모아요!'},
 ]
 const DEFAULT={
-  currency:{unit:'별',symbol:'⭐',desc:'열심히 공부하면 별을 받아요!'},
-  students:['김민준','이서연','박지우','최하은','정도윤','강서현','윤민서','장준혁','임지원','한소율'],
+  currency:{unit:'포인트',symbol:'🏅',desc:'포인트를 모아서 간식이랑 교환해요!'},
+  students:['민서준','김하린','박재이','정시우','정시원','최다연','안하윤'],
   menu:{
     learn:[
-      {id:'study',   icon:'📖',label:'자습 인증하기',   cost:0,reward:2,requirePhoto:false},
-      {id:'homework',icon:'✏️',label:'숙제 제출 완료',  cost:0,reward:1,requirePhoto:false},
-      {id:'question',icon:'🙋',label:'질문하기',        cost:0,reward:1,requirePhoto:false},
-      {id:'record',  icon:'📝',label:'모르는 문제 기록',cost:0,reward:2,requirePhoto:true},
-      {id:'material',icon:'📄',label:'추가 학습지 요청',cost:0,reward:0,requirePhoto:false},
+      {id:'study',   icon:'📖',label:'자습 인증하기',        cost:0,reward:2,requirePhoto:true},
+      {id:'homework',icon:'✏️',label:'숙제 제출하기',        cost:0,reward:1,requirePhoto:false},
+      {id:'question',icon:'🙋',label:'질문하기',             cost:0,reward:1,requirePhoto:false},
+      {id:'record',  icon:'📝',label:'모르는 문제 기록하기', cost:0,reward:2,requirePhoto:true},
+      {id:'material',icon:'📄',label:'추가 학습지 요청',     cost:0,reward:0,requirePhoto:false},
+      {id:'makeup',  icon:'📅',label:'보강 신청',            cost:0,reward:0,requirePhoto:false},
+      {id:'consult', icon:'💬',label:'상담 요청',            cost:0,reward:0,requirePhoto:false},
     ],
     fine:[
-      {id:'callteacher',icon:'🔔',label:'선생님 호출',cost:3,reward:0,requirePhoto:false},
-      {id:'lostwork',   icon:'😰',label:'숙제 분실',  cost:4,reward:0,requirePhoto:false},
-      {id:'nohomework', icon:'🚫',label:'숙제 안함',  cost:5,reward:0,requirePhoto:false},
+      {id:'helpme',     icon:'🆘',label:'지현쌤 Help me!',cost:3,reward:0,requirePhoto:false},
+      {id:'lostwork',   icon:'😰',label:'숙제 분실',       cost:4,reward:0,requirePhoto:false},
+      {id:'nohomework', icon:'🚫',label:'숙제 안함',       cost:5,reward:0,requirePhoto:false},
     ],
     shop:[
-      {id:'snack',    icon:'🍬',label:'간식 교환권',   cost:5, reward:0,requirePhoto:false},
-      {id:'sticker',  icon:'🌟',label:'스티커 1장',    cost:2, reward:0,requirePhoto:false},
-      {id:'pencil',   icon:'✏️',label:'연필 1자루',    cost:3, reward:0,requirePhoto:false},
-      {id:'freetime', icon:'⏱️',label:'자유시간 10분', cost:10,reward:0,requirePhoto:false},
-      {id:'worksheet',icon:'📋',label:'학습지 2장',    cost:3, reward:0,requirePhoto:false},
+      {id:'choco',     icon:'🍫',label:'초콜릿(달달구리)',cost:3,reward:0,requirePhoto:false},
+      {id:'jelly',     icon:'🍬',label:'젤리',            cost:2,reward:0,requirePhoto:false},
+      {id:'candy',     icon:'🍭',label:'사탕',            cost:2,reward:0,requirePhoto:false},
+      {id:'snack',     icon:'🍿',label:'과자',            cost:3,reward:0,requirePhoto:false},
+      {id:'saekkomdal',icon:'🍋',label:'새콤달콤',        cost:2,reward:0,requirePhoto:false},
+      {id:'vitaminc',  icon:'💊',label:'비타민C',         cost:2,reward:0,requirePhoto:false},
     ],
   },
 }
@@ -1668,16 +1684,18 @@ window.addItem=function(type){
 
 /* 저장 */
 window.saveCfg=function(){
-  cfg.currency.unit  =document.getElementById('curUnit').value.trim()||'별'
-  cfg.currency.symbol=document.getElementById('curSymbol').value.trim()||'⭐'
+  cfg.currency.unit  =document.getElementById('curUnit').value.trim()||'포인트'
+  cfg.currency.symbol=document.getElementById('curSymbol').value.trim()||'🏅'
   cfg.currency.desc  =document.getElementById('curDesc').value.trim()
   localStorage.setItem('kiosk_config',JSON.stringify(cfg))
+  localStorage.setItem('kiosk_config_version','2025-v2')
   renderAll(); toast('✅ 저장 완료! 키오스크에 즉시 반영됩니다')
 }
 window.resetAll=function(){
   if(!confirm('기본값으로 초기화할까요?')) return
   cfg=JSON.parse(JSON.stringify(DEFAULT))
   localStorage.removeItem('kiosk_config')
+  localStorage.removeItem('kiosk_config_version')
   renderAll(); toast('기본값으로 초기화됨')
 }
 
