@@ -637,9 +637,9 @@ async function init(){
   try{
     const r=await fetch('/api/config');const d=await r.json()
     const sv=localStorage.getItem('kiosk_cfg_ver');const lc=localStorage.getItem('kiosk_config')
-    if(lc&&sv===CFG_VER){try{CFG=JSON.parse(lc)}catch{CFG=d}}
+    if(lc&&sv===CFG_VER){try{CFG=JSON.parse(lc)}catch(e){CFG=d}}
     else{CFG=d;localStorage.removeItem('kiosk_config');localStorage.setItem('kiosk_cfg_ver',CFG_VER)}
-  }catch{}
+  }catch(e){}
   applyCurrencyUI()
   await loadStudents()
   goTo('splash')
@@ -649,11 +649,11 @@ async function loadStudents(){
   try{
     const r=await fetch('/api/students');const d=await r.json()
     if(d.success){STUDENTS=d.students;renderStudents()}
-  }catch{}
+  }catch(e){}
 }
 
 function applyCurrencyUI(){
-  const c=CFG.currency
+  const c=CFG.currency || {unit:'포인트', symbol:'\uD83C\uDFC5', desc:''}
   document.getElementById('spSym').textContent=c.symbol
   document.getElementById('spDesc').textContent=c.desc||c.symbol+' '+c.unit+' 모으기!'
 }
@@ -735,7 +735,7 @@ function renderMenu(){
     let costTxt=ST.tab==='learn'?(m.reward>0?'+'+m.reward+' '+c.symbol:'무료'):ST.tab==='fine'?'-'+m.cost+' '+c.unit:m.cost+' '+c.symbol
     const photoBadge=m.requirePhoto?'<div class="photo-badge-sm">📸</div>':''
     const qtyChip=qty>0?'<div class="qty-chip">'+qty+'</div>':''
-    return '<button class="menu-btn type-'+ST.tab+(inCart?' in-cart':'')+'" onclick="addToCart(\''+m.id+'\',\''+ST.tab+'\')">'+
+    return '<button class="menu-btn type-'+ST.tab+(inCart?' in-cart':'')+' btn-menu-item" data-id="'+m.id+'" data-tab="'+ST.tab+'">'+
       photoBadge+
       '<div class="menu-ic-wrap">'+m.icon+qtyChip+'</div>'+
       '<div class="menu-lbl">'+escHtml(m.label)+'</div>'+
@@ -743,6 +743,12 @@ function renderMenu(){
     '</button>'
   }).join('')
 }
+
+// 메뉴 그리드 이벤트 위임 (onclick 대신 data-* 속성 사용)
+document.addEventListener('click',function(e){
+  const btn=e.target.closest('.btn-menu-item')
+  if(btn){window.addToCart(btn.dataset.id,btn.dataset.tab)}
+})
 
 // 장바구니
 window.addToCart=function(id,tab){
@@ -838,15 +844,16 @@ window.doSubmit=async function(){
     const updStu=STUDENTS.find(x=>x.id===ST.student.id)
     if(updStu) ST.student=updStu
     closeConfirm();renderDone(data.slack,data.notion,ts,tc)
-  }catch{closeConfirm();renderDone(false,false,ts,tc)}
+  }catch(err){closeConfirm();renderDone(false,false,ts,tc)}
   finally{ST.submitting=false}
 }
 
 // 완료 화면
 function renderDone(slackOk,notionOk,ts,tc){
   const c=CFG.currency
-  const hasFine=ST.sessionOrders.at(-1)?.category==='fine'
-  const hasShop=ST.sessionOrders.at(-1)?.category==='shop'
+  const lastOrder=ST.sessionOrders[ST.sessionOrders.length-1]
+  const hasFine=lastOrder&&lastOrder.category==='fine'
+  const hasShop=lastOrder&&lastOrder.category==='shop'
   document.getElementById('doneEmoji').textContent=hasFine?'\uD83D\uDE05':hasShop?'\uD83D\uDECD':'\uD83C\uDF89'
   document.getElementById('doneTitle').textContent=hasFine?'기록 완료!':hasShop?'교환 완료! 🎊':'잘했어요! 🌟'
   const newPts=ST.student?ST.student.points:0
