@@ -1350,7 +1350,6 @@ function renderStudentCards(){
         '</div>'+
       '</div>'+
       '<div class="sc-body">'+
-        // 빠른 포인트 조정
         '<div>'+
           '<div class="sc-sec-lbl">⚡ 빠른 포인트 조정</div>'+
           '<div class="preset-pts">'+
@@ -1363,7 +1362,6 @@ function renderStudentCards(){
             '<button class="ppt-btn sub" onclick="quickPt('+s.id+',-5)">-5</button>'+
           '</div>'+
         '</div>'+
-        // 직접 입력 조정
         '<div>'+
           '<div class="sc-sec-lbl">✏️ 직접 입력</div>'+
           '<div class="sc-row">'+
@@ -1375,7 +1373,6 @@ function renderStudentCards(){
             '<button class="btn-sm red" style="flex:1" onclick="adjustPoints('+s.id+',-1)"><i class="fas fa-minus"></i> 포인트 차감</button>'+
           '</div>'+
         '</div>'+
-        // 이력 보기
         '<button class="btn-sm gray" style="width:100%" onclick="showHistory('+s.id+',\''+escH(s.name)+'\')"><i class="fas fa-history" style="margin-right:4px"></i>포인트 이력 보기</button>'+
       '</div>'+
     '</div>'
@@ -1394,7 +1391,7 @@ window.addStudent=async function(){
   else toast('오류: '+d.error)
 }
 window.delStudent=async function(id,name){
-  if(!confirm(name+' 학생을 삭제할까요?\n(포인트 이력도 모두 삭제됩니다)'))return
+  if(!confirm(name+' 학생을 삭제할까요? (포인트 이력도 모두 삭제됩니다)'))return
   await fetch('/api/admin/students/'+id,{method:'DELETE',headers:authHdr()})
   await loadStudentData();toast('🗑️ 삭제됨: '+name)
 }
