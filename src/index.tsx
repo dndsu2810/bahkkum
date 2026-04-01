@@ -123,6 +123,96 @@ app.post('/api/request', async (c) => {
   }
 })
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  API: 번호표
+// ══════════════════════════════════════════════════════════════════════════════
+
+// KST 오늘 날짜 (YYYY-MM-DD)
+function getKSTDate() {
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return kst.toISOString().slice(0, 10)
+}
+
+// 번호표 발급
+app.post('/api/queue/draw', async (c) => {
+  try {
+    const { studentName } = await c.req.json()
+    if (!studentName) return c.json({ success: false, error: '이름 필요' }, 400)
+    const today = getKSTDate()
+
+    // 오늘 이미 번호표 뽑았는지 + 연속 발급 여부 체크
+    const existing = await c.env.DB.prepare(
+      'SELECT * FROM queue WHERE student_name=? AND date=? ORDER BY created_at DESC LIMIT 1'
+    ).bind(studentName, today).first() as any
+
+    if (existing) {
+      return c.json({ success: false, error: 'already_drawn', message: '오늘 이미 번호표를 뽑았어요!' })
+    }
+
+    // 직전 번호표 발급자 체크 (연속 발급 방지)
+    const lastTicket = await c.env.DB.prepare(
+      'SELECT * FROM queue WHERE date=? ORDER BY created_at DESC LIMIT 1'
+    ).bind(today).first() as any
+
+    if (lastTicket && lastTicket.student_name === studentName) {
+      return c.json({ success: false, error: 'consecutive', message: '방금 전에도 내가 뽑았어요! 친구에게 양보해요 😊' })
+    }
+
+    // 오늘 마지막 번호 조회
+    const maxRow = await c.env.DB.prepare(
+      'SELECT MAX(number) as maxNum FROM queue WHERE date=?'
+    ).bind(today).first() as any
+    const nextNum = (maxRow?.maxNum || 0) + 1
+
+    // 번호표 발급
+    const result = await c.env.DB.prepare(
+      'INSERT INTO queue (number, student_name, date) VALUES (?,?,?)'
+    ).bind(nextNum, studentName, today).run()
+
+    // 대기 인원 (내 앞)
+    const waitingRow = await c.env.DB.prepare(
+      'SELECT COUNT(*) as cnt FROM queue WHERE date=? AND number < ? AND called=0'
+    ).bind(today, nextNum).first() as any
+    const waiting = waitingRow?.cnt || 0
+
+    return c.json({ success: true, number: nextNum, waiting, date: today })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 번호표 현황 조회
+app.get('/api/queue/status', async (c) => {
+  try {
+    const today = getKSTDate()
+    const rows = await c.env.DB.prepare(
+      'SELECT * FROM queue WHERE date=? ORDER BY number ASC'
+    ).bind(today).all()
+    const waiting = (rows.results as any[]).filter((r: any) => !r.called).length
+    const total = rows.results.length
+    const lastCalled = await c.env.DB.prepare(
+      'SELECT * FROM queue WHERE date=? AND called=1 ORDER BY number DESC LIMIT 1'
+    ).bind(today).first() as any
+    return c.json({ success: true, total, waiting, lastCalled: lastCalled?.number || 0, tickets: rows.results })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 번호 호출 (관리자)
+app.post('/api/admin/queue/call', async (c) => {
+  try {
+    const { number, date } = await c.req.json()
+    const today = date || getKSTDate()
+    await c.env.DB.prepare('UPDATE queue SET called=1 WHERE number=? AND date=?').bind(number, today).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
 app.get('/api/health', (c) => c.json({
   status: 'ok',
   slack: !!c.env.SLACK_WEBHOOK_URL,
@@ -625,6 +715,43 @@ const MAIN_HTML = `<!DOCTYPE html>
     .btn-home{width:100%;background:var(--g100);border:1.5px solid var(--g200);color:var(--g600);font-family:inherit;font-size:clamp(13px,1.7vw,15px);font-weight:700;padding:clamp(11px,1.7vw,15px);border-radius:var(--r-lg);cursor:pointer;transition:all .2s;}
     .btn-home:hover{background:var(--g200);}
 
+
+    /* ── 번호표 화면 ── */
+    #queue-screen{min-height:calc(100vh - clamp(56px,7vw,68px));display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:clamp(20px,3.5vw,44px) clamp(14px,3vw,28px);gap:clamp(14px,2.5vw,22px);}
+    #queue-screen.active{display:flex;}
+    .queue-hero{width:100%;max-width:500px;background:linear-gradient(135deg,#1e40af,#2563eb,#3b82f6);border-radius:var(--r-xl);padding:clamp(24px,4vw,40px) clamp(20px,3.5vw,36px);text-align:center;color:white;box-shadow:0 16px 48px rgba(37,99,235,.35);position:relative;overflow:hidden;}
+    .queue-hero::before{content:'';position:absolute;right:-30px;top:-30px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.06);}
+    .queue-hero::after{content:'';position:absolute;left:-20px;bottom:-20px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.04);}
+    .queue-label{font-size:clamp(12px,1.8vw,15px);font-weight:800;letter-spacing:2px;text-transform:uppercase;opacity:.8;margin-bottom:8px;}
+    .queue-number{font-family:'Nunito',sans-serif;font-size:clamp(72px,14vw,120px);font-weight:900;line-height:1;text-shadow:0 6px 24px rgba(0,0,0,.2);animation:numPop .5s cubic-bezier(.34,1.4,.64,1);}
+    @keyframes numPop{from{transform:scale(0) rotate(-15deg);opacity:0;}60%{transform:scale(1.15) rotate(5deg);}to{transform:scale(1) rotate(0);opacity:1;}}
+    .queue-sub{font-size:clamp(13px,1.8vw,16px);opacity:.85;margin-top:8px;}
+    .queue-date{font-size:clamp(11px,1.4vw,13px);opacity:.6;margin-top:6px;}
+    .waiting-card{width:100%;max-width:500px;background:var(--white);border-radius:var(--r-xl);padding:clamp(16px,2.5vw,24px);box-shadow:0 4px 20px rgba(0,0,0,.07);border:1.5px solid var(--g200);}
+    .waiting-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--g100);}
+    .waiting-row:last-child{border-bottom:none;}
+    .waiting-lbl{font-size:clamp(13px,1.7vw,15px);font-weight:700;color:var(--g600);}
+    .waiting-val{font-size:clamp(16px,2.2vw,20px);font-weight:900;}
+    .waiting-val.big{font-size:clamp(22px,3.5vw,32px);color:#2563eb;}
+    .queue-msg-box{width:100%;max-width:500px;border-radius:var(--r-lg);padding:clamp(14px,2.2vw,20px) clamp(16px,2.5vw,22px);display:flex;align-items:center;gap:12px;font-size:clamp(13px,1.7vw,15px);font-weight:700;}
+    .queue-msg-box.warn{background:#fef3c7;border:1.5px solid #fcd34d;color:#92400e;}
+    .queue-msg-box.ok{background:var(--green-s);border:1.5px solid rgba(34,197,94,.3);color:#166534;}
+    .queue-msg-box.info{background:var(--blue-soft);border:1.5px solid var(--blue-mid);color:var(--blue-dd);}
+    .queue-msg-icon{font-size:clamp(20px,3vw,26px);flex-shrink:0;}
+    .btn-queue-draw{width:100%;max-width:500px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;border-radius:var(--r-xl);padding:clamp(16px,2.5vw,22px);font-family:inherit;font-size:clamp(15px,2.2vw,19px);font-weight:900;cursor:pointer;box-shadow:0 8px 28px rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s;}
+    .btn-queue-draw:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(37,99,235,.55);}
+    .btn-queue-draw:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+    .queue-ticket-list{width:100%;max-width:500px;}
+    .qtl-title{font-size:13px;font-weight:800;color:var(--g400);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;}
+    .qtl-items{display:flex;flex-wrap:wrap;gap:6px;}
+    .qtl-chip{padding:5px 12px;border-radius:100px;font-size:12px;font-weight:800;}
+    .qtl-chip.waiting{background:var(--blue-soft);color:#2563eb;border:1.5px solid var(--blue-mid);}
+    .qtl-chip.called{background:var(--g100);color:var(--g400);border:1.5px solid var(--g200);text-decoration:line-through;}
+    .qtl-chip.mine{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;box-shadow:0 2px 8px rgba(37,99,235,.35);}
+
+    /* 스플래시 번호표 버튼 */
+    .queue-entry-btn{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-size:clamp(13px,1.8vw,15px);font-weight:800;padding:clamp(10px,1.5vw,14px) clamp(20px,3vw,28px);border-radius:100px;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(37,99,235,.4);transition:all .2s;font-family:inherit;}
+    .queue-entry-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(37,99,235,.55);}
     /* 피드백 토스트 */
     .fb-toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--g800);color:white;padding:9px 22px;border-radius:100px;font-size:14px;font-weight:700;z-index:9999;animation:fb-in .3s ease;pointer-events:none;white-space:nowrap;}
     @keyframes fb-in{from{opacity:0;transform:translateX(-50%) translateY(10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
@@ -661,6 +788,7 @@ const MAIN_HTML = `<!DOCTYPE html>
   <div class="sp-desc">초등수학 전용 · Made by 이지현 선생님</div>
   <div class="fi-row"><span class="fi">📖</span><span class="fi">🏅</span><span class="fi">🍫</span><span class="fi">🏆</span><span class="fi">🍬</span><span class="fi">🎉</span></div>
   <button class="tap-btn"><i class="fas fa-hand-pointer"></i>화면을 터치해서 시작!</button>
+  <button class="queue-entry-btn" onclick="event.stopPropagation();goToQueue()" id="queueEntryBtn"><i class="fas fa-ticket"></i>번호표 뽑기</button>
   <div class="sp-footer">Made with ❤️ by 이지현 | 바꿈수학 초등 전용</div>
 </div>
 
@@ -716,6 +844,64 @@ const MAIN_HTML = `<!DOCTYPE html>
     <div class="chips-row" id="doneChips"></div>
     <div class="done-btns">
       <button class="btn-cont" onclick="continueOrder()"><i class="fas fa-plus-circle"></i><span id="btnContLbl">계속 담기</span></button>
+      <button class="btn-home" onclick="goTo('splash')"><i class="fas fa-house" style="margin-right:6px"></i>처음으로</button>
+    </div>
+  </div>
+</div>
+
+<!-- 번호표 화면 -->
+<div class="screen" id="queue-screen">
+  <!-- 학생 선택 단계 -->
+  <div id="queue-step-select" style="width:100%;max-width:500px;display:none;">
+    <div style="text-align:center;margin-bottom:clamp(16px,2.5vw,24px);">
+      <div style="font-family:Nunito,sans-serif;font-size:clamp(20px,3.5vw,28px);font-weight:900;color:#1e40af;">번호표 뽑기</div>
+      <div style="font-size:clamp(13px,1.7vw,15px);color:var(--g400);margin-top:6px;">이름을 선택하면 번호가 발급돼요!</div>
+    </div>
+    <div class="search-wrap">
+      <i class="fas fa-magnifying-glass search-ic"></i>
+      <input class="search-inp" id="queueSearchInp" type="text" placeholder="이름 검색..."
+             oninput="filterQueueStudents(this.value)" autocomplete="off" spellcheck="false"/>
+    </div>
+    <div class="student-grid" id="queueStudentGrid"></div>
+    <div style="margin-top:16px;text-align:center;">
+      <button class="home-btn" onclick="goTo('splash')" style="margin:0 auto;"><i class="fas fa-chevron-left" style="margin-right:4px"></i>돌아가기</button>
+    </div>
+  </div>
+
+  <!-- 번호표 결과 단계 -->
+  <div id="queue-step-result" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:clamp(14px,2.2vw,20px);display:none;">
+    <!-- 번호 카드 -->
+    <div class="queue-hero">
+      <div class="queue-label">내 번호표</div>
+      <div class="queue-number" id="queueNumber">--</div>
+      <div class="queue-sub" id="queueStuName"></div>
+      <div class="queue-date" id="queueDate"></div>
+    </div>
+
+    <!-- 대기 현황 -->
+    <div class="waiting-card">
+      <div class="waiting-row">
+        <div class="waiting-lbl"><i class="fas fa-clock" style="margin-right:6px;color:#2563eb"></i>내 앞 대기</div>
+        <div class="waiting-val big" id="queueWaiting">--</div>
+      </div>
+      <div class="waiting-row">
+        <div class="waiting-lbl"><i class="fas fa-users" style="margin-right:6px;color:var(--g400)"></i>오늘 총 발급</div>
+        <div class="waiting-val" id="queueTotal">--</div>
+      </div>
+    </div>
+
+    <!-- 메시지 박스 -->
+    <div class="queue-msg-box info" id="queueMsgBox">
+      <div class="queue-msg-icon">🎫</div>
+      <div id="queueMsgText">번호를 기억해두세요!</div>
+    </div>
+
+    <!-- 오늘의 번호표 목록 -->
+    <div class="queue-ticket-list" id="queueTicketList"></div>
+
+    <!-- 버튼 -->
+    <div style="display:flex;flex-direction:column;gap:9px;width:100%;max-width:500px;">
+      <button class="btn-cont" onclick="goTo('student')" style="background:linear-gradient(135deg,var(--blue),var(--blue-d));"><i class="fas fa-check"></i>키오스크 이용하기</button>
       <button class="btn-home" onclick="goTo('splash')"><i class="fas fa-house" style="margin-right:6px"></i>처음으로</button>
     </div>
   </div>
@@ -815,11 +1001,11 @@ let autoTimer=null
 setInterval(()=>{const n=new Date();document.getElementById('clock').textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':')},1000)
 
 // 화면 전환
-const SCRS=['splash','student-screen','menu-screen','done-screen']
+const SCRS=['splash','student-screen','menu-screen','done-screen','queue-screen']
 function goTo(id){
   clearTimeout(autoTimer)
   SCRS.forEach(s=>document.getElementById(s).classList.remove('active'))
-  const MAP={splash:'splash',student:'student-screen',menu:'menu-screen',done:'done-screen'}
+  const MAP={splash:'splash',student:'student-screen',menu:'menu-screen',done:'done-screen',queue:'queue-screen'}
   const el=document.getElementById(MAP[id]);if(!el)return
   el.classList.add('active','fade-up');setTimeout(()=>el.classList.remove('fade-up'),350)
   document.getElementById('cartBar').classList.toggle('visible',id==='menu')
@@ -1197,6 +1383,133 @@ window.doRequest=async function(){
     showFb('💬','요청사항 전송 완료!')
   }catch(err){showFb('💬','전송 실패. 다시 시도해주세요.')}
   finally{btn.disabled=false;document.getElementById('reqTxt').textContent='전송하기'}
+}
+
+
+// ──────────────────────────────────────────────────────────
+//  번호표 시스템
+// ──────────────────────────────────────────────────────────
+let QUEUE_STUDENT = null  // 번호표 뽑을 학생
+
+// 번호표 화면으로 이동 (학생 선택 단계)
+window.goToQueue = function() {
+  goTo('queue')
+  // queue-screen 내 sub-step 제어
+  document.getElementById('queue-step-select').style.display = 'block'
+  document.getElementById('queue-step-result').style.display = 'none'
+  document.getElementById('queueSearchInp').value = ''
+  renderQueueStudents()
+}
+
+// 번호표 학생 그리드 렌더
+function renderQueueStudents() {
+  const g = document.getElementById('queueStudentGrid')
+  g.innerHTML = STUDENTS.map(s => {
+    const photoEl = s.photo_url
+      ? '<img class="stu-photo" src="'+escHtml(s.photo_url)+'" alt="'+escHtml(s.name)+'"/>'
+      : '<div class="stu-av">'+escHtml(s.name[0])+'</div>'
+    return '<button class="stu-btn" data-name="'+escHtml(s.name)+'" onclick="selectQueueStudent('+s.id+')">'+
+      photoEl+'<div class="stu-name">'+escHtml(s.name)+'</div></button>'
+  }).join('')
+}
+
+window.filterQueueStudents = function(q) {
+  const kw = q.trim()
+  document.querySelectorAll('#queueStudentGrid .stu-btn').forEach(b => {
+    b.classList.toggle('hidden', !!kw && !b.dataset.name.includes(kw))
+  })
+}
+
+// 학생 선택 후 번호표 발급
+window.selectQueueStudent = async function(id) {
+  const s = STUDENTS.find(x => x.id === id); if (!s) return
+  QUEUE_STUDENT = s
+
+  // 단계 전환 (결과 화면으로)
+  document.getElementById('queue-step-select').style.display = 'none'
+  document.getElementById('queue-step-result').style.display = 'flex'
+
+  // 임시 로딩 표시
+  document.getElementById('queueNumber').textContent = '...'
+  document.getElementById('queueStuName').textContent = s.name
+  document.getElementById('queueWaiting').textContent = '-'
+  document.getElementById('queueTotal').textContent = '-'
+
+  try {
+    const res = await fetch('/api/queue/draw', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ studentName: s.name })
+    })
+    const data = await res.json()
+
+    if (!data.success) {
+      // 오류 처리
+      const msgBox = document.getElementById('queueMsgBox')
+      const msgText = document.getElementById('queueMsgText')
+      msgBox.className = 'queue-msg-box warn'
+      document.querySelector('#queueMsgBox .queue-msg-icon').textContent = data.error === 'consecutive' ? '🙋' : '⚠️'
+      msgText.textContent = data.message || '번호표를 발급할 수 없어요.'
+      document.getElementById('queueNumber').textContent = '!'
+      // 현황 불러오기
+      await loadQueueStatus(null)
+      return
+    }
+
+    // 성공
+    document.getElementById('queueNumber').textContent = data.number
+    document.getElementById('queueDate').textContent = data.date + ' 발급'
+
+    const msgBox = document.getElementById('queueMsgBox')
+    const msgText = document.getElementById('queueMsgText')
+
+    if (data.waiting === 0) {
+      msgBox.className = 'queue-msg-box ok'
+      document.querySelector('#queueMsgBox .queue-msg-icon').textContent = '🎉'
+      msgText.textContent = '첫 번째! 바로 이용할 수 있어요!'
+    } else if (data.waiting <= 2) {
+      msgBox.className = 'queue-msg-box info'
+      document.querySelector('#queueMsgBox .queue-msg-icon').textContent = '⏳'
+      msgText.textContent = '앞에 ' + data.waiting + '명 있어요. 거의 다 왔어요!'
+    } else {
+      msgBox.className = 'queue-msg-box info'
+      document.querySelector('#queueMsgBox .queue-msg-icon').textContent = '🎫'
+      msgText.textContent = '앞에 ' + data.waiting + '명이 기다리고 있어요!'
+    }
+
+    await loadQueueStatus(data.number)
+
+  } catch (err) {
+    document.getElementById('queueNumber').textContent = '!'
+    document.getElementById('queueMsgText').textContent = '네트워크 오류가 발생했어요.'
+  }
+}
+
+// 현황 조회 및 목록 표시
+async function loadQueueStatus(myNumber) {
+  try {
+    const res = await fetch('/api/queue/status')
+    const data = await res.json()
+    if (!data.success) return
+
+    document.getElementById('queueWaiting').textContent = myNumber
+      ? (data.tickets.filter(t => !t.called && t.number < myNumber).length) + '명'
+      : (data.waiting + '명')
+    document.getElementById('queueTotal').textContent = data.total + '장'
+
+    // 번호표 목록 렌더
+    const listEl = document.getElementById('queueTicketList')
+    if (data.tickets.length > 0) {
+      const chips = data.tickets.map(t => {
+        const isMine = myNumber && t.number === myNumber
+        const cls = isMine ? 'mine' : (t.called ? 'called' : 'waiting')
+        return '<div class="qtl-chip ' + cls + '">' + t.number + '번 ' + escHtml(t.student_name) + (isMine ? ' (나)' : '') + '</div>'
+      }).join('')
+      listEl.innerHTML = '<div class="qtl-title">오늘의 번호표 현황</div><div class="qtl-items">' + chips + '</div>'
+    } else {
+      listEl.innerHTML = ''
+    }
+  } catch (e) {}
 }
 
 init()
