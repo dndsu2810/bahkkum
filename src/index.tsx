@@ -60,7 +60,7 @@ app.get('/api/config', (c) => c.json(DEFAULT_CONFIG))
 
 
 
-// 학생 목록 (포인트 + 미납 벌금 포함)
+// 학생 목록 (포인트 + 벌금 유형별 집계 포함)
 
 app.get('/api/students', async (c) => {
 
@@ -72,7 +72,13 @@ app.get('/api/students', async (c) => {
 
         COALESCE(SUM(CASE WHEN f.paid=0 THEN f.amount ELSE 0 END),0) AS unpaid_fines,
 
-        COUNT(CASE WHEN f.paid=0 THEN 1 END) AS fine_count
+        COUNT(CASE WHEN f.paid=0 THEN 1 END) AS fine_count,
+
+        COALESCE(SUM(CASE WHEN f.paid=0 AND f.fine_type='time' THEN f.amount ELSE 0 END),0) AS fine_time,
+
+        COALESCE(SUM(CASE WHEN f.paid=0 AND f.fine_type='sheet' THEN f.amount ELSE 0 END),0) AS fine_sheet,
+
+        COALESCE(SUM(CASE WHEN f.paid=0 AND f.fine_type='point' THEN f.amount ELSE 0 END),0) AS fine_point
 
       FROM students s
 
@@ -118,7 +124,23 @@ app.get('/api/students/:id', async (c) => {
 
     ).bind(id).all()
 
-    return c.json({ success: true, student: stu, history: history.results, fines: fines.results })
+    // 벌금 유형별 미납 합계
+
+    const fineStats = await c.env.DB.prepare(`
+
+      SELECT
+
+        COALESCE(SUM(CASE WHEN fine_type='time' AND paid=0 THEN amount ELSE 0 END),0) AS fine_time,
+
+        COALESCE(SUM(CASE WHEN fine_type='sheet' AND paid=0 THEN amount ELSE 0 END),0) AS fine_sheet,
+
+        COALESCE(SUM(CASE WHEN fine_type='point' AND paid=0 THEN amount ELSE 0 END),0) AS fine_point
+
+      FROM fines WHERE student_id=?
+
+    `).bind(id).first()
+
+    return c.json({ success: true, student: stu, history: history.results, fines: fines.results, fineStats })
 
   } catch (e: any) {
 
@@ -166,11 +188,15 @@ app.post('/api/submit', async (c) => {
 
         for (const item of items) {
 
+          // item.fineType: 'point'|'time'|'sheet' (항목별 화폐 유형)
+          const fineType = item.fineType || 'point'
+          const unitLabel = item.unit || currency
+
           await c.env.DB.prepare(
 
-            'INSERT INTO fines (student_id, label, amount, unit) VALUES (?,?,?,?)'
+            'INSERT INTO fines (student_id, label, amount, unit, fine_type) VALUES (?,?,?,?,?)'
 
-          ).bind(stu.id, `${item.icon} ${item.label}`, item.qty, currency).run()
+          ).bind(stu.id, `${item.icon} ${item.label}`, item.qty, unitLabel, fineType).run()
 
         }
 
@@ -720,23 +746,87 @@ app.delete('/api/admin/fines/:id', async (c) => {
 
 
 
-// 전체 벌금 목록 (관리자용)
+// 전체 벌금 목록 (관리자용) - fine_type 필터 지원
 
 app.get('/api/admin/fines-all', async (c) => {
 
   try {
 
-    const rows = await c.env.DB.prepare(`
+    const fineType = c.req.query('type') || 'all'
 
-      SELECT f.*, s.name as student_name FROM fines f
+    let sql = `SELECT f.*, s.name as student_name FROM fines f LEFT JOIN students s ON s.id = f.student_id`
 
-      LEFT JOIN students s ON s.id = f.student_id
+    if (fineType !== 'all') sql += ` WHERE f.fine_type='${fineType}'`
 
-      ORDER BY f.created_at DESC LIMIT 500
+    sql += ` ORDER BY f.created_at DESC LIMIT 500`
 
-    `).all()
+    const rows = await c.env.DB.prepare(sql).all()
 
     return c.json({ success: true, fines: rows.results })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+// 벌금 확인(time/sheet는 확인 즉시 삭제, point는 paid 처리)
+
+app.post('/api/admin/fines/:id/confirm', async (c) => {
+
+  const id = c.req.param('id')
+
+  try {
+
+    const fine = await c.env.DB.prepare('SELECT * FROM fines WHERE id=?').bind(id).first() as any
+
+    if (!fine) return c.json({ success: false, error: '없음' }, 404)
+
+    if (fine.fine_type === 'time' || fine.fine_type === 'sheet') {
+
+      // 시간/장수 벌금: 확인하면 삭제
+
+      await c.env.DB.prepare('DELETE FROM fines WHERE id=?').bind(id).run()
+
+    } else {
+
+      // 포인트 벌금: paid 처리
+
+      await c.env.DB.prepare('UPDATE fines SET paid=1 WHERE id=?').bind(id).run()
+
+    }
+
+    return c.json({ success: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+// 학생 벌금 현황 공개 조회 (키오스크에서 학생이 확인)
+
+app.get('/api/my-fines/:studentId', async (c) => {
+
+  const id = c.req.param('studentId')
+
+  try {
+
+    const stu = await c.env.DB.prepare('SELECT id, name, photo_url, points FROM students WHERE id=?').bind(id).first()
+
+    if (!stu) return c.json({ success: false, error: '학생 없음' }, 404)
+
+    const fines = await c.env.DB.prepare(
+
+      `SELECT id, label, amount, unit, fine_type, created_at FROM fines WHERE student_id=? AND paid=0 ORDER BY created_at DESC`
+
+    ).bind(id).all()
+
+    return c.json({ success: true, student: stu, fines: fines.results })
 
   } catch (e: any) {
 
@@ -1212,27 +1302,27 @@ const DEFAULT_CONFIG = {
 
     fine: [
 
-      { id: 'helpme',     icon: '🆘', label: '지현쌤 Help me!', cost: 3, reward: 0, requirePhoto: false },
+      { id: 'helpme',     icon: '🆘', label: '지현쌤 Help me!', cost: 3, reward: 0, requirePhoto: false, fineType: 'point', unit: '포인트' },
 
-      { id: 'lostwork',   icon: '😰', label: '숙제 분실',        cost: 4, reward: 0, requirePhoto: false },
+      { id: 'lostwork',   icon: '😰', label: '숙제 분실',        cost: 4, reward: 0, requirePhoto: false, fineType: 'point', unit: '포인트' },
 
-      { id: 'nohomework', icon: '🚫', label: '숙제 안함',        cost: 5, reward: 0, requirePhoto: false },
+      { id: 'nohomework', icon: '🚫', label: '숙제 안함',        cost: 5, reward: 0, requirePhoto: false, fineType: 'point', unit: '포인트' },
 
     ],
 
     shop: [
 
-      { id: 'choco',      icon: '🍫', label: '초콜릿(달달구리)', cost: 3, reward: 0, requirePhoto: false },
+      { id: 'choco',      icon: '🍫', label: '초콜릿(달달구리)', cost: 3, reward: 0, requirePhoto: false, soldOut: false },
 
-      { id: 'jelly',      icon: '🍬', label: '젤리',             cost: 2, reward: 0, requirePhoto: false },
+      { id: 'jelly',      icon: '🍬', label: '젤리',             cost: 2, reward: 0, requirePhoto: false, soldOut: false },
 
-      { id: 'candy',      icon: '🍭', label: '사탕',             cost: 2, reward: 0, requirePhoto: false },
+      { id: 'candy',      icon: '🍭', label: '사탕',             cost: 2, reward: 0, requirePhoto: false, soldOut: false },
 
-      { id: 'snack',      icon: '🍿', label: '과자',             cost: 3, reward: 0, requirePhoto: false },
+      { id: 'snack',      icon: '🍿', label: '과자',             cost: 3, reward: 0, requirePhoto: false, soldOut: false },
 
-      { id: 'saekkomdal', icon: '🍋', label: '새콤달콤',         cost: 2, reward: 0, requirePhoto: false },
+      { id: 'saekkomdal', icon: '🍋', label: '새콤달콤',         cost: 2, reward: 0, requirePhoto: false, soldOut: false },
 
-      { id: 'vitaminc',   icon: '💊', label: '비타민C',          cost: 2, reward: 0, requirePhoto: false },
+      { id: 'vitaminc',   icon: '💊', label: '비타민C',          cost: 2, reward: 0, requirePhoto: false, soldOut: false },
 
     ],
 
@@ -1440,6 +1530,12 @@ const MAIN_HTML = `<!DOCTYPE html>
 
     .stat-chip.red-chip{background:rgba(239,68,68,.3);border-color:rgba(239,68,68,.4);}
 
+    .stat-chip.orange-chip{background:rgba(249,115,22,.25);border-color:rgba(249,115,22,.4);color:#c2410c;}
+
+    .stat-chip.status-chip{cursor:pointer;transition:all .2s;}
+
+    .stat-chip.status-chip:hover{transform:scale(1.05);}
+
     .btn-change{background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);color:white;font-family:inherit;font-size:clamp(10px,1.3vw,12px);font-weight:700;padding:6px 12px;border-radius:100px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
 
     .btn-change:hover{background:rgba(255,255,255,.3);}
@@ -1483,6 +1579,10 @@ const MAIN_HTML = `<!DOCTYPE html>
     .menu-btn.in-cart.type-fine{border-color:var(--red);border-width:3px;}
 
     .menu-btn.in-cart.type-shop{border-color:var(--purple);border-width:3px;}
+
+    .menu-btn.sold-out{opacity:.55;cursor:not-allowed;filter:grayscale(.4);}
+
+    .menu-btn.sold-out:hover{transform:none;box-shadow:none;}
 
     .menu-ic-wrap{width:clamp(50px,7.5vw,68px);height:clamp(50px,7.5vw,68px);border-radius:clamp(12px,1.8vw,18px);display:flex;align-items:center;justify-content:center;font-size:clamp(22px,3.5vw,32px);position:relative;}
 
@@ -2062,6 +2162,28 @@ const MAIN_HTML = `<!DOCTYPE html>
 
 
 
+<!-- 내 상태 모달 -->
+
+<div class="modal-ov" id="my-status-modal">
+
+  <div class="modal-box" style="max-width:400px;">
+
+    <div class="modal-title">📊 내 현재 상태</div>
+
+    <div id="myStatusContent" style="margin:12px 0;"></div>
+
+    <div class="modal-btns">
+
+      <button class="btn-mok" style="flex:1;" onclick="closeMyStatus()"><i class="fas fa-check"></i>확인</button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
 <!-- 장바구니 바 -->
 
 <div class="cart-bar" id="cartBar">
@@ -2292,6 +2414,98 @@ window.goTo=goTo
 
 
 
+// 내 상태 모달
+
+window.openMyStatus=function(){
+
+  const s=ST.student;if(!s){toast('학생을 먼저 선택해주세요');return}
+
+  const c=CFG.currency
+
+  let html='<div style="display:flex;flex-direction:column;gap:12px;">'
+
+  // 포인트
+
+  html+='<div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #93c5fd;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">'
+
+  html+='<div style="font-size:32px;">'+c.symbol+'</div>'
+
+  html+='<div><div style="font-size:12px;color:#3b82f6;font-weight:700;">내 포인트</div>'
+
+  html+='<div style="font-size:24px;font-weight:900;color:#1e40af;">'+s.points+' <span style="font-size:14px;">'+c.unit+'</span></div></div>'
+
+  html+='</div>'
+
+  // 벌금 포인트
+
+  if(s.fine_point>0){
+
+    html+='<div style="background:#fff5f5;border:2px solid #fca5a5;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">'
+
+    html+='<div style="font-size:32px;">💸</div>'
+
+    html+='<div><div style="font-size:12px;color:#dc2626;font-weight:700;">미납 벌금 포인트</div>'
+
+    html+='<div style="font-size:24px;font-weight:900;color:#dc2626;">'+s.fine_point+' <span style="font-size:14px;">'+c.unit+'</span></div></div>'
+
+    html+='</div>'
+
+  }
+
+  // 벌금 시간
+
+  if(s.fine_time>0){
+
+    html+='<div style="background:#fff7ed;border:2px solid #fdba74;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">'
+
+    html+='<div style="font-size:32px;">⏰</div>'
+
+    html+='<div><div style="font-size:12px;color:#ea580c;font-weight:700;">벌금 시간 (선생님 확인 후 삭제)</div>'
+
+    html+='<div style="font-size:24px;font-weight:900;color:#ea580c;">'+s.fine_time+' <span style="font-size:14px;">분</span></div></div>'
+
+    html+='</div>'
+
+  }
+
+  // 벌금 학습지
+
+  if(s.fine_sheet>0){
+
+    html+='<div style="background:#fff7ed;border:2px solid #fdba74;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">'
+
+    html+='<div style="font-size:32px;">📄</div>'
+
+    html+='<div><div style="font-size:12px;color:#ea580c;font-weight:700;">벌금 학습지 (선생님 확인 후 삭제)</div>'
+
+    html+='<div style="font-size:24px;font-weight:900;color:#ea580c;">'+s.fine_sheet+' <span style="font-size:14px;">장</span></div></div>'
+
+    html+='</div>'
+
+  }
+
+  if(s.fine_point===0&&s.fine_time===0&&s.fine_sheet===0){
+
+    html+='<div style="text-align:center;padding:16px;color:#22c55e;font-weight:700;font-size:16px;">🎉 벌금이 없어요!</div>'
+
+  }
+
+  html+='</div>'
+
+  document.getElementById('myStatusContent').innerHTML=html
+
+  document.getElementById('my-status-modal').classList.add('open')
+
+}
+
+window.closeMyStatus=function(){
+
+  document.getElementById('my-status-modal').classList.remove('open')
+
+}
+
+
+
 // 초기 로드
 
 async function init(){
@@ -2448,9 +2662,14 @@ function updateBannerStats(s){
 
   let html='<div class="stat-chip">'+c.symbol+' '+s.points+' '+c.unit+'</div>'
 
-  if(s.fine_count>0) html+='<div class="stat-chip red-chip">\u26A0 미납 벌금 '+s.fine_count+'건</div>'
+  if(s.fine_point>0) html+='<div class="stat-chip red-chip">💸 벌금 '+s.fine_point+' '+c.unit+'</div>'
 
-  if(s.unpaid_fines>0) html+='<div class="stat-chip red-chip">📋 미납 누적 '+s.unpaid_fines+'건</div>'
+  if(s.fine_time>0) html+='<div class="stat-chip orange-chip">⏰ 벌금 '+s.fine_time+'분</div>'
+
+  if(s.fine_sheet>0) html+='<div class="stat-chip orange-chip">📄 벌금 학습지 '+s.fine_sheet+'장</div>'
+
+  // 내 상태 확인 버튼 (벌금 있을 때만 강조)
+  html+='<div class="stat-chip status-chip" onclick="openMyStatus()" style="cursor:pointer;background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:#2563eb;">📊 내 상태</div>'
 
   stats.innerHTML=html
 
@@ -2520,19 +2739,34 @@ function renderMenu(){
 
     } else if(ST.tab==='fine'){
 
-      costTxt='-'+m.cost+' '+c.unit+(m.reward>0?' (+'+m.reward+c.symbol+')':'')
+      // 항목별 화폐 단위 표시
+      const fineUnit=m.unit||(m.fineType==='time'?'분':m.fineType==='sheet'?'장':c.unit)
+      const fineIcon=m.fineType==='time'?'⏰':m.fineType==='sheet'?'📄':'💸'
+      costTxt=fineIcon+' '+m.cost+' '+fineUnit
 
     } else {
 
-      costTxt=m.cost+' '+c.symbol
+      // shop: soldOut 체크
+      if(m.soldOut){
+        costTxt='품절'
+      } else {
+        costTxt=m.cost+' '+c.symbol
+      }
 
     }
 
     const photoBadge=m.requirePhoto?'<div class="photo-badge-sm">cam</div>':''
 
+    // shop 품절 처리
+    const isSoldOut=(ST.tab==='shop'&&m.soldOut)
+
     let bottomHtml
 
-    if(qty>0){
+    if(isSoldOut){
+
+      bottomHtml='<div class="menu-cost-tag" style="background:#fee2e2;color:#dc2626;border-color:#fca5a5;">🚫 품절</div>'
+
+    } else if(qty>0){
 
       bottomHtml='<div class="qty-ctrl" data-id="'+m.id+'" data-tab="'+ST.tab+'">'+
 
@@ -2550,7 +2784,7 @@ function renderMenu(){
 
     }
 
-    return '<div class="menu-btn type-'+ST.tab+(inCart?' in-cart':'')+' btn-menu-item" data-id="'+m.id+'" data-tab="'+ST.tab+'">'+
+    return '<div class="menu-btn type-'+ST.tab+(inCart?' in-cart':'')+(isSoldOut?' sold-out':'')+' btn-menu-item" data-id="'+m.id+'" data-tab="'+ST.tab+'" data-soldout="'+isSoldOut+'">'+
 
       photoBadge+
 
@@ -2622,11 +2856,11 @@ document.addEventListener('click',function(e){
 
   }
 
-  // 메뉴 카드 클릭 (수량 컨트롤 영역 제외)
+  // 메뉴 카드 클릭 (수량 컨트롤 영역 제외, 품절 제외)
 
   const btn=e.target.closest('.btn-menu-item')
 
-  if(btn&&!e.target.closest('.qty-ctrl')){window.addToCart(btn.dataset.id,btn.dataset.tab)}
+  if(btn&&!e.target.closest('.qty-ctrl')&&btn.dataset.soldout!=='true'){window.addToCart(btn.dataset.id,btn.dataset.tab)}
 
 })
 
@@ -2638,6 +2872,9 @@ window.addToCart=function(id,tab){
 
   const item=(CFG.menu[tab]||[]).find(x=>x.id===id);if(!item)return
 
+  // 품절 처리
+  if(item.soldOut){toast('😢 품절된 상품이에요!');return}
+
   if(item.requirePhoto){ST.pendingItem={item,tab};openPhotoModal(item.label);return}
 
   pushCart(item,tab,null)
@@ -2648,7 +2885,7 @@ function pushCart(item,tab,photo,comment){
 
   const ex=ST.cart.find(x=>x.id===item.id&&x.tab===tab)
 
-  if(ex){ex.qty++}else{ST.cart.push({id:item.id,tab,icon:item.icon,label:item.label,cost:item.cost,reward:item.reward||0,requirePhoto:item.requirePhoto,qty:1,photo,comment:comment||''})}
+  if(ex){ex.qty++}else{ST.cart.push({id:item.id,tab,icon:item.icon,label:item.label,cost:item.cost,reward:item.reward||0,requirePhoto:item.requirePhoto,qty:1,photo,comment:comment||'',fineType:item.fineType||'point',unit:item.unit||''})}
 
   updateCartBar();renderMenu()
 
@@ -2840,7 +3077,7 @@ window.doSubmit=async function(){
 
         name:ST.student.name,
 
-        items:ST.cart.map(x=>({icon:x.icon,label:x.label,qty:x.qty,tab:x.tab,comment:x.comment||''})),
+        items:ST.cart.map(x=>({icon:x.icon,label:x.label,qty:x.qty,tab:x.tab,comment:x.comment||'',fineType:x.fineType||'point',unit:x.unit||''})),
 
         totalCost:tc,
 
@@ -4028,9 +4265,13 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
             <button class="filter-btn active" onclick="filterFine('all',this)">전체</button>
 
-            <button class="filter-btn" onclick="filterFine('unpaid',this)">미납</button>
+            <button class="filter-btn" onclick="filterFine('point',this)">💸 포인트</button>
 
-            <button class="filter-btn" onclick="filterFine('paid',this)">납부</button>
+            <button class="filter-btn" onclick="filterFine('time',this)">⏰ 시간</button>
+
+            <button class="filter-btn" onclick="filterFine('sheet',this)">📄 학습지</button>
+
+            <button class="btn btn-sm btn-green" onclick="loadStudentsData()" style="margin-left:6px;"><i class="fas fa-refresh"></i></button>
 
           </div>
 
@@ -4098,15 +4339,23 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
           <div id="menuFineList"></div>
 
-          <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;">
+          <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;align-items:center;">
 
             <input class="inp" id="nFIc" placeholder="아이콘" style="width:64px;"/>
 
             <input class="inp" id="nFLbl" placeholder="항목명" style="flex:1;min-width:100px;"/>
 
-            <input class="inp" id="nFCost" placeholder="비용" type="number" style="width:80px;"/>
+            <input class="inp" id="nFCost" placeholder="수량" type="number" style="width:70px;"/>
 
-            <input class="inp" id="nFUnit" placeholder="화폐단위" style="width:80px;"/>
+            <select class="inp" id="nFType" style="width:110px;padding:6px 8px;font-size:12px;">
+
+              <option value="point">💸 포인트</option>
+
+              <option value="time">⏰ 시간(분)</option>
+
+              <option value="sheet">📄 학습지(장)</option>
+
+            </select>
 
             <button class="btn btn-red btn-sm" id="addFineBtn">추가</button>
 
@@ -4280,1045 +4529,8 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
 
 
-<script>
 
-(function(){
-
-var PW_TOKEN=''
-
-var students=[]
-
-var allFines=[]
-
-var allQueues=[]
-
-var allRequests=[]
-
-var allOrders=[]
-
-var menuCfg={learn:[],fine:[],shop:[]}
-
-var curCfg={unit:'포인트',symbol:'P',desc:''}
-
-var curNoteReqId=null
-
-var queueFilter='all'
-
-var reqFilter='all'
-
-var fineFilter='all'
-
-
-
-var PRESETS=[
-
-  {symbol:'P',unit:'포인트',desc:'포인트를 모아요!'},
-
-  {symbol:'🏅',unit:'메달',desc:'메달을 모아요!'},
-
-  {symbol:'🌟',unit:'별',desc:'별을 모아요!'},
-
-  {symbol:'💎',unit:'보석',desc:'보석을 모아요!'},
-
-  {symbol:'🪙',unit:'코인',desc:'코인을 모아요!'},
-
-  {symbol:'🍀',unit:'클로버',desc:'클로버를 모아요!'},
-
-  {symbol:'❤️',unit:'하트',desc:'하트를 모아요!'},
-
-  {symbol:'🔥',unit:'불꽃',desc:'불꽃을 모아요!'},
-
-]
-
-
-
-var DEFAULT_MENU={
-
-  learn:[
-
-    {id:'study',icon:'📖',label:'자습 인증하기',cost:0,reward:2,unit:'P',requirePhoto:true},
-
-    {id:'homework',icon:'✏️',label:'숙제 제출하기',cost:0,reward:1,unit:'P',requirePhoto:false},
-
-    {id:'question',icon:'🙋',label:'질문하기',cost:0,reward:1,unit:'P',requirePhoto:false},
-
-    {id:'record',icon:'📝',label:'모르는 문제 기록하기',cost:0,reward:2,unit:'P',requirePhoto:true},
-
-    {id:'material',icon:'📄',label:'추가 학습지 요청',cost:0,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'makeup',icon:'📅',label:'보강 신청',cost:0,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'consult',icon:'💬',label:'상담 요청',cost:0,reward:0,unit:'P',requirePhoto:false},
-
-  ],
-
-  fine:[
-
-    {id:'helpme',icon:'🆘',label:'지현쌤 Help me!',cost:3,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'lostwork',icon:'😰',label:'숙제 분실',cost:4,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'nohomework',icon:'🚫',label:'숙제 안함',cost:5,reward:0,unit:'P',requirePhoto:false},
-
-  ],
-
-  shop:[
-
-    {id:'choco',icon:'🍫',label:'초콜릿(달달구리)',cost:3,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'jelly',icon:'🍬',label:'젤리',cost:2,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'candy',icon:'🍭',label:'사탕',cost:2,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'snack',icon:'🍿',label:'과자',cost:3,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'saekkomdal',icon:'🍋',label:'새콤달콤',cost:2,reward:0,unit:'P',requirePhoto:false},
-
-    {id:'vitaminc',icon:'💊',label:'비타민C',cost:2,reward:0,unit:'P',requirePhoto:false},
-
-  ]
-
-}
-
-
-
-// ── 로그인 ──
-
-function doLogin(){
-
-  var pw=document.getElementById('pwInp').value.trim()
-
-  if(!pw)return
-
-  fetch('/api/admin/auth',{headers:{'X-Admin-Password':pw}})
-
-    .then(r=>r.json()).then(d=>{
-
-      if(d.success){
-
-        PW_TOKEN=pw
-
-        document.getElementById('login-screen').classList.add('hidden')
-
-        document.getElementById('main-screen').classList.remove('hidden')
-
-        initAdmin()
-
-      } else {
-
-        document.getElementById('loginErr').classList.add('show')
-
-      }
-
-    }).catch(()=>{document.getElementById('loginErr').classList.add('show')})
-
-}
-
-window.doLogin=doLogin
-
-
-
-function doLogout(){PW_TOKEN='';location.reload()}
-
-window.doLogout=doLogout
-
-
-
-function api(path,opts){
-
-  opts=opts||{}
-
-  opts.headers=Object.assign({'X-Admin-Password':PW_TOKEN,'Content-Type':'application/json'},opts.headers||{})
-
-  return fetch(path,opts).then(r=>r.json())
-
-}
-
-
-
-// ── 탭 전환 ──
-
-function switchMainTab(tab){
-
-  document.querySelectorAll('.mtab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))
-
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+tab))
-
-  if(tab==='queue')loadQueue()
-
-  else if(tab==='requests')loadRequests()
-
-  else if(tab==='orders')loadOrders()
-
-  else if(tab==='students')renderStudents()
-
-  else if(tab==='fines')renderFines()
-
-  else if(tab==='menu')renderMenuItems('learn'),renderMenuItems('fine'),renderMenuItems('shop')
-
-  else if(tab==='currency')renderPresets(),updateCurPreview()
-
-}
-
-window.switchMainTab=switchMainTab
-
-
-
-// ── 초기화 ──
-
-function initAdmin(){
-
-  // 오늘 날짜 세팅
-
-  document.getElementById('queueDatePick').value=new Date().toISOString().slice(0,10)
-
-  loadConfig()
-
-  loadStudentsData()
-
-  loadQueue()
-
-  loadRequests()
-
-  loadOrders()
-
-}
-
-
-
-function loadConfig(){
-
-  var lc=localStorage.getItem('kiosk_config')
-
-  if(lc){try{var cfg=JSON.parse(lc);menuCfg=cfg.menu||DEFAULT_MENU;curCfg=cfg.currency||{unit:'포인트',symbol:'P',desc:''}}catch(e){menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))}}
-
-  else{menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))}
-
-  // unit 필드 없는 항목 보완
-
-  ;['learn','fine','shop'].forEach(function(t){
-
-    (menuCfg[t]||[]).forEach(function(m){if(!m.unit)m.unit=curCfg.symbol||'P'})
-
-  })
-
-}
-
-
-
-function loadStudentsData(){
-
-  fetch('/api/students').then(r=>r.json()).then(d=>{
-
-    if(d.success){
-
-      students=d.students
-
-      renderStudents()
-
-      var unpaid=students.reduce(function(a,s){return a+(s.fine_count||0)},0)
-
-      document.getElementById('badge-fines').textContent=unpaid>0?unpaid:''
-
-    }
-
-  })
-
-  api('/api/admin/fines-all').then(d=>{if(d.success)allFines=d.fines}).catch(()=>{
-
-    // fallback: 학생별로 모음
-
-  })
-
-}
-
-
-
-// ══ 번호표 ══
-
-function loadQueue(){
-
-  var date=document.getElementById('queueDatePick').value||new Date().toISOString().slice(0,10)
-
-  api('/api/admin/queue?date='+date).then(function(d){
-
-    if(!d.success)return
-
-    allQueues=d.tickets
-
-    var w=allQueues.filter(function(t){return t.status==='waiting'}).length
-
-    var a=allQueues.filter(function(t){return t.status==='answering'}).length
-
-    var dn=allQueues.filter(function(t){return t.status==='done'}).length
-
-    document.getElementById('qs-waiting').textContent=w
-
-    document.getElementById('qs-answering').textContent=a
-
-    document.getElementById('qs-done').textContent=dn
-
-    document.getElementById('qs-total').textContent=allQueues.length
-
-    document.getElementById('badge-queue').textContent=(w+a)>0?(w+a):''
-
-    renderQueueList()
-
-  })
-
-}
-
-window.loadQueue=loadQueue
-
-
-
-function renderQueueList(){
-
-  var list=allQueues.filter(function(t){return queueFilter==='all'||t.status===queueFilter})
-
-  var el=document.getElementById('queueList')
-
-  if(list.length===0){el.innerHTML='<div style="color:var(--g400);text-align:center;padding:20px;">항목 없음</div>';return}
-
-  el.innerHTML=list.map(function(t){
-
-    var sc=t.status==='done'?'done':t.status==='answering'?'answering':'waiting'
-
-    var sl=t.status==='done'?'완료':t.status==='answering'?'답변중':'대기'
-
-    var tm=t.created_at?t.created_at.slice(11,16):''
-
-    return '<div class="ticket-item">'+
-
-      '<div class="ticket-num '+sc+'">'+t.number+'</div>'+
-
-      '<div class="ticket-info">'+
-
-        '<div class="ticket-name">'+esc(t.student_name)+'</div>'+
-
-        '<div class="ticket-time">'+tm+' 발급</div>'+
-
-      '</div>'+
-
-      '<span class="ticket-status-badge '+sc+'">'+sl+'</span>'+
-
-      '<div class="ticket-actions">'+
-
-        (t.status==='waiting'?'<button class="btn btn-sm" style="background:var(--yellow-s);color:#92400e;border:1.5px solid #fcd34d;" data-qid="'+t.id+'" data-qst="answering" data-qaction="status"><i class="fas fa-comment"></i> 답변중</button>':'')+
-
-        (t.status==='answering'?'<button class="btn btn-green btn-sm" data-qid="'+t.id+'" data-qst="done" data-qaction="status"><i class="fas fa-check"></i> 완료</button>':'')+
-
-        (t.status==='done'?'<span style="font-size:11px;color:var(--g400);">재발급 가능</span>':'')+
-
-      '</div>'+
-
-    '</div>'
-
-  }).join('')
-
-}
-
-
-
-window.setQueueStatus=function(id,status){
-
-  api('/api/admin/queue/'+id+'/status',{method:'POST',body:JSON.stringify({status:status})}).then(function(d){
-
-    if(d.success){toast('상태 변경 완료');loadQueue()}
-
-    else toast('오류: '+d.error)
-
-  })
-
-}
-
-
-
-function filterQueue(f,el){
-
-  queueFilter=f
-
-  document.querySelectorAll('#tab-queue .filter-btn').forEach(function(b){b.classList.remove('active')})
-
-  el.classList.add('active')
-
-  renderQueueList()
-
-}
-
-window.filterQueue=filterQueue
-
-
-
-// ══ 요청사항 ══
-
-function loadRequests(){
-
-  api('/api/admin/requests').then(function(d){
-
-    if(!d.success)return
-
-    allRequests=d.requests
-
-    var pending=allRequests.filter(function(r){return r.status==='pending'}).length
-
-    document.getElementById('badge-requests').textContent=pending>0?pending:''
-
-    renderReqList()
-
-  })
-
-}
-
-window.loadRequests=loadRequests
-
-
-
-function renderReqList(){
-
-  var list=allRequests.filter(function(r){return reqFilter==='all'||r.status===reqFilter})
-
-  var el=document.getElementById('reqList')
-
-  if(list.length===0){el.innerHTML='<div style="color:var(--g400);text-align:center;padding:20px;">항목 없음</div>';return}
-
-  el.innerHTML=list.map(function(r){
-
-    var sl={pending:'미확인',in_progress:'처리중',done:'완료'}[r.status]||r.status
-
-    var sc={pending:'pending',in_progress:'in_progress',done:'done'}[r.status]||'pending'
-
-    var tm=r.created_at?r.created_at.slice(0,16).replace('T',' '):''
-
-    return '<div class="req-item">'+
-
-      '<div class="req-av">'+esc(r.student_name[0])+'</div>'+
-
-      '<div class="req-body">'+
-
-        '<div class="req-top">'+
-
-          '<span class="req-name">'+esc(r.student_name)+'</span>'+
-
-          '<span class="req-time">'+tm+'</span>'+
-
-          (r.has_photo?'<span class="req-photo-badge"><i class="fas fa-image"></i> 사진</span>':'')+
-
-          '<span class="status-badge '+sc+'">'+sl+'</span>'+
-
-        '</div>'+
-
-        '<div class="req-msg">'+esc(r.message)+'</div>'+
-
-        (r.admin_note?'<div class="req-note"><i class="fas fa-pen-to-square"></i> '+esc(r.admin_note)+'</div>':'')+
-
-      '</div>'+
-
-      '<div class="req-actions">'+
-
-        '<button class="btn btn-gray btn-sm" data-rid="'+r.id+'" data-rnote="'+esc(r.admin_note||'')+'" data-raction="note"><i class="fas fa-pen"></i></button>'+
-
-        (r.status!=='done'?'<button class="btn btn-green btn-sm" data-rid="'+r.id+'" data-raction="done"><i class="fas fa-check"></i></button>':'')+
-
-      '</div>'+
-
-    '</div>'
-
-  }).join('')
-
-}
-
-
-
-function filterReq(f,el){
-
-  reqFilter=f
-
-  document.querySelectorAll('#tab-requests .filter-btn').forEach(function(b){b.classList.remove('active')})
-
-  el.classList.add('active')
-
-  renderReqList()
-
-}
-
-window.filterReq=filterReq
-
-
-
-window.openNote=function(id,note){
-
-  curNoteReqId=id
-
-  document.getElementById('noteInp').value=note||''
-
-  document.getElementById('note-modal').classList.add('open')
-
-}
-
-
-
-window.saveNote=function(status){
-
-  if(!curNoteReqId)return
-
-  var note=document.getElementById('noteInp').value.trim()
-
-  api('/api/admin/requests/'+curNoteReqId+'/status',{method:'POST',body:JSON.stringify({status:status,adminNote:note})}).then(function(d){
-
-    if(d.success){toast('저장 완료');document.getElementById('note-modal').classList.remove('open');loadRequests()}
-
-    else toast('오류')
-
-  })
-
-}
-
-
-
-window.quickDoneReq=function(id){
-
-  api('/api/admin/requests/'+id+'/status',{method:'POST',body:JSON.stringify({status:'done'})}).then(function(d){
-
-    if(d.success){toast('완료 처리');loadRequests()}
-
-  })
-
-}
-
-
-
-// ══ 주문현황 ══
-
-function loadOrders(){
-
-  var stu=document.getElementById('orderSearch').value.trim()
-
-  var cat=document.getElementById('orderCatFilter').value
-
-  var qs='?student='+encodeURIComponent(stu)+'&category='+cat
-
-  api('/api/admin/orders'+qs).then(function(d){
-
-    if(!d.success)return
-
-    allOrders=d.orders
-
-    renderOrderList()
-
-  })
-
-}
-
-window.loadOrders=loadOrders
-
-
-
-function renderOrderList(){
-
-  var el=document.getElementById('orderList')
-
-  if(allOrders.length===0){el.innerHTML='<div style="color:var(--g400);text-align:center;padding:20px;">항목 없음</div>';return}
-
-  var catEmoji={learn:'✅',fine:'🚨',shop:'🛍️'}
-
-  el.innerHTML=allOrders.map(function(o){
-
-    var items=[]
-
-    try{items=JSON.parse(o.items_json)}catch(e){}
-
-    var itemsTxt=items.map(function(x){return (x.icon||'')+' '+x.label+(x.qty>1?' x'+x.qty:'')}).join(' / ')
-
-    var costVal=o.total_cost
-
-    var cc=costVal===0?'free':costVal<0?'gain':'loss'
-
-    var ct=costVal===0?'무료':costVal<0?'+'+Math.abs(costVal)+' '+o.currency+' 획득':'-'+costVal+' '+o.currency+' 차감'
-
-    var tm=o.created_at?o.created_at.slice(0,16).replace('T',' '):''
-
-    return '<div class="order-item">'+
-
-      '<div class="order-cat '+o.category+'">'+(catEmoji[o.category]||'📋')+'</div>'+
-
-      '<div class="order-body">'+
-
-        '<div class="order-top">'+
-
-          '<span class="order-stu">'+esc(o.student_name)+'</span>'+
-
-          '<span class="order-time">'+tm+'</span>'+
-
-          (o.has_photo?'<span style="font-size:10px;background:var(--orange);color:white;padding:2px 6px;border-radius:100px;font-weight:800;">사진</span>':'')+
-
-        '</div>'+
-
-        '<div class="order-items-txt">'+esc(itemsTxt)+'</div>'+
-
-        (o.comment?'<div style="font-size:11px;color:var(--indigo);margin-top:2px;">💬 '+esc(o.comment)+'</div>':'')+
-
-      '</div>'+
-
-      '<div class="order-cost '+cc+'">'+ct+'</div>'+
-
-    '</div>'
-
-  }).join('')
-
-}
-
-
-
-// ══ 학생 관리 ══
-
-function renderStudents(){
-
-  var el=document.getElementById('stuList')
-
-  if(students.length===0){el.innerHTML='<div style="color:var(--g400)">학생이 없습니다.</div>';return}
-
-  el.innerHTML=students.map(function(s){
-
-    var av=s.photo_url
-
-      ?'<img class="stu-av-sm" src="'+esc(s.photo_url)+'" alt=""/>'
-
-      :'<div class="stu-av-txt">'+esc(s.name[0])+'</div>'
-
-    return '<div class="stu-list-item">'+av+
-
-      '<div class="stu-name-lbl">'+esc(s.name)+'</div>'+
-
-      '<span class="stu-pts-lbl">'+curCfg.symbol+' '+s.points+'</span>'+
-
-      '<button class="btn btn-gray btn-sm btn-icon" data-sid="'+s.id+'" data-sname="'+esc(s.name)+'" data-saction="hist"><i class="fas fa-clock-rotate-left"></i></button>'+
-
-      '<button class="btn btn-gray btn-sm btn-icon" data-sid="'+s.id+'" data-sname="'+esc(s.name)+'" data-saction="adj"><i class="fas fa-plus-minus"></i></button>'+
-
-      '<button class="btn btn-gray btn-sm btn-icon" data-sid="'+s.id+'" data-saction="photo"><i class="fas fa-camera"></i></button>'+
-
-      '<button class="btn btn-red btn-sm btn-icon" data-sid="'+s.id+'" data-sname="'+esc(s.name)+'" data-saction="del"><i class="fas fa-trash"></i></button>'+
-
-    '</div>'
-
-  }).join('')
-
-}
-
-
-
-window.addStudent=function(){
-
-  var name=document.getElementById('newStuName').value.trim()
-
-  if(!name){toast('이름 입력');return}
-
-  api('/api/admin/students',{method:'POST',body:JSON.stringify({name:name})}).then(function(d){
-
-    if(d.success){document.getElementById('newStuName').value='';toast('추가: '+name);loadStudentsData()}
-
-    else toast('오류: '+d.error)
-
-  })
-
-}
-
-
-
-window.delStudent=function(id,name){
-
-  if(!confirm(name+' 삭제?'))return
-
-  api('/api/admin/students/'+id,{method:'DELETE'}).then(function(d){
-
-    if(d.success){toast('삭제됨');loadStudentsData()}
-
-  })
-
-}
-
-
-
-window.adjPoints=function(id,name){
-
-  var v=prompt(name+'님 포인트 조정 (예: +5 또는 -3)','')
-
-  if(!v)return
-
-  var delta=parseInt(v)
-
-  if(isNaN(delta)){toast('숫자로 입력하세요');return}
-
-  api('/api/admin/students/'+id+'/points',{method:'POST',body:JSON.stringify({delta:delta,reason:'관리자 조정'})}).then(function(d){
-
-    if(d.success){toast('조정 완료');loadStudentsData()}
-
-  })
-
-}
-
-
-
-window.uploadPhoto=function(id){
-
-  var inp=document.createElement('input');inp.type='file';inp.accept='image/*'
-
-  inp.onchange=function(){
-
-    var f=inp.files[0];if(!f)return
-
-    var r=new FileReader()
-
-    r.onload=function(ev){
-
-      api('/api/admin/students/'+id+'/photo',{method:'POST',body:JSON.stringify({photoBase64:ev.target.result})}).then(function(d){
-
-        if(d.success){toast('사진 업데이트');loadStudentsData()}
-
-      })
-
-    };r.readAsDataURL(f)
-
-  };inp.click()
-
-}
-
-
-
-window.showHist=function(id,name){
-
-  fetch('/api/students/'+id).then(r=>r.json()).then(d=>{
-
-    if(!d.success)return
-
-    document.getElementById('histTitle').textContent=name+' 포인트 이력'
-
-    var hist=d.history||[]
-
-    document.getElementById('histList').innerHTML=hist.length===0
-
-      ?'<div style="color:var(--g400)">이력 없음</div>'
-
-      :hist.map(function(h){
-
-        var pos=h.delta>=0
-
-        return '<div class="hist-item"><span>'+esc(h.reason||'')+'</span><span class="hist-delta '+(pos?'pos':'neg')+'">'+(pos?'+':'')+h.delta+'</span></div>'
-
-      }).join('')
-
-    document.getElementById('hist-modal').classList.add('open')
-
-  })
-
-}
-
-
-
-// ══ 벌금 ══
-
-function renderFines(){
-
-  // 학생 전체에서 벌금 합산
-
-  var allF=[]
-
-  students.forEach(function(s){
-
-    if(s.fine_count>0||s.unpaid_fines>0){
-
-      allF.push({student:s.name,unpaid:s.unpaid_fines,count:s.fine_count,id:s.id})
-
-    }
-
-  })
-
-  var el=document.getElementById('fineList')
-
-  if(allF.length===0){el.innerHTML='<div style="color:var(--g400);text-align:center;padding:20px;">미납 벌금 없음</div>';return}
-
-  el.innerHTML='<div style="color:var(--g400);font-size:12px;padding:8px 0;">상세 내역은 학생 상세에서 확인 가능합니다.</div>'+
-
-  allF.map(function(f){
-
-    return '<div class="stu-list-item">'+
-
-      '<div class="stu-av-txt">'+esc(f.student[0])+'</div>'+
-
-      '<div class="stu-name-lbl">'+esc(f.student)+'</div>'+
-
-      '<span style="font-size:12px;font-weight:700;background:var(--red-s);color:var(--red);border:1px solid rgba(239,68,68,.25);border-radius:100px;padding:2px 8px;">미납 '+f.count+'건</span>'+
-
-      '<button class="btn btn-blue btn-sm" data-fid="'+f.id+'" data-fname="'+esc(f.student)+'" data-faction="hist">내역</button>'+
-
-    '</div>'
-
-  }).join('')
-
-}
-
-window.filterFine=function(f,el){
-
-  fineFilter=f
-
-  document.querySelectorAll('#tab-fines .filter-btn').forEach(function(b){b.classList.remove('active')})
-
-  el.classList.add('active')
-
-  renderFines()
-
-}
-
-
-
-// ══ 메뉴 설정 ══
-
-function renderMenuItems(type){
-
-  var el=document.getElementById('menu'+type.charAt(0).toUpperCase()+type.slice(1)+'List')
-
-  var items=menuCfg[type]||[]
-
-  if(items.length===0){el.innerHTML='<div style="color:var(--g400);font-size:13px;padding:8px 0;">항목 없음</div>';return}
-
-  el.innerHTML=items.map(function(m,i){
-
-    var isLearn=type==='learn'
-
-    var valField=isLearn
-
-      ?'<input class="item-cost-inp" type="number" value="'+(m.reward||0)+'" onchange="menuCfg.'+type+'['+i+'].reward=+this.value" placeholder="보상"/>'
-
-      :'<input class="item-cost-inp" type="number" value="'+(m.cost||0)+'" onchange="menuCfg.'+type+'['+i+'].cost=+this.value" placeholder="비용"/>'
-
-    return '<div class="menu-item-row">'+
-
-      '<div class="item-icon-box">'+m.icon+'</div>'+
-
-      '<div class="item-label">'+esc(m.label)+'</div>'+
-
-      valField+
-
-      '<input class="item-unit-sel" value="'+(m.unit||curCfg.symbol||'P')+'" onchange="menuCfg.'+type+'['+i+'].unit=this.value" placeholder="단위" style="width:60px;"/>'+
-
-      (isLearn?'<label style="font-size:11px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:3px;"><input type="checkbox" '+(m.requirePhoto?'checked':'')+' onchange="menuCfg.'+type+'['+i+'].requirePhoto=this.checked"/> 사진</label>':'')+
-
-      '<button class="item-del-btn" data-mtype="'+type+'" data-midx="'+i+'" data-maction="del"><i class="fas fa-trash"></i></button>'+
-
-    '</div>'
-
-  }).join('')
-
-}
-
-
-
-window.delMenuItem=function(type,i){
-
-  menuCfg[type].splice(i,1)
-
-  renderMenuItems(type)
-
-}
-
-
-
-function addMenuItem(type){
-
-  var pfx={learn:'nL',fine:'nF',shop:'nS'}[type]
-
-  var ic=(document.getElementById(pfx+'Ic').value||'').trim()||'[항목]'
-
-  var lbl=document.getElementById(pfx+'Lbl').value.trim()
-
-  if(!lbl){toast('항목 이름 입력');return}
-
-  var costEl=document.getElementById(type==='learn'?'nLRew':type==='fine'?'nFCost':'nSCost')
-
-  var unitEl=document.getElementById(pfx+'Unit')
-
-  var cost=parseInt(costEl.value||'0')||0
-
-  var unit=(unitEl&&unitEl.value.trim())||curCfg.symbol||'P'
-
-  var newId=type+'_'+Date.now()
-
-  if(type==='learn'){
-
-    var photo=document.getElementById('nLPhoto').checked||false
-
-    menuCfg.learn.push({id:newId,icon:ic,label:lbl,cost:0,reward:cost,unit:unit,requirePhoto:photo})
-
-  } else {
-
-    menuCfg[type].push({id:newId,icon:ic,label:lbl,cost:cost,reward:0,unit:unit,requirePhoto:false})
-
-  }
-
-  document.getElementById(pfx+'Ic').value=''
-
-  document.getElementById(pfx+'Lbl').value=''
-
-  costEl.value=''
-
-  if(unitEl)unitEl.value=''
-
-  renderMenuItems(type);toast('추가: '+lbl)
-
-}
-
-
-
-document.getElementById('addLearnBtn').addEventListener('click',function(){addMenuItem('learn')})
-
-document.getElementById('addFineBtn').addEventListener('click',function(){addMenuItem('fine')})
-
-document.getElementById('addShopBtn').addEventListener('click',function(){addMenuItem('shop')})
-
-
-
-document.getElementById('savemenuBtn').addEventListener('click',function(){
-
-  var lc=localStorage.getItem('kiosk_config'),cfg={currency:curCfg,menu:menuCfg}
-
-  if(lc){try{cfg=Object.assign({},JSON.parse(lc),{menu:menuCfg})}catch(e){}}
-
-  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
-
-  toast('메뉴 저장 완료!')
-
-})
-
-
-
-document.getElementById('resetmenuBtn').addEventListener('click',function(){
-
-  if(!confirm('기본값으로 초기화?'))return
-
-  menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))
-
-  renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop');toast('초기화됨')
-
-})
-
-
-
-// ══ 화폐 설정 ══
-
-function renderPresets(){
-
-  document.getElementById('presetGrid').innerHTML=PRESETS.map(function(p,i){
-
-    return '<button class="preset-btn" onclick="applyPreset('+i+')"><span class="pi">'+p.symbol+'</span>'+p.unit+'</button>'
-
-  }).join('')
-
-}
-
-window.applyPreset=function(i){
-
-  var p=PRESETS[i];curCfg.unit=p.unit;curCfg.symbol=p.symbol;curCfg.desc=p.desc
-
-  document.getElementById('curUnit').value=p.unit
-
-  document.getElementById('curSymbol').value=p.symbol
-
-  document.getElementById('curDesc').value=p.desc
-
-  updateCurPreview()
-
-}
-
-function updateCurPreview(){
-
-  document.getElementById('curPrevSymbol').textContent=document.getElementById('curSymbol').value||'P'
-
-  document.getElementById('curPrevUnit').textContent=document.getElementById('curUnit').value||'포인트'
-
-  document.getElementById('curPrevDesc').textContent=document.getElementById('curDesc').value||'설명이 여기 표시됩니다'
-
-}
-
-document.getElementById('curUnit').addEventListener('input',updateCurPreview)
-
-document.getElementById('curSymbol').addEventListener('input',updateCurPreview)
-
-document.getElementById('savecurBtn').addEventListener('click',function(){
-
-  curCfg.unit=document.getElementById('curUnit').value.trim()||'포인트'
-
-  curCfg.symbol=document.getElementById('curSymbol').value.trim()||'P'
-
-  curCfg.desc=document.getElementById('curDesc').value.trim()
-
-  var lc=localStorage.getItem('kiosk_config'),cfg={currency:curCfg,menu:menuCfg}
-
-  if(lc){try{cfg=Object.assign({},JSON.parse(lc),{currency:curCfg})}catch(e){}}
-
-  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
-
-  renderPresets();toast('화폐 설정 저장!')
-
-})
-
-
-
-// ── 유틸 ──
-
-function esc(s){var r=String(s);r=r.split('&').join('&amp;');r=r.split('<').join('&lt;');r=r.split('>').join('&gt;');r=r.split(String.fromCharCode(34)).join('&#34;');return r}
-
-function toast(msg){var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},2200)}
-
-
-
-document.getElementById('closeHistBtn').addEventListener('click',function(){document.getElementById('hist-modal').classList.remove('open')})
-
-
-
-// ── 이벤트 위임: 동적으로 생성된 버튼들 처리 ──
-document.addEventListener('click',function(e){
-  var btn=e.target.closest('[data-qaction]')
-  if(btn){
-    var id=btn.dataset.qid, st=btn.dataset.qst
-    if(btn.dataset.qaction==='status') setQueueStatus(id,st)
-    return
-  }
-  btn=e.target.closest('[data-raction]')
-  if(btn){
-    var rid=btn.dataset.rid
-    if(btn.dataset.raction==='note') openNote(rid, btn.dataset.rnote||'')
-    else if(btn.dataset.raction==='done') quickDoneReq(rid)
-    return
-  }
-  btn=e.target.closest('[data-saction]')
-  if(btn){
-    var sid=btn.dataset.sid, sname=btn.dataset.sname||''
-    if(btn.dataset.saction==='hist') showHist(sid,sname)
-    else if(btn.dataset.saction==='adj') adjPoints(sid,sname)
-    else if(btn.dataset.saction==='photo') uploadPhoto(sid)
-    else if(btn.dataset.saction==='del') delStudent(sid,sname)
-    return
-  }
-  btn=e.target.closest('[data-faction]')
-  if(btn){
-    var fid=btn.dataset.fid, fname=btn.dataset.fname||''
-    if(btn.dataset.faction==='hist') showHist(fid,fname)
-    return
-  }
-  btn=e.target.closest('[data-maction]')
-  if(btn){
-    if(btn.dataset.maction==='del') delMenuItem(btn.dataset.mtype, parseInt(btn.dataset.midx))
-    return
-  }
-})
-
-
-
-})()
-
-</script>
-
+<script src="/static/admin.js"></script>
 </body>
 
 </html>`
