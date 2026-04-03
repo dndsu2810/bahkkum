@@ -193,16 +193,24 @@ app.get('/api/shop/status', async (c) => {
     const unlocked = !!unlockRow
     const expiresAt = unlockRow?.expires_at || null
 
-    // 강제 잠금 상태 확인 (관리자가 즉시 잠금한 경우)
+    // 강제 잠금 상태 확인
     const forceLockRow = await c.env.DB.prepare(
       "SELECT value FROM app_config WHERE key='force_lock'"
     ).first() as any
     const forceLocked = forceLockRow?.value === '1'
 
-    // 잠금 여부: 강제잠금 OR 수업시간, 단 unlocked(열기 승인)가 있으면 열림
-    const locked = (forceLocked || isClassTime) && !unlocked
+    // 완전 오픈 상태 확인 (관리자가 시간 제한 없이 열어둔 경우)
+    const forceOpenRow = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='force_open'"
+    ).first() as any
+    const forceOpen = forceOpenRow?.value === '1'
 
-    return c.json({ success: true, isClassTime, forceLocked, locked, unlocked, expiresAt })
+    // 잠금 여부 계산
+    // force_open이면 무조건 열림
+    // forceLocked 또는 수업시간이면 잠김 (단, unlocked 승인이 있으면 열림)
+    const locked = !forceOpen && (forceLocked || isClassTime) && !unlocked
+
+    return c.json({ success: true, isClassTime, forceLocked, forceOpen, locked, unlocked, expiresAt })
 
   } catch (e: any) {
 
@@ -276,20 +284,32 @@ app.post('/api/admin/shop/unlock', async (c) => {
 // ── 관리자: 상점 직접 열기 (승인 요청 없이) ───────────────────────────────────
 app.post('/api/admin/shop/direct-unlock', async (c) => {
   try {
-    const { minutes = 10 } = await c.req.json()
-    const mins = Math.max(1, Math.min(180, parseInt(minutes) || 10))
-    // 강제 잠금 해제
+    const { minutes = 10, mode = 'timed' } = await c.req.json()
+    // force_lock 해제
     await c.env.DB.prepare(
       "INSERT INTO app_config (key, value, updated_at) VALUES ('force_lock', '0', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='0', updated_at=CURRENT_TIMESTAMP"
     ).run()
-    // 기존 승인된 것 만료 처리 후 새로 생성
+    // 기존 승인된 것 만료 처리
     await c.env.DB.prepare(
       "UPDATE shop_unlock_requests SET status='expired' WHERE status='approved'"
     ).run()
-    await c.env.DB.prepare(
-      `INSERT INTO shop_unlock_requests (student_name, student_id, status, unlocked_at, expires_at) VALUES ('관리자 직접 열기', NULL, 'approved', datetime('now'), datetime('now','+${mins} minutes'))`
-    ).run()
-    return c.json({ success: true })
+
+    if (mode === 'permanent') {
+      // 완전 오픈: force_open=1 저장 (시간 제한 없음)
+      await c.env.DB.prepare(
+        "INSERT INTO app_config (key, value, updated_at) VALUES ('force_open', '1', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='1', updated_at=CURRENT_TIMESTAMP"
+      ).run()
+    } else {
+      // 시간 제한 열기
+      const mins = Math.max(1, Math.min(480, parseInt(minutes) || 10))
+      await c.env.DB.prepare(
+        "INSERT INTO app_config (key, value, updated_at) VALUES ('force_open', '0', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='0', updated_at=CURRENT_TIMESTAMP"
+      ).run()
+      await c.env.DB.prepare(
+        `INSERT INTO shop_unlock_requests (student_name, student_id, status, unlocked_at, expires_at) VALUES ('관리자 직접 열기', NULL, 'approved', datetime('now'), datetime('now','+${mins} minutes'))`
+      ).run()
+    }
+    return c.json({ success: true, mode })
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)
   }
@@ -297,9 +317,12 @@ app.post('/api/admin/shop/direct-unlock', async (c) => {
 
 app.post('/api/admin/shop/lock', async (c) => {
   try {
-    // 강제 잠금 ON
+    // 강제 잠금 ON + force_open OFF
     await c.env.DB.prepare(
       "INSERT INTO app_config (key, value, updated_at) VALUES ('force_lock', '1', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='1', updated_at=CURRENT_TIMESTAMP"
+    ).run()
+    await c.env.DB.prepare(
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('force_open', '0', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='0', updated_at=CURRENT_TIMESTAMP"
     ).run()
     // 열려있는 잠금해제 요청도 모두 만료
     await c.env.DB.prepare(
@@ -3177,6 +3200,7 @@ function updateBannerStats(s){
 // ── 상점 잠금 상태 ──
 let SHOP_STATUS = { locked: false, forceLocked: false, unlocked: false, expiresAt: null }
 let shopUnlockTimer = null
+let shopPollTimer = null
 
 async function checkShopStatus() {
   try {
@@ -3192,6 +3216,14 @@ async function checkShopStatus() {
 function renderShopLockOverlay() {
   const overlay = document.getElementById('shop-lock-overlay')
   if (!overlay) return
+
+  // 상점 탭이 아닐 때는 오버레이/배지 항상 숨김
+  if (ST.tab !== 'shop') {
+    overlay.style.display = 'none'
+    const b = document.getElementById('shop-unlock-badge')
+    if (b) b.style.display = 'none'
+    return
+  }
 
   if (SHOP_STATUS.unlocked && !SHOP_STATUS.locked) {
     const exp = SHOP_STATUS.expiresAt ? new Date(SHOP_STATUS.expiresAt + 'Z') : null
@@ -3231,29 +3263,32 @@ function renderShopLockOverlay() {
 
 window.switchTab=async function(tab){
 
+  // 탭 변경 전 상점 polling 정지 (상점 탭 벗어날 때)
+  if (tab !== 'shop' && shopPollTimer) {
+    clearInterval(shopPollTimer); shopPollTimer = null
+  }
+
+  // 상점 탭이 아니면 오버레이/배지 반드시 숨김 (ST.tab 업데이트 전에 먼저 숨김)
+  if (tab !== 'shop') {
+    const ov = document.getElementById('shop-lock-overlay')
+    if (ov) ov.style.display = 'none'
+    const badge = document.getElementById('shop-unlock-badge')
+    if (badge) badge.style.display = 'none'
+  }
+
+  // ST.tab 먼저 업데이트 (renderShopLockOverlay가 ST.tab 확인하므로)
+  ST.tab = tab
+  document.querySelectorAll('.tab-btn').forEach(b=>b.className='tab-btn')
+  document.getElementById('tab-'+tab).classList.add('tab-btn','active-'+tab)
+
   // 상점 탭 클릭 시 잠금 확인
   if (tab === 'shop') {
     await checkShopStatus()
-    if (SHOP_STATUS.locked) {
-      // 잠긴 상태 - 오버레이 표시 후 탭 전환
-      ST.tab = tab
-      document.querySelectorAll('.tab-btn').forEach((b) => b.className='tab-btn')
-      document.getElementById('tab-shop').classList.add('tab-btn','active-shop')
-      renderMenu()
-      renderShopLockOverlay()
-      return
-    }
   }
-
-  ST.tab=tab
-
-  document.querySelectorAll('.tab-btn').forEach(b=>b.className='tab-btn')
-
-  document.getElementById('tab-'+tab).classList.add('tab-btn','active-'+tab)
 
   renderMenu()
 
-  // 상점 탭이면 잠금해제 남은 시간 배지 갱신
+  // 상점 탭이면 잠금 오버레이 처리
   if (tab === 'shop') renderShopLockOverlay()
 
 }
@@ -5164,7 +5199,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
         <div class="card-body">
           <div id="shopStatusBadge" style="margin-bottom:12px;padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;">확인 중...</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <button class="btn btn-green btn-sm" onclick="adminUnlockShop()"><i class="fas fa-unlock"></i> 직접 열기</button>
+            <button class="btn btn-green btn-sm" id="adminUnlockBtn" onclick="adminUnlockShop()"><i class="fas fa-unlock"></i> 열기</button>
             <button class="btn btn-red btn-sm" id="adminLockBtn" onclick="adminLockShop()"><i class="fas fa-lock"></i> 즉시 잠금</button>
           </div>
         </div>

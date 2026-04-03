@@ -1434,34 +1434,43 @@ function loadShopRequests(){
 function loadShopStatus(){
   var el=document.getElementById('shopStatusBadge')
   var lockBtn=document.getElementById('adminLockBtn')
+  var unlockBtn=document.getElementById('adminUnlockBtn')
   if(!el)return
   api('/api/shop/status').then(function(d){
     if(!d.success)return
     if(d.forceLocked){
-      el.style.background='#fee2e2';el.style.color='#dc2626';el.style.border='1.5px solid #fca5a5'
-      el.textContent='🔒 관리자 강제 잠금 중 (직접 열기 전까지 유지)'
+      el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;'
+      el.textContent='🔒 관리자 강제 잠금 중 – 직접 풀기 전까지 유지'
       if(lockBtn){lockBtn.textContent='🔒 잠금 중';lockBtn.disabled=true;lockBtn.style.opacity='0.5'}
+      if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
+    } else if(d.forceOpen){
+      el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#f0fdf4;color:#15803d;border:1.5px solid #86efac;'
+      el.textContent='🟢 완전 오픈 중 – 잠금 전까지 계속 열림'
+      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      if(unlockBtn){unlockBtn.disabled=true;unlockBtn.style.opacity='0.5'}
     } else if(d.locked){
-      el.style.background='#fee2e2';el.style.color='#dc2626';el.style.border='1.5px solid #fca5a5'
+      el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;'
       el.textContent='🔒 수업 시간 – 상점 잠김'
       if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
     } else if(d.unlocked){
       var exp=d.expiresAt?new Date(d.expiresAt+'Z'):null
       var remain=exp?Math.max(0,Math.ceil((exp-Date.now())/60000)):0
-      el.style.background='#fff7ed';el.style.color='#c2410c';el.style.border='1.5px solid #fdba74'
+      el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#fff7ed;color:#c2410c;border:1.5px solid #fdba74;'
       el.textContent='🔓 임시 오픈 중 (약 '+remain+'분 남음)'
       if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
     } else {
-      el.style.background='#f0fdf4';el.style.color='#16a34a';el.style.border='1.5px solid #86efac'
+      el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#f0fdf4;color:#16a34a;border:1.5px solid #86efac;'
       el.textContent='✅ 상점 열림'
       if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
     }
   })
 }
 
 window.adminUnlockShop=function(){
-  // prompt 대신 모달 UI 사용
-  openUnlockMinutesModal()
+  openUnlockModal()
 }
 
 function openApproveModal(reqId, reqName){
@@ -1493,30 +1502,114 @@ window.doApproveUnlock=function(reqId,reqName){
   })
 }
 
-function openUnlockMinutesModal(){
-  var existing=document.getElementById('unlock-min-modal')
+function openUnlockModal(){
+  var existing=document.getElementById('unlock-modal')
   if(existing)existing.remove()
   var modal=document.createElement('div')
-  modal.id='unlock-min-modal'
-  modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px;'
-  modal.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.18);">'+
-    '<div style="font-size:16px;font-weight:800;margin-bottom:14px;color:#0f172a;">🔓 상점 열기</div>'+
-    '<div style="font-size:13px;color:#64748b;margin-bottom:12px;">몇 분간 상점을 열까요?</div>'+
-    '<input id="unlockMinsInp" type="number" value="10" min="1" max="180" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;font-weight:700;text-align:center;margin-bottom:14px;box-sizing:border-box;">'+
-    '<div style="display:flex;gap:8px;">'+
-    '<button onclick="doDirectUnlock()" style="flex:1;padding:10px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">열기</button>'+
-    '<button onclick="document.getElementById(\'unlock-min-modal\').remove()" style="padding:10px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:10px;font-size:14px;cursor:pointer;">취소</button>'+
-    '</div></div>'
+  modal.id='unlock-modal'
+  modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px;'
+  modal.innerHTML=
+    '<div style="background:#fff;border-radius:18px;padding:0;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.22);overflow:hidden;">'+
+      '<div style="padding:20px 20px 0;font-size:17px;font-weight:800;color:#0f172a;">🔓 상점 열기</div>'+
+      // 탭 버튼 3개
+      '<div style="display:flex;gap:0;padding:14px 20px 0;border-bottom:1.5px solid #f1f5f9;">'+
+        '<button id="utab-timed" onclick="switchUnlockTab(\'timed\')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2.5px solid #3b82f6;color:#3b82f6;">⏱ 시간 설정</button>'+
+        '<button id="utab-until" onclick="switchUnlockTab(\'until\')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;">🕐 시각 지정</button>'+
+        '<button id="utab-perm" onclick="switchUnlockTab(\'perm\')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;">♾ 완전 오픈</button>'+
+      '</div>'+
+      // 패널: 시간 설정 (분)
+      '<div id="upanel-timed" style="padding:18px 20px;">'+
+        '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">몇 분간 상점을 열까요?</div>'+
+        '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">'+
+          '<button onclick="setUnlockMins(10)" style="padding:7px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:#f8fafc;">10분</button>'+
+          '<button onclick="setUnlockMins(20)" style="padding:7px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:#f8fafc;">20분</button>'+
+          '<button onclick="setUnlockMins(30)" style="padding:7px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:#f8fafc;">30분</button>'+
+          '<button onclick="setUnlockMins(60)" style="padding:7px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:#f8fafc;">1시간</button>'+
+        '</div>'+
+        '<input id="unlockMinsInp" type="number" value="10" min="1" max="480" placeholder="직접 입력 (분)" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;font-weight:700;text-align:center;box-sizing:border-box;">'+
+      '</div>'+
+      // 패널: 시각 지정 (끝나는 시간)
+      '<div id="upanel-until" style="padding:18px 20px;display:none;">'+
+        '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">언제까지 열어둘까요? (오늘 기준)</div>'+
+        '<input id="unlockUntilInp" type="time" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:16px;font-weight:700;text-align:center;box-sizing:border-box;">'+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:6px;text-align:center;">지정 시각까지 자동으로 닫힙니다</div>'+
+      '</div>'+
+      // 패널: 완전 오픈
+      '<div id="upanel-perm" style="padding:18px 20px;display:none;">'+
+        '<div style="background:#fef9c3;border:1.5px solid #fde047;border-radius:10px;padding:12px 14px;font-size:13px;color:#854d0e;line-height:1.6;">'+
+          '⚠️ <b>완전 오픈</b> 모드입니다.<br>수업 시간표와 관계없이 상점이 항상 열립니다.<br>다시 잠금 버튼을 눌러야 닫힙니다.'+
+        '</div>'+
+      '</div>'+
+      // 버튼
+      '<div style="display:flex;gap:8px;padding:0 20px 20px;">'+
+        '<button id="unlockConfirmBtn" onclick="doUnlockConfirm()" style="flex:1;padding:11px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;">✅ 열기</button>'+
+        '<button onclick="document.getElementById(\'unlock-modal\').remove()" style="padding:11px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:10px;font-size:14px;cursor:pointer;">취소</button>'+
+      '</div>'+
+    '</div>'
   document.body.appendChild(modal)
-  document.getElementById('unlockMinsInp').focus()
-  document.getElementById('unlockMinsInp').select()
+  // 기본 시각 설정 (지금+30분)
+  var now=new Date(); now.setMinutes(now.getMinutes()+30)
+  document.getElementById('unlockUntilInp').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')
 }
 
+window.switchUnlockTab=function(tab){
+  var tabs=['timed','until','perm']
+  tabs.forEach(function(t){
+    var btn=document.getElementById('utab-'+t)
+    var panel=document.getElementById('upanel-'+t)
+    var active=t===tab
+    if(btn){btn.style.borderBottomColor=active?'#3b82f6':'transparent';btn.style.color=active?'#3b82f6':'#94a3b8';btn.style.fontWeight=active?'700':'600'}
+    if(panel)panel.style.display=active?'block':'none'
+  })
+}
+
+window.setUnlockMins=function(m){
+  var inp=document.getElementById('unlockMinsInp')
+  if(inp)inp.value=m
+}
+
+window.doUnlockConfirm=function(){
+  // 활성 탭 파악
+  var tab='timed'
+  if(document.getElementById('upanel-until').style.display!=='none') tab='until'
+  else if(document.getElementById('upanel-perm').style.display!=='none') tab='perm'
+
+  var body={}
+  if(tab==='timed'){
+    var mins=parseInt(document.getElementById('unlockMinsInp').value)||10
+    body={mode:'timed',minutes:mins}
+  } else if(tab==='until'){
+    var untilVal=document.getElementById('unlockUntilInp').value
+    if(!untilVal){toast('시각을 입력해주세요');return}
+    var parts=untilVal.split(':')
+    var target=new Date()
+    target.setHours(parseInt(parts[0]),parseInt(parts[1]),0,0)
+    var now=new Date()
+    var diffMins=Math.round((target-now)/60000)
+    if(diffMins<=0){toast('현재 시각 이후로 설정해주세요');return}
+    body={mode:'timed',minutes:diffMins}
+  } else {
+    body={mode:'permanent'}
+  }
+
+  document.getElementById('unlock-modal').remove()
+  api('/api/admin/shop/direct-unlock',{method:'POST',body:JSON.stringify(body)}).then(function(d){
+    if(d.success){
+      var msg=body.mode==='permanent'?'🟢 완전 오픈! 잠금 버튼을 누를 때까지 유지됩니다.':'🔓 '+(body.minutes)+'분간 상점이 열렸습니다!'
+      toast(msg)
+      loadShopStatus()
+      loadShopRequests()
+    } else toast('오류: '+(d.error||''))
+  })
+}
+
+// 구버전 호환 (승인 요청 모달에서 사용)
 window.doDirectUnlock=function(){
   var mins=parseInt(document.getElementById('unlockMinsInp').value)||10
   if(mins<=0)mins=10
-  document.getElementById('unlock-min-modal').remove()
-  api('/api/admin/shop/direct-unlock',{method:'POST',body:JSON.stringify({minutes:mins})}).then(function(d){
+  var existing=document.getElementById('unlock-modal')||document.getElementById('unlock-min-modal')
+  if(existing)existing.remove()
+  api('/api/admin/shop/direct-unlock',{method:'POST',body:JSON.stringify({mode:'timed',minutes:mins})}).then(function(d){
     if(d.success){toast('🔓 '+mins+'분간 상점이 열렸습니다!');loadShopStatus();loadShopRequests()}
     else toast('오류: '+(d.error||''))
   })
