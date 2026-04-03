@@ -689,6 +689,8 @@ function renderStudents(){
 
       '<button class="btn btn-gray btn-sm btn-icon" data-sid="'+s.id+'" data-saction="photo"><i class="fas fa-camera"></i></button>'+
 
+      '<button class="btn btn-blue btn-sm btn-icon" title="수업 시간표" data-sid="'+s.id+'" data-sname="'+esc(s.name)+'" data-saction="schedule"><i class="fas fa-calendar-week"></i></button>'+
+
       '<button class="btn btn-red btn-sm btn-icon" data-sid="'+s.id+'" data-sname="'+esc(s.name)+'" data-saction="del"><i class="fas fa-trash"></i></button>'+
 
       '</div>'+
@@ -1278,6 +1280,7 @@ document.addEventListener('click',function(e){
     if(btn.dataset.saction==='hist') showHist(sid,sname)
     else if(btn.dataset.saction==='adj') adjPoints(sid,sname)
     else if(btn.dataset.saction==='photo') uploadPhoto(sid)
+    else if(btn.dataset.saction==='schedule') openStudentSchedule(sid,sname)
     else if(btn.dataset.saction==='del') delStudent(sid,sname)
     return
   }
@@ -1323,6 +1326,80 @@ document.addEventListener('click',function(e){
     return
   }
 })
+
+// ── 학생별 시간표 모달 ────────────────────────────────────────────────────────────
+
+var stuSchedId=null, stuSchedSlots=[]
+var DAYS=['월','화','수','목','금','토','일']
+
+function openStudentSchedule(sid, sname){
+  stuSchedId=sid
+  stuSchedSlots=[]
+  var modal=document.getElementById('stu-sched-modal')
+  if(!modal)return
+  document.getElementById('stuSchedTitle').textContent=esc(sname)+' 수업 시간표'
+  document.getElementById('stuSchedSlots').innerHTML='<div style="color:var(--g400);text-align:center;padding:12px;">로딩 중...</div>'
+  modal.classList.add('open')
+  api('/api/admin/students/'+sid+'/schedule').then(function(d){
+    stuSchedSlots=d.success&&Array.isArray(d.schedule)?d.schedule:[]
+    renderStuSchedSlots()
+  }).catch(function(){stuSchedSlots=[];renderStuSchedSlots()})
+}
+
+function renderStuSchedSlots(){
+  var el=document.getElementById('stuSchedSlots')
+  if(!el)return
+  if(stuSchedSlots.length===0){
+    el.innerHTML='<div style="color:var(--g400);font-size:13px;padding:8px 0;">추가된 시간대가 없습니다.<br><span style="font-size:11px;color:var(--g300);">비워두면 전체 시간표가 적용됩니다.</span></div>'
+    return
+  }
+  var html=''
+  stuSchedSlots.forEach(function(sl,i){
+    html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">'
+    html+='<select class="ss-day" data-idx="'+i+'" style="padding:5px 7px;border:1.5px solid var(--g200);border-radius:8px;font-size:13px;">'
+    DAYS.forEach(function(d){html+='<option value="'+d+'"'+(sl.day===d?' selected':'')+'>'+d+'</option>'})
+    html+='</select>'
+    html+='<input type="time" class="ss-start" data-idx="'+i+'" value="'+(sl.start||'')+'" style="padding:5px 7px;border:1.5px solid var(--g200);border-radius:8px;font-size:13px;">'
+    html+='<span style="color:var(--g400);">~</span>'
+    html+='<input type="time" class="ss-end" data-idx="'+i+'" value="'+(sl.end||'')+'" style="padding:5px 7px;border:1.5px solid var(--g200);border-radius:8px;font-size:13px;">'
+    html+='<button class="btn btn-red btn-sm" onclick="removeStuSchedSlot('+i+')"><i class="fas fa-trash"></i></button>'
+    html+='</div>'
+  })
+  el.innerHTML=html
+}
+
+window.addStuSchedSlot=function(){
+  stuSchedSlots.push({day:'월',start:'14:00',end:'16:00'})
+  renderStuSchedSlots()
+}
+
+window.removeStuSchedSlot=function(i){
+  stuSchedSlots.splice(i,1)
+  renderStuSchedSlots()
+}
+
+window.saveStuSchedule=function(){
+  if(!stuSchedId)return
+  // DOM에서 현재 값 수집
+  var dayEls=document.querySelectorAll('.ss-day')
+  var startEls=document.querySelectorAll('.ss-start')
+  var endEls=document.querySelectorAll('.ss-end')
+  var arr=[]
+  dayEls.forEach(function(el,i){arr.push({day:el.value,start:startEls[i].value,end:endEls[i].value})})
+  stuSchedSlots=arr
+  api('/api/admin/students/'+stuSchedId+'/schedule',{method:'POST',body:JSON.stringify({schedule:stuSchedSlots})}).then(function(d){
+    if(d.success){
+      toast('✅ 시간표 저장됨!')
+      document.getElementById('stu-sched-modal').classList.remove('open')
+    } else {
+      toast('저장 실패: '+(d.error||''))
+    }
+  })
+}
+
+window.closeStuSchedModal=function(){
+  document.getElementById('stu-sched-modal').classList.remove('open')
+}
 
 // ── 상점 잠금 관련 ──────────────────────────────────────────────────────────────
 

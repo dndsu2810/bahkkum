@@ -109,22 +109,32 @@ app.post('/api/admin/config', async (c) => {
 
 
 // ── 상점 잠금 상태 조회 (키오스크용) ──────────────────────────────────────────
+// 시간 범위 체크 헬퍼
+function checkSlots(slots: any[], dayName: string, hhmm: number): boolean {
+  for (const slot of slots) {
+    if ((slot.day || '') !== dayName) continue
+    const [sh, sm] = (slot.start || '00:00').split(':').map(Number)
+    const [eh, em] = (slot.end || '00:00').split(':').map(Number)
+    if (hhmm >= sh * 100 + sm && hhmm < eh * 100 + em) return true
+  }
+  return false
+}
+
+function parseSlots(value: string): any[] {
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) return parsed
+    if (Array.isArray(parsed.schedule)) return parsed.schedule
+    if (Array.isArray(parsed.slots)) return parsed.slots
+  } catch (_) {}
+  return []
+}
+
 app.get('/api/shop/status', async (c) => {
 
   try {
-
-    const schedRow = await c.env.DB.prepare(
-      "SELECT value FROM app_config WHERE key='class_schedule'"
-    ).first() as any
-
-    let slots: any[] = []
-    if (schedRow?.value) {
-      const parsed = JSON.parse(schedRow.value)
-      // {schedule:[{day:'월',start:'14:00',end:'16:00'},...]} 형태 또는 배열
-      if (Array.isArray(parsed)) slots = parsed
-      else if (Array.isArray(parsed.schedule)) slots = parsed.schedule
-      else if (Array.isArray(parsed.slots)) slots = parsed.slots
-    }
+    // student_id 쿼리 파라미터 (있으면 학생별 스케줄 우선, 없으면 전체 스케줄)
+    const studentId = c.req.query('student_id')
 
     const DAYS_KO = ['일','월','화','수','목','금','토']
     const now = new Date(Date.now() + 9 * 3600 * 1000)
@@ -132,17 +142,53 @@ app.get('/api/shop/status', async (c) => {
     const hhmm = now.getUTCHours() * 100 + now.getUTCMinutes()
 
     let isClassTime = false
-    for (const slot of slots) {
-      const slotDay = slot.day || ''
-      if (slotDay !== dayName) continue
-      const [sh, sm] = (slot.start || '00:00').split(':').map(Number)
-      const [eh, em] = (slot.end || '00:00').split(':').map(Number)
-      if (hhmm >= sh * 100 + sm && hhmm < eh * 100 + em) { isClassTime = true; break }
+
+    if (studentId) {
+      // 1순위: 학생 개인 시간표
+      const stuSched = await c.env.DB.prepare(
+        'SELECT schedule_json FROM student_schedules WHERE student_id=?'
+      ).bind(studentId).first() as any
+
+      if (stuSched?.schedule_json) {
+        const slots = parseSlots(stuSched.schedule_json)
+        if (slots.length > 0) {
+          isClassTime = checkSlots(slots, dayName, hhmm)
+        } else {
+          // 개인 시간표가 비어있으면 전체 시간표 fallback
+          const globalSched = await c.env.DB.prepare(
+            "SELECT value FROM app_config WHERE key='class_schedule'"
+          ).first() as any
+          if (globalSched?.value) isClassTime = checkSlots(parseSlots(globalSched.value), dayName, hhmm)
+        }
+      } else {
+        // 개인 시간표 없으면 전체 시간표
+        const globalSched = await c.env.DB.prepare(
+          "SELECT value FROM app_config WHERE key='class_schedule'"
+        ).first() as any
+        if (globalSched?.value) isClassTime = checkSlots(parseSlots(globalSched.value), dayName, hhmm)
+      }
+    } else {
+      // student_id 없으면 전체 시간표
+      const schedRow = await c.env.DB.prepare(
+        "SELECT value FROM app_config WHERE key='class_schedule'"
+      ).first() as any
+      if (schedRow?.value) isClassTime = checkSlots(parseSlots(schedRow.value), dayName, hhmm)
     }
 
-    const unlockRow = await c.env.DB.prepare(
-      "SELECT * FROM shop_unlock_requests WHERE status='approved' AND expires_at > datetime('now') ORDER BY expires_at DESC LIMIT 1"
-    ).first() as any
+    // 잠금해제 요청: student_id가 있으면 해당 학생 것만 확인
+    let unlockQuery = "SELECT * FROM shop_unlock_requests WHERE status='approved' AND expires_at > datetime('now')"
+    let unlockRow: any
+    if (studentId) {
+      unlockRow = await c.env.DB.prepare(unlockQuery + ' AND student_id=? ORDER BY expires_at DESC LIMIT 1')
+        .bind(studentId).first() as any
+      // 학생 id 매칭 안 되면 전체 승인도 확인
+      if (!unlockRow) {
+        unlockRow = await c.env.DB.prepare(unlockQuery + ' AND student_id IS NULL ORDER BY expires_at DESC LIMIT 1')
+          .first() as any
+      }
+    } else {
+      unlockRow = await c.env.DB.prepare(unlockQuery + ' ORDER BY expires_at DESC LIMIT 1').first() as any
+    }
 
     const unlocked = !!unlockRow
     const expiresAt = unlockRow?.expires_at || null
@@ -164,7 +210,7 @@ app.post('/api/shop/request-unlock', async (c) => {
 
   try {
 
-    const { studentName } = await c.req.json()
+    const { studentName, studentId } = await c.req.json()
 
     if (!studentName) return c.json({ success: false, error: '학생 이름 필요' }, 400)
 
@@ -175,8 +221,8 @@ app.post('/api/shop/request-unlock', async (c) => {
     if (existing) return c.json({ success: true, requestId: existing.id, alreadyPending: true })
 
     const result = await c.env.DB.prepare(
-      "INSERT INTO shop_unlock_requests (student_name, status) VALUES (?, 'pending')"
-    ).bind(studentName).run() as any
+      "INSERT INTO shop_unlock_requests (student_name, student_id, status) VALUES (?, ?, 'pending')"
+    ).bind(studentName, studentId || null).run() as any
 
     try { await sendShopUnlockSlack(c.env, studentName) } catch (_) {}
 
@@ -1011,6 +1057,34 @@ app.post('/api/admin/students/:id/points', async (c) => {
 })
 
 
+
+// ── 학생별 시간표 조회/저장 ─────────────────────────────────────────────────
+app.get('/api/admin/students/:id/schedule', async (c) => {
+  const id = c.req.param('id')
+  try {
+    const row = await c.env.DB.prepare(
+      'SELECT schedule_json FROM student_schedules WHERE student_id=?'
+    ).bind(id).first() as any
+    const schedule = row?.schedule_json ? parseSlots(row.schedule_json) : []
+    return c.json({ success: true, schedule })
+  } catch (e: any) {
+    return c.json({ success: false, schedule: [], error: e.message })
+  }
+})
+
+app.post('/api/admin/students/:id/schedule', async (c) => {
+  const id = c.req.param('id')
+  try {
+    const { schedule } = await c.req.json()
+    const json = JSON.stringify(Array.isArray(schedule) ? schedule : [])
+    await c.env.DB.prepare(
+      'INSERT INTO student_schedules (student_id, schedule_json, updated_at) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(student_id) DO UPDATE SET schedule_json=excluded.schedule_json, updated_at=CURRENT_TIMESTAMP'
+    ).bind(id, json).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
 
 app.post('/api/admin/fines/:id/pay', async (c) => {
 
@@ -3076,7 +3150,9 @@ let shopUnlockTimer: ReturnType<typeof setTimeout> | null = null
 
 async function checkShopStatus() {
   try {
-    const r = await fetch('/api/shop/status')
+    const sid = (ST.student as any)?.id
+    const url = sid ? '/api/shop/status?student_id=' + sid : '/api/shop/status'
+    const r = await fetch(url)
     const d = await r.json() as any
     SHOP_STATUS = d
     // 잠금 해제 중이면 남은 시간 표시 갱신
@@ -3372,7 +3448,7 @@ window.requestShopUnlock = async function() {
     const res = await fetch('/api/shop/request-unlock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentName: ST.student.name })
+      body: JSON.stringify({ studentName: (ST.student as any).name, studentId: (ST.student as any).id })
     })
 
     const d = await res.json() as any
@@ -5134,6 +5210,31 @@ const ADMIN_HTML = `<!DOCTYPE html>
       <div id="reqPhotoModalContent" style="min-height:80px;display:flex;align-items:center;justify-content:center;">
         <div style="color:var(--g400);">로딩 중...</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 학생 시간표 설정 모달 -->
+<div class="modal-ov" id="stu-sched-modal" onclick="if(event.target===this)closeStuSchedModal()">
+  <div class="modal-box" style="max-width:460px;width:95%;">
+    <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span class="modal-title" id="stuSchedTitle">수업 시간표</span>
+      <button class="btn btn-gray btn-sm" onclick="closeStuSchedModal()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--g500);margin-bottom:10px;background:#f0f9ff;border-radius:8px;padding:8px 10px;border:1px solid #bae6fd;">
+      <i class="fas fa-info-circle" style="color:#0ea5e9;margin-right:4px;"></i>
+      수업 시간 중에는 이 학생의 상점이 자동으로 잠깁니다.<br>
+      비워두면 전체 공통 시간표가 적용됩니다.
+    </div>
+    <div id="stuSchedSlots" style="margin-bottom:12px;"></div>
+    <button class="btn btn-gray btn-sm" onclick="addStuSchedSlot()" style="margin-bottom:14px;">
+      <i class="fas fa-plus"></i> 시간대 추가
+    </button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-green" onclick="saveStuSchedule()" style="flex:1;">
+        <i class="fas fa-floppy-disk"></i> 저장
+      </button>
+      <button class="btn btn-gray" onclick="closeStuSchedModal()">취소</button>
     </div>
   </div>
 </div>
