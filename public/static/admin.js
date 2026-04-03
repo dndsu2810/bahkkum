@@ -1055,10 +1055,69 @@ document.getElementById('addShopBtn').addEventListener('click',function(){addMen
 
 document.getElementById('savemenuBtn').addEventListener('click',function(){
 
-  // 현재 입력 중인 unit 값 반영
+  // DOM에서 현재 입력값을 직접 수집해 menuCfg에 반영 (onchange 누락 방지)
   ;['learn','fine','shop'].forEach(function(t){
 
-    (menuCfg[t]||[]).forEach(function(m){if(!m.unit)m.unit=curCfg.symbol||'P'})
+    var el=document.getElementById('menu'+t.charAt(0).toUpperCase()+t.slice(1)+'List')
+
+    if(!el)return
+
+    var rows=el.querySelectorAll('.menu-item-row')
+
+    rows.forEach(function(row,i){
+
+      if(!menuCfg[t][i])return
+
+      // 비용/보상 숫자 입력값
+      var costInp=row.querySelector('.item-cost-inp')
+
+      if(costInp){
+
+        if(t==='learn') menuCfg[t][i].reward=+(costInp.value)||0
+
+        else menuCfg[t][i].cost=+(costInp.value)||0
+
+      }
+
+      // 단위 입력값 (learn/shop)
+      var unitInp=row.querySelector('.item-unit-sel')
+
+      if(unitInp && t!=='fine') menuCfg[t][i].unit=unitInp.value||curCfg.symbol||'P'
+
+      // fine 타입 셀렉트
+      if(t==='fine'){
+
+        var ftSel=row.querySelector('select')
+
+        if(ftSel){
+
+          menuCfg[t][i].fineType=ftSel.value
+
+          menuCfg[t][i].unit=ftSel.value==='time'?'분':ftSel.value==='sheet'?'장':curCfg.unit
+
+        }
+
+      }
+
+      // shop 품절 체크박스
+      if(t==='shop'){
+
+        var cb=row.querySelector('input[type="checkbox"]')
+
+        if(cb) menuCfg[t][i].soldOut=cb.checked
+
+      }
+
+      // learn 사진 체크박스
+      if(t==='learn'){
+
+        var pcb=row.querySelector('input[type="checkbox"]')
+
+        if(pcb) menuCfg[t][i].requirePhoto=pcb.checked
+
+      }
+
+    })
 
   })
 
