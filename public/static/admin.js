@@ -1456,6 +1456,16 @@ function loadShopStatus(){
   })
 }
 
+window.adminUnlockShop=function(){
+  var mins=parseInt(prompt('몇 분간 상점을 열까요? (기본 10분)','10')||'10')
+  if(isNaN(mins)||mins<=0)return
+  // 직접 열기: requestId 없이 새 approved 레코드 생성
+  api('/api/admin/shop/direct-unlock',{method:'POST',body:JSON.stringify({minutes:mins})}).then(function(d){
+    if(d.success){toast('🔓 '+mins+'분간 상점이 열렸습니다!');loadShopStatus()}
+    else toast('오류: '+(d.error||''))
+  })
+}
+
 window.adminLockShop=function(){
   if(!confirm('상점을 즉시 잠글까요?'))return
   api('/api/admin/shop/lock',{method:'POST'}).then(function(d){

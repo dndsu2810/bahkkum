@@ -264,6 +264,24 @@ app.post('/api/admin/shop/unlock', async (c) => {
 
 
 // ── 관리자: 상점 즉시 잠금 ────────────────────────────────────────────────────
+// ── 관리자: 상점 직접 열기 (승인 요청 없이) ───────────────────────────────────
+app.post('/api/admin/shop/direct-unlock', async (c) => {
+  try {
+    const { minutes = 10 } = await c.req.json()
+    const mins = Math.max(1, Math.min(180, parseInt(minutes) || 10))
+    // 기존 승인된 것 만료 처리 후 새로 생성
+    await c.env.DB.prepare(
+      "UPDATE shop_unlock_requests SET status='expired' WHERE status='approved'"
+    ).run()
+    await c.env.DB.prepare(
+      `INSERT INTO shop_unlock_requests (student_name, student_id, status, unlocked_at, expires_at) VALUES ('관리자 직접 열기', NULL, 'approved', datetime('now'), datetime('now','+${mins} minutes'))`
+    ).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
 app.post('/api/admin/shop/lock', async (c) => {
 
   try {
@@ -484,7 +502,7 @@ app.post('/api/submit', async (c) => {
 
       await c.env.DB.prepare('UPDATE students SET points = points + ? WHERE id=?').bind(delta, stu.id).run()
 
-      const reason = items.map((x: any) => `${x.icon}${x.label}×${x.qty}`).join(', ')
+      const reason = items.map((x) => `${x.icon}${x.label}×${x.qty}`).join(', ')
 
       await c.env.DB.prepare(
 
@@ -660,7 +678,7 @@ app.post('/api/queue/draw', async (c) => {
 
     if (existing && existing.status !== 'done') {
 
-      return c.json({ success: false, error: 'already_drawn', message: '오늘 이미 번호표를 뽑았어요! 선생님이 완료 처리 후 재발급 가능해요.' })
+      return c.json({ success: false, error: 'already_drawn', message: '오늘 이미 번호표를 뽑았어요 선생님이 완료 처리 후 재발급 가능해요.' })
 
     }
 
@@ -678,7 +696,7 @@ app.post('/api/queue/draw', async (c) => {
 
     if (lastTicket && lastTicket.student_name === studentName) {
 
-      return c.json({ success: false, error: 'consecutive', message: '방금 전에도 내가 뽑았어요! 친구에게 양보해요 😊' })
+      return c.json({ success: false, error: 'consecutive', message: '방금 전에도 내가 뽑았어요 친구에게 양보해요 😊' })
 
     }
 
@@ -754,11 +772,11 @@ app.get('/api/queue/status', async (c) => {
 
     const tickets = rows.results as any[]
 
-    const waiting = tickets.filter((r: any) => r.status === 'waiting').length
+    const waiting = tickets.filter((r) => r.status === 'waiting').length
 
-    const answering = tickets.filter((r: any) => r.status === 'answering').length
+    const answering = tickets.filter((r) => r.status === 'answering').length
 
-    const done = tickets.filter((r: any) => r.status === 'done').length
+    const done = tickets.filter((r) => r.status === 'done').length
 
     return c.json({ success: true, total: tickets.length, waiting, answering, done, tickets })
 
@@ -1256,7 +1274,7 @@ async function sendSlack(env: Bindings, d: any) {
 
   const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
 
-  const itemList = d.items.map((x: any) => `• ${x.icon} ${x.label} × ${x.qty}`).join('\n')
+  const itemList = d.items.map((x) => `• ${x.icon} ${x.label} × ${x.qty}`).join('\n')
 
   const costText = d.totalCost === 0 ? '무료' : d.totalCost < 0
 
@@ -1341,7 +1359,7 @@ async function saveNotion(env: Bindings, d: any) {
 
   const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
 
-  const itemList = d.items.map((x: any) => `${x.icon} ${x.label} × ${x.qty}${x.comment ? ' ('+x.comment+')' : ''}`).join(', ')
+  const itemList = d.items.map((x) => `${x.icon} ${x.label} × ${x.qty}${x.comment ? ' ('+x.comment+')' : ''}`).join(', ')
 
   const costText = d.totalCost === 0 ? '무료' : d.totalCost < 0
 
@@ -1461,7 +1479,7 @@ async function saveNotion(env: Bindings, d: any) {
 
           // 안내 블록은 제거 (이미지 성공)
 
-          children.splice(children.findIndex((b: any) => b.callout?.icon?.emoji === '📸'), 1)
+          children.splice(children.findIndex((b) => b.callout?.icon?.emoji === '📸'), 1)
 
         }
 
@@ -2703,7 +2721,7 @@ const MAIN_HTML = `<!DOCTYPE html>
 
     </div>
 
-    <textarea id="photoComment" placeholder="선생님께 한마디 남겨도 좋아요! (선택)" style="width:100%;min-height:70px;border:2px solid var(--g200);border-radius:var(--r-md);padding:10px 12px;font-family:inherit;font-size:14px;outline:none;resize:none;margin-bottom:4px;transition:border-color .2s;" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--g200)'"></textarea>
+    <textarea id="photoComment" placeholder="선생님께 한마디 남겨도 좋아요 (선택)" style="width:100%;min-height:70px;border:2px solid var(--g200);border-radius:var(--r-md);padding:10px 12px;font-family:inherit;font-size:14px;outline:none;resize:none;margin-bottom:4px;transition:border-color .2s;" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--g200)'"></textarea>
 
     <div class="modal-btns">
 
@@ -3145,15 +3163,15 @@ function updateBannerStats(s){
 
 
 // ── 상점 잠금 상태 ──
-let SHOP_STATUS = { locked: false, unlocked: false, expiresAt: null as string|null }
-let shopUnlockTimer: ReturnType<typeof setTimeout> | null = null
+let SHOP_STATUS = { locked: false, unlocked: false, expiresAt: null }
+let shopUnlockTimer = null
 
 async function checkShopStatus() {
   try {
-    const sid = (ST.student as any)?.id
+    const sid = ST.student?.id
     const url = sid ? '/api/shop/status?student_id=' + sid : '/api/shop/status'
     const r = await fetch(url)
-    const d = await r.json() as any
+    const d = await r.json()
     SHOP_STATUS = d
     // 잠금 해제 중이면 남은 시간 표시 갱신
     renderShopLockOverlay()
@@ -3195,8 +3213,8 @@ window.switchTab=async function(tab){
     if (SHOP_STATUS.locked) {
       // 잠긴 상태 - 오버레이 표시 후 탭 전환
       ST.tab = tab
-      document.querySelectorAll('.tab-btn').forEach((b:any) => b.className='tab-btn')
-      document.getElementById('tab-shop')!.classList.add('tab-btn','active-shop')
+      document.querySelectorAll('.tab-btn').forEach((b) => b.className='tab-btn')
+      document.getElementById('tab-shop').classList.add('tab-btn','active-shop')
       renderMenu()
       renderShopLockOverlay()
       return
@@ -3431,15 +3449,15 @@ window.clearCart=function(){ST.cart=[];updateCartBar();renderMenu()}
 
 
 // ── 상점 잠금해제 요청 ──────────────────────────────────────────────────────
-let shopPollTimer: ReturnType<typeof setInterval> | null = null
+let shopPollTimer = null
 
 window.requestShopUnlock = async function() {
 
   if (!ST.student) return
 
-  const btn = document.getElementById('shopUnlockReqBtn') as HTMLButtonElement
+  const btn = document.getElementById('shopUnlockReqBtn')
 
-  const status = document.getElementById('shopUnlockReqStatus')!
+  const status = document.getElementById('shopUnlockReqStatus')
 
   btn.disabled = true; btn.textContent = '⏳ 요청 중...'
 
@@ -3448,10 +3466,10 @@ window.requestShopUnlock = async function() {
     const res = await fetch('/api/shop/request-unlock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentName: (ST.student as any).name, studentId: (ST.student as any).id })
+      body: JSON.stringify({ studentName: ST.student.name, studentId: ST.student.id })
     })
 
-    const d = await res.json() as any
+    const d = await res.json()
 
     if (d.success) {
 
@@ -3459,7 +3477,7 @@ window.requestShopUnlock = async function() {
 
       status.textContent = d.alreadyPending
         ? '이미 요청을 보냈어요. 선생님 승인을 기다려주세요 🙏'
-        : '선생님께 알림을 보냈어요! 승인되면 자동으로 열립니다 🙏'
+        : '선생님께 알림을 보냈어요 승인되면 자동으로 열립니다 🙏'
 
       // 10초마다 승인 여부 폴링
       if (shopPollTimer) clearInterval(shopPollTimer)
@@ -3470,16 +3488,16 @@ window.requestShopUnlock = async function() {
 
         if (!SHOP_STATUS.locked) {
 
-          clearInterval(shopPollTimer!); shopPollTimer = null
+          clearInterval(shopPollTimer); shopPollTimer = null
 
-          showFb('🛍️','상점이 열렸어요! 빠르게 주문하세요!')
+          showFb('🛍️','상점이 열렸어요 빠르게 주문하세요!')
 
           renderShopLockOverlay()
 
           renderMenu()
 
           // 배지 표시
-          const badge = document.getElementById('shop-unlock-badge')!
+          const badge = document.getElementById('shop-unlock-badge')
 
           badge.style.display = 'block'
 
@@ -3748,11 +3766,11 @@ function renderDone(slackOk,notionOk,ts,tc){
 
   document.getElementById('doneEmoji').textContent=hasFine?'\uD83D\uDE05':hasShop?'\uD83D\uDECD':'\uD83C\uDF89'
 
-  document.getElementById('doneTitle').textContent=hasFine?'기록 완료!':hasShop?'교환 완료! 🎊':'잘했어요! 🌟'
+  document.getElementById('doneTitle').textContent=hasFine?'기록 완료!':hasShop?'교환 완료 🎊':'잘했어요 🌟'
 
   const newPts=ST.student?ST.student.points:0
 
-  document.getElementById('doneSub').innerHTML='<strong>'+escHtml(ST.student.name)+'</strong>님 기록 완료!<br/>'+(tc<0?'<span style="color:var(--green)">+'+Math.abs(tc)+' '+c.symbol+' 획득! 🎊</span>':tc>0?'<span style="color:var(--red)">-'+tc+' '+c.unit+' 차감</span>':'<span style="color:var(--green)">무료 활동 ✅</span>')
+  document.getElementById('doneSub').innerHTML='<strong>'+escHtml(ST.student.name)+'</strong>님 기록 완료!<br/>'+(tc<0?'<span style="color:var(--green)">+'+Math.abs(tc)+' '+c.symbol+' 획득 🎊</span>':tc>0?'<span style="color:var(--red)">-'+tc+' '+c.unit+' 차감</span>':'<span style="color:var(--green)">무료 활동 ✅</span>')
 
   const totalItems=ST.cart.reduce((a,x)=>a+x.qty,0)
 
@@ -4076,7 +4094,7 @@ window.selectQueueStudent = async function(id) {
 
       document.querySelector('#queueMsgBox .queue-msg-icon').textContent = '🎉'
 
-      msgText.textContent = '첫 번째! 바로 이용할 수 있어요!'
+      msgText.textContent = '첫 번째 바로 이용할 수 있어요!'
 
     } else if (data.waiting <= 2) {
 
@@ -5121,7 +5139,10 @@ const ADMIN_HTML = `<!DOCTYPE html>
         </div>
         <div class="card-body">
           <div id="shopStatusBadge" style="margin-bottom:12px;padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;">확인 중...</div>
-          <button class="btn btn-red btn-sm" onclick="adminLockShop()" style="margin-right:8px;"><i class="fas fa-lock"></i> 즉시 잠금</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-green btn-sm" onclick="adminUnlockShop()"><i class="fas fa-unlock"></i> 직접 열기</button>
+            <button class="btn btn-red btn-sm" onclick="adminLockShop()"><i class="fas fa-lock"></i> 즉시 잠금</button>
+          </div>
         </div>
       </div>
 
