@@ -3508,7 +3508,6 @@ window.clearCart=function(){ST.cart=[];updateCartBar();renderMenu()}
 
 
 // ── 상점 잠금해제 요청 ──────────────────────────────────────────────────────
-let shopPollTimer = null
 
 window.requestShopUnlock = async function() {
 
