@@ -58,9 +58,53 @@ app.use('/api/admin/*', async (c, next) => {
 
 
 
-// 키오스크 기본 설정
+// 키오스크 설정 조회 (DB 우선, 없으면 DEFAULT_CONFIG)
+app.get('/api/config', async (c) => {
 
-app.get('/api/config', (c) => c.json(DEFAULT_CONFIG))
+  try {
+
+    const row = await c.env.DB.prepare(
+
+      "SELECT value FROM app_config WHERE key='kiosk_config'"
+
+    ).first() as any
+
+    if (row?.value) {
+
+      return c.json(JSON.parse(row.value))
+
+    }
+
+  } catch (_) {}
+
+  return c.json(DEFAULT_CONFIG)
+
+})
+
+
+
+// 관리자 설정 저장 (DB에 저장 → 모든 기기에서 즉시 반영)
+app.post('/api/admin/config', async (c) => {
+
+  try {
+
+    const body = await c.req.json()
+
+    await c.env.DB.prepare(
+
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
+
+    ).bind(JSON.stringify(body)).run()
+
+    return c.json({ success: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
 
 
 
@@ -2626,13 +2670,13 @@ async function init(){
 
   try{
 
+    // 항상 서버(DB)에서 최신 설정 불러오기 (관리자 변경 즉시 반영)
     const r=await fetch('/api/config');const d=await r.json()
 
-    const sv=localStorage.getItem('kiosk_cfg_ver');const lc=localStorage.getItem('kiosk_config')
+    CFG=d
 
-    if(lc&&sv===CFG_VER){try{CFG=JSON.parse(lc)}catch(e){CFG=d}}
-
-    else{CFG=d;localStorage.removeItem('kiosk_config');localStorage.setItem('kiosk_cfg_ver',CFG_VER)}
+    // localStorage는 더 이상 사용하지 않음 (삭제하여 혼동 방지)
+    localStorage.removeItem('kiosk_config');localStorage.removeItem('kiosk_cfg_ver')
 
   }catch(e){}
 

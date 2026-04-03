@@ -219,19 +219,57 @@ function initAdmin(){
 
 function loadConfig(){
 
-  var lc=localStorage.getItem('kiosk_config')
+  // API에서 설정 불러오기 (DB 저장, 모든 기기 공유)
+  fetch('/api/config').then(function(r){return r.json()}).then(function(cfg){
 
-  if(lc){try{var cfg=JSON.parse(lc);menuCfg=cfg.menu||DEFAULT_MENU;curCfg=cfg.currency||{unit:'포인트',symbol:'P',desc:''}}catch(e){menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))}}
+    menuCfg=cfg.menu||JSON.parse(JSON.stringify(DEFAULT_MENU))
 
-  else{menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))}
+    curCfg=cfg.currency||{unit:'포인트',symbol:'P',desc:''}
 
-  // unit 필드 없는 항목 보완
+    // unit 필드 없는 항목 보완
+    ;['learn','fine','shop'].forEach(function(t){
 
-  ;['learn','fine','shop'].forEach(function(t){
+      (menuCfg[t]||[]).forEach(function(m){if(!m.unit)m.unit=curCfg.symbol||'P'})
 
-    (menuCfg[t]||[]).forEach(function(m){if(!m.unit)m.unit=curCfg.symbol||'P'})
+    })
+
+    // UI 반영
+    renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop')
+
+    document.getElementById('curUnit').value=curCfg.unit||'포인트'
+
+    document.getElementById('curSymbol').value=curCfg.symbol||'P'
+
+    document.getElementById('curDesc').value=curCfg.desc||''
+
+    updateCurPreview();renderPresets()
+
+  }).catch(function(){
+
+    menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))
 
   })
+
+}
+
+// 설정을 API(DB)에 저장하는 공통 함수
+function saveConfigToServer(callback){
+
+  var cfg={currency:curCfg,menu:menuCfg}
+
+  api('/api/admin/config',{method:'POST',body:JSON.stringify(cfg)}).then(function(d){
+
+    if(d.success){
+
+      if(callback)callback()
+
+    } else {
+
+      toast('저장 실패: '+(d.error||''))
+
+    }
+
+  }).catch(function(){ toast('저장 중 오류 발생') })
 
 }
 
@@ -1017,13 +1055,14 @@ document.getElementById('addShopBtn').addEventListener('click',function(){addMen
 
 document.getElementById('savemenuBtn').addEventListener('click',function(){
 
-  var lc=localStorage.getItem('kiosk_config'),cfg={currency:curCfg,menu:menuCfg}
+  // 현재 입력 중인 unit 값 반영
+  ;['learn','fine','shop'].forEach(function(t){
 
-  if(lc){try{cfg=Object.assign({},JSON.parse(lc),{menu:menuCfg})}catch(e){}}
+    (menuCfg[t]||[]).forEach(function(m){if(!m.unit)m.unit=curCfg.symbol||'P'})
 
-  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
+  })
 
-  toast('메뉴 저장 완료!')
+  saveConfigToServer(function(){ toast('✅ 메뉴 저장 완료! 키오스크에 즉시 반영됩니다.') })
 
 })
 
@@ -1031,11 +1070,13 @@ document.getElementById('savemenuBtn').addEventListener('click',function(){
 
 document.getElementById('resetmenuBtn').addEventListener('click',function(){
 
-  if(!confirm('기본값으로 초기화?'))return
+  if(!confirm('기본값으로 초기화? 저장된 설정이 모두 삭제됩니다.'))return
 
   menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))
 
-  renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop');toast('초기화됨')
+  renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop')
+
+  saveConfigToServer(function(){ toast('기본값으로 초기화됨') })
 
 })
 
@@ -1089,13 +1130,7 @@ document.getElementById('savecurBtn').addEventListener('click',function(){
 
   curCfg.desc=document.getElementById('curDesc').value.trim()
 
-  var lc=localStorage.getItem('kiosk_config'),cfg={currency:curCfg,menu:menuCfg}
-
-  if(lc){try{cfg=Object.assign({},JSON.parse(lc),{currency:curCfg})}catch(e){}}
-
-  localStorage.setItem('kiosk_config',JSON.stringify(cfg));localStorage.setItem('kiosk_cfg_ver','2025-v3')
-
-  renderPresets();toast('화폐 설정 저장!')
+  saveConfigToServer(function(){ renderPresets();toast('✅ 화폐 설정 저장! 키오스크에 즉시 반영됩니다.') })
 
 })
 
