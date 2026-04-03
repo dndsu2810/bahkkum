@@ -108,6 +108,220 @@ app.post('/api/admin/config', async (c) => {
 
 
 
+// ── 상점 잠금 상태 조회 (키오스크용) ──────────────────────────────────────────
+app.get('/api/shop/status', async (c) => {
+
+  try {
+
+    const schedRow = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='class_schedule'"
+    ).first() as any
+
+    let slots: any[] = []
+    if (schedRow?.value) {
+      const parsed = JSON.parse(schedRow.value)
+      // {schedule:[{day:'월',start:'14:00',end:'16:00'},...]} 형태 또는 배열
+      if (Array.isArray(parsed)) slots = parsed
+      else if (Array.isArray(parsed.schedule)) slots = parsed.schedule
+      else if (Array.isArray(parsed.slots)) slots = parsed.slots
+    }
+
+    const DAYS_KO = ['일','월','화','수','목','금','토']
+    const now = new Date(Date.now() + 9 * 3600 * 1000)
+    const dayName = DAYS_KO[now.getUTCDay()]
+    const hhmm = now.getUTCHours() * 100 + now.getUTCMinutes()
+
+    let isClassTime = false
+    for (const slot of slots) {
+      const slotDay = slot.day || ''
+      if (slotDay !== dayName) continue
+      const [sh, sm] = (slot.start || '00:00').split(':').map(Number)
+      const [eh, em] = (slot.end || '00:00').split(':').map(Number)
+      if (hhmm >= sh * 100 + sm && hhmm < eh * 100 + em) { isClassTime = true; break }
+    }
+
+    const unlockRow = await c.env.DB.prepare(
+      "SELECT * FROM shop_unlock_requests WHERE status='approved' AND expires_at > datetime('now') ORDER BY expires_at DESC LIMIT 1"
+    ).first() as any
+
+    const unlocked = !!unlockRow
+    const expiresAt = unlockRow?.expires_at || null
+
+    return c.json({ success: true, isClassTime, locked: isClassTime && !unlocked, unlocked, expiresAt })
+
+  } catch (e: any) {
+
+    return c.json({ success: true, isClassTime: false, locked: false, unlocked: false, expiresAt: null })
+
+  }
+
+})
+
+
+
+// ── 상점 잠금해제 요청 (키오스크) ─────────────────────────────────────────────
+app.post('/api/shop/request-unlock', async (c) => {
+
+  try {
+
+    const { studentName } = await c.req.json()
+
+    if (!studentName) return c.json({ success: false, error: '학생 이름 필요' }, 400)
+
+    const existing = await c.env.DB.prepare(
+      "SELECT id FROM shop_unlock_requests WHERE status='pending' AND student_name=? AND requested_at > datetime('now','-5 minutes')"
+    ).bind(studentName).first() as any
+
+    if (existing) return c.json({ success: true, requestId: existing.id, alreadyPending: true })
+
+    const result = await c.env.DB.prepare(
+      "INSERT INTO shop_unlock_requests (student_name, status) VALUES (?, 'pending')"
+    ).bind(studentName).run() as any
+
+    try { await sendShopUnlockSlack(c.env, studentName) } catch (_) {}
+
+    return c.json({ success: true, requestId: result.meta?.last_row_id })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
+
+// ── 관리자: 잠금해제 승인 ─────────────────────────────────────────────────────
+app.post('/api/admin/shop/unlock', async (c) => {
+
+  try {
+
+    const { requestId, minutes } = await c.req.json()
+
+    const mins = minutes || 10
+
+    await c.env.DB.prepare(
+      `UPDATE shop_unlock_requests SET status='approved', unlocked_at=datetime('now'), expires_at=datetime('now','+${mins} minutes') WHERE id=?`
+    ).bind(requestId).run()
+
+    return c.json({ success: true, minutes: mins })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
+
+// ── 관리자: 상점 즉시 잠금 ────────────────────────────────────────────────────
+app.post('/api/admin/shop/lock', async (c) => {
+
+  try {
+
+    await c.env.DB.prepare(
+      "UPDATE shop_unlock_requests SET status='expired' WHERE status='approved'"
+    ).run()
+
+    return c.json({ success: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
+
+// ── 관리자: 잠금해제 요청 목록 ────────────────────────────────────────────────
+app.get('/api/admin/shop/requests', async (c) => {
+
+  try {
+
+    const rows = await c.env.DB.prepare(
+      "SELECT * FROM shop_unlock_requests ORDER BY requested_at DESC LIMIT 50"
+    ).all()
+
+    return c.json({ success: true, requests: rows.results })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
+
+// ── 관리자: 수업 시간표 저장 ──────────────────────────────────────────────────
+// ── 수업 시간표 조회 ──────────────────────────────────────────────────────────
+app.get('/api/admin/shop/schedule', async (c) => {
+  try {
+    const row = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='class_schedule'"
+    ).first<{ value: string }>()
+    if (!row) return c.json({ success: true, schedule: [] })
+    const parsed = JSON.parse(row.value)
+    // body가 {schedule:[...]} 형태이거나 그냥 배열인 경우 모두 처리
+    const schedule = Array.isArray(parsed) ? parsed : (parsed.schedule || [])
+    return c.json({ success: true, schedule })
+  } catch (e: any) {
+    return c.json({ success: false, schedule: [], error: e.message })
+  }
+})
+
+app.post('/api/admin/shop/schedule', async (c) => {
+
+  try {
+
+    const body = await c.req.json()
+
+    await c.env.DB.prepare(
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('class_schedule', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
+    ).bind(JSON.stringify(body)).run()
+
+    return c.json({ success: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
+
+// ── 상점 잠금해제 Slack 알림 ──────────────────────────────────────────────────
+async function sendShopUnlockSlack(env: Bindings, studentName: string) {
+
+  if (!env.SLACK_WEBHOOK_URL) return
+
+  const now = new Date(Date.now() + 9 * 3600 * 1000)
+  const timeStr = `${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}`
+
+  await fetch(env.SLACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      blocks: [
+        { type: 'header', text: { type: 'plain_text', text: '🛍️ 상점 주문 승인 요청', emoji: true } },
+        { type: 'section', text: { type: 'mrkdwn', text: `*👤 학생:* ${studentName}\n*⏰ 요청 시각:* ${timeStr}\n\n관리자 페이지에서 승인하면 10분간 주문 가능합니다.` } },
+        { type: 'divider' },
+      ]
+    })
+  })
+
+}
+
+
+
 // 학생 목록 (포인트 + 벌금 유형별 집계 포함)
 
 app.get('/api/students', async (c) => {
@@ -1739,6 +1953,9 @@ const MAIN_HTML = `<!DOCTYPE html>
     .menu-btn.in-cart.type-shop{border-color:var(--purple);border-width:3px;}
 
     .menu-btn.sold-out{opacity:.55;cursor:not-allowed;filter:grayscale(.4);}
+    #shop-unlock-badge{display:none;}
+    #shopUnlockReqBtn:hover{opacity:.9;transform:translateY(-2px);}
+    #shopUnlockReqBtn:active{transform:translateY(0);}
 
     .menu-btn.sold-out:hover{transform:none;box-shadow:none;}
 
@@ -2166,7 +2383,25 @@ const MAIN_HTML = `<!DOCTYPE html>
 
     </div>
 
-    <div class="menu-grid" id="menuGrid"></div>
+    <!-- 상점 잠금해제 배지 (해제 중 남은 시간) -->
+    <div id="shop-unlock-badge" style="display:none;text-align:center;font-size:13px;font-weight:700;color:#16a34a;background:#f0fdf4;border:1.5px solid #86efac;border-radius:100px;padding:4px 14px;margin-bottom:8px;"></div>
+
+    <div style="position:relative;">
+
+      <div class="menu-grid" id="menuGrid"></div>
+
+      <!-- 상점 잠금 오버레이 -->
+      <div id="shop-lock-overlay" style="display:none;position:absolute;inset:0;z-index:20;background:rgba(15,23,42,.72);backdrop-filter:blur(6px);border-radius:16px;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;">
+        <div style="font-size:52px;">🔒</div>
+        <div style="color:white;font-size:18px;font-weight:900;text-align:center;">수업 중에는 상점을 이용할 수 없어요</div>
+        <div style="color:rgba(255,255,255,.7);font-size:13px;text-align:center;">선생님께 승인 요청을 보내면<br/>10분간 주문이 가능해요!</div>
+        <button id="shopUnlockReqBtn" onclick="requestShopUnlock()" style="margin-top:8px;padding:14px 28px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;border:none;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(99,102,241,.4);">
+          🙋 선생님께 상점 열기 요청
+        </button>
+        <div id="shopUnlockReqStatus" style="color:rgba(255,255,255,.8);font-size:13px;min-height:20px;text-align:center;"></div>
+      </div>
+
+    </div>
 
   </div>
 
@@ -2835,9 +3070,62 @@ function updateBannerStats(s){
 
 
 
+// ── 상점 잠금 상태 ──
+let SHOP_STATUS = { locked: false, unlocked: false, expiresAt: null as string|null }
+let shopUnlockTimer: ReturnType<typeof setTimeout> | null = null
+
+async function checkShopStatus() {
+  try {
+    const r = await fetch('/api/shop/status')
+    const d = await r.json() as any
+    SHOP_STATUS = d
+    // 잠금 해제 중이면 남은 시간 표시 갱신
+    renderShopLockOverlay()
+  } catch(_) {}
+}
+
+function renderShopLockOverlay() {
+  const overlay = document.getElementById('shop-lock-overlay')
+  if (!overlay) return
+  if (!SHOP_STATUS.locked && !SHOP_STATUS.unlocked) {
+    overlay.style.display = 'none'; return
+  }
+  if (SHOP_STATUS.unlocked && !SHOP_STATUS.locked) {
+    // 해제 중 - 남은 시간 표시
+    const exp = SHOP_STATUS.expiresAt ? new Date(SHOP_STATUS.expiresAt + 'Z') : null
+    const remain = exp ? Math.max(0, Math.floor((exp.getTime() - Date.now()) / 1000)) : 0
+    if (remain <= 0) { SHOP_STATUS.unlocked = false; SHOP_STATUS.locked = false; overlay.style.display = 'none'; return }
+    const mm = Math.floor(remain / 60), ss = remain % 60
+    overlay.style.display = 'none'  // 해제 중엔 오버레이 숨김
+    const badge = document.getElementById('shop-unlock-badge')
+    if (badge) badge.textContent = '\uD83D\uDD13 ' + mm + ':' + String(ss).padStart(2,'0') + ' \uB0A8\uC74C'
+    return
+  }
+  // 잠긴 상태
+  overlay.style.display = 'flex'
+  const badge = document.getElementById('shop-unlock-badge')
+  if (badge) badge.textContent = ''
+}
+
+
+
 // 탭
 
-window.switchTab=function(tab){
+window.switchTab=async function(tab){
+
+  // 상점 탭 클릭 시 잠금 확인
+  if (tab === 'shop') {
+    await checkShopStatus()
+    if (SHOP_STATUS.locked) {
+      // 잠긴 상태 - 오버레이 표시 후 탭 전환
+      ST.tab = tab
+      document.querySelectorAll('.tab-btn').forEach((b:any) => b.className='tab-btn')
+      document.getElementById('tab-shop')!.classList.add('tab-btn','active-shop')
+      renderMenu()
+      renderShopLockOverlay()
+      return
+    }
+  }
 
   ST.tab=tab
 
@@ -2846,6 +3134,9 @@ window.switchTab=function(tab){
   document.getElementById('tab-'+tab).classList.add('tab-btn','active-'+tab)
 
   renderMenu()
+
+  // 상점 탭이면 잠금해제 남은 시간 배지 갱신
+  if (tab === 'shop') renderShopLockOverlay()
 
 }
 
@@ -3060,6 +3351,100 @@ function showFb(icon,label){
 }
 
 window.clearCart=function(){ST.cart=[];updateCartBar();renderMenu()}
+
+
+
+// ── 상점 잠금해제 요청 ──────────────────────────────────────────────────────
+let shopPollTimer: ReturnType<typeof setInterval> | null = null
+
+window.requestShopUnlock = async function() {
+
+  if (!ST.student) return
+
+  const btn = document.getElementById('shopUnlockReqBtn') as HTMLButtonElement
+
+  const status = document.getElementById('shopUnlockReqStatus')!
+
+  btn.disabled = true; btn.textContent = '⏳ 요청 중...'
+
+  try {
+
+    const res = await fetch('/api/shop/request-unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentName: ST.student.name })
+    })
+
+    const d = await res.json() as any
+
+    if (d.success) {
+
+      btn.textContent = '✅ 요청 완료!'
+
+      status.textContent = d.alreadyPending
+        ? '이미 요청을 보냈어요. 선생님 승인을 기다려주세요 🙏'
+        : '선생님께 알림을 보냈어요! 승인되면 자동으로 열립니다 🙏'
+
+      // 10초마다 승인 여부 폴링
+      if (shopPollTimer) clearInterval(shopPollTimer)
+
+      shopPollTimer = setInterval(async () => {
+
+        await checkShopStatus()
+
+        if (!SHOP_STATUS.locked) {
+
+          clearInterval(shopPollTimer!); shopPollTimer = null
+
+          showFb('🛍️','상점이 열렸어요! 빠르게 주문하세요!')
+
+          renderShopLockOverlay()
+
+          renderMenu()
+
+          // 배지 표시
+          const badge = document.getElementById('shop-unlock-badge')!
+
+          badge.style.display = 'block'
+
+          // 1분마다 남은 시간 갱신
+          const badgeTimer = setInterval(() => {
+
+            if (!SHOP_STATUS.unlocked) { clearInterval(badgeTimer); badge.style.display='none'; return }
+
+            const exp = SHOP_STATUS.expiresAt ? new Date(SHOP_STATUS.expiresAt + 'Z') : null
+
+            const remain = exp ? Math.max(0, Math.floor((exp.getTime() - Date.now()) / 1000)) : 0
+
+            if (remain <= 0) { clearInterval(badgeTimer); badge.style.display='none'; checkShopStatus(); return }
+
+            const mm = Math.floor(remain/60), ss = remain%60
+
+            badge.textContent = '\uD83D\uDD13 \uC0C1\uC810 \uC624\uD508 \uC911 \u00B7 ' + mm + ':' + String(ss).padStart(2,'0') + ' \uB0A8\uC74C'
+
+          }, 1000)
+
+        }
+
+      }, 10000)
+
+    } else {
+
+      status.textContent = '요청 실패. 다시 시도해주세요.'
+
+      btn.disabled = false; btn.textContent = '🙋 선생님께 상점 열기 요청'
+
+    }
+
+  } catch(_) {
+
+    status.textContent = '오류가 발생했어요.'
+
+    btn.disabled = false; btn.textContent = '🙋 선생님께 상점 열기 요청'
+
+  }
+
+}
 
 function updateCartBar(){
 
@@ -4227,6 +4612,12 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
     </button>
 
+    <button class="mtab" data-tab="shoplock" onclick="switchMainTab('shoplock')">
+
+      <i class="fas fa-store"></i> 상점잠금
+
+    </button>
+
   </nav>
 
 
@@ -4627,6 +5018,50 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
         </div>
 
+      </div>
+
+    </div>
+
+
+
+    <!-- ══ 상점 잠금 탭 ══ -->
+    <div class="tab-panel" id="tab-shoplock">
+
+      <!-- 승인 요청 목록 -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><i class="fas fa-bell"></i> 상점 열기 요청</div>
+          <button class="btn btn-sm btn-green" onclick="loadShopRequests()"><i class="fas fa-refresh"></i></button>
+        </div>
+        <div class="card-body">
+          <div id="shopRequestList"><div style="color:var(--g400);text-align:center;padding:16px;">로딩 중...</div></div>
+        </div>
+      </div>
+
+      <!-- 현재 상태 -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><i class="fas fa-store"></i> 상점 현재 상태</div>
+        </div>
+        <div class="card-body">
+          <div id="shopStatusBadge" style="margin-bottom:12px;padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;">확인 중...</div>
+          <button class="btn btn-red btn-sm" onclick="adminLockShop()" style="margin-right:8px;"><i class="fas fa-lock"></i> 즉시 잠금</button>
+        </div>
+      </div>
+
+      <!-- 수업 시간표 설정 -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><i class="fas fa-calendar-week"></i> 수업 시간표 설정</div>
+        </div>
+        <div class="card-body">
+          <div style="font-size:12px;color:var(--g500);margin-bottom:10px;">수업 시간 중에는 상점이 자동으로 잠깁니다.</div>
+          <div id="scheduleSlots"></div>
+          <button class="btn btn-blue btn-sm" style="margin-top:8px;" onclick="addScheduleSlot()"><i class="fas fa-plus"></i> 시간대 추가</button>
+          <div style="margin-top:14px;display:flex;gap:8px;">
+            <button class="btn btn-green" onclick="saveSchedule()"><i class="fas fa-floppy-disk"></i> 시간표 저장</button>
+          </div>
+        </div>
       </div>
 
     </div>

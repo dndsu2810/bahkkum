@@ -1310,7 +1310,159 @@ document.addEventListener('click',function(e){
     if(btn.dataset.maction==='del') delMenuItem(btn.dataset.mtype, parseInt(btn.dataset.midx))
     return
   }
+  // 상점 잠금해제 승인 버튼
+  btn=e.target.closest('[data-unlock-id]')
+  if(btn){
+    var reqId=btn.dataset.unlockId, reqName=btn.dataset.unlockName||''
+    var mins=parseInt(prompt('몇 분간 열어줄까요? (기본 10분)','10')||'10')
+    if(isNaN(mins)||mins<=0)return
+    api('/api/admin/shop/unlock',{method:'POST',body:JSON.stringify({requestId:reqId,minutes:mins})}).then(function(d){
+      if(d.success){toast('✅ '+reqName+' 요청 승인! '+mins+'분간 상점 열립니다.');loadShopRequests();loadShopStatus()}
+      else toast('오류: '+(d.error||''))
+    })
+    return
+  }
 })
+
+// ── 상점 잠금 관련 ──────────────────────────────────────────────────────────────
+
+var shopSchedule=[]
+
+function loadShopRequests(){
+  var el=document.getElementById('shopRequestList')
+  if(!el)return
+  el.innerHTML='<div style="color:var(--g400);text-align:center;padding:16px;">로딩 중...</div>'
+  api('/api/admin/shop/requests').then(function(d){
+    if(!d.success||!d.requests||d.requests.length===0){
+      el.innerHTML='<div style="color:var(--g400);text-align:center;padding:16px;">승인 요청이 없습니다.</div>'
+      return
+    }
+    var html=''
+    d.requests.forEach(function(r){
+      var statusLabel={pending:'⏳ 대기',approved:'✅ 승인',expired:'만료',rejected:'거절'}[r.status]||r.status
+      var statusColor={pending:'#f59e0b',approved:'#22c55e',expired:'#94a3b8',rejected:'#ef4444'}[r.status]||'#94a3b8'
+      var dt=r.requested_at?r.requested_at.replace('T',' ').substring(0,16):''
+      html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--g100);">'
+      html+='<div style="flex:1;">'
+      html+='<div style="font-weight:700;font-size:14px;">'+esc(r.student_name)+'</div>'
+      html+='<div style="font-size:12px;color:var(--g400);">'+esc(dt)+'</div>'
+      html+='</div>'
+      html+='<span style="font-size:12px;font-weight:700;color:'+statusColor+';">'+statusLabel+'</span>'
+      if(r.status==='pending'){
+        html+='<button class="btn btn-green btn-sm" data-unlock-id="'+r.id+'" data-unlock-name="'+esc(r.student_name)+'"><i class="fas fa-unlock"></i> 열기</button>'
+      }
+      html+='</div>'
+    })
+    el.innerHTML=html
+  }).catch(function(){
+    el.innerHTML='<div style="color:#ef4444;text-align:center;padding:16px;">불러오기 실패</div>'
+  })
+}
+
+function loadShopStatus(){
+  var el=document.getElementById('shopStatusBadge')
+  if(!el)return
+  api('/api/shop/status').then(function(d){
+    if(!d.success)return
+    if(d.locked){
+      el.style.background='#fee2e2';el.style.color='#dc2626';el.style.border='1.5px solid #fca5a5'
+      el.textContent='🔒 수업 중 – 상점 잠김'
+    } else if(d.unlocked){
+      var exp=d.expiresAt?new Date(d.expiresAt+'Z'):null
+      var remain=exp?Math.max(0,Math.ceil((exp-Date.now())/60000)):0
+      el.style.background='#f0fdf4';el.style.color='#16a34a';el.style.border='1.5px solid #86efac'
+      el.textContent='🔓 임시 오픈 중 (약 '+remain+'분 남음)'
+    } else {
+      el.style.background='#f0fdf4';el.style.color='#16a34a';el.style.border='1.5px solid #86efac'
+      el.textContent='✅ 상점 열림 (수업 시간 아님)'
+    }
+  })
+}
+
+window.adminLockShop=function(){
+  if(!confirm('상점을 즉시 잠글까요?'))return
+  api('/api/admin/shop/lock',{method:'POST'}).then(function(d){
+    if(d.success){toast('🔒 상점 잠금됨');loadShopStatus()}
+    else toast('오류: '+(d.error||''))
+  })
+}
+
+// 시간표 슬롯 렌더링
+var DAYS=['월','화','수','목','금','토','일']
+function renderScheduleSlots(){
+  var el=document.getElementById('scheduleSlots')
+  if(!el)return
+  if(shopSchedule.length===0){
+    el.innerHTML='<div style="color:var(--g400);font-size:13px;padding:8px 0;">추가된 시간대가 없습니다.</div>'
+    return
+  }
+  var html=''
+  shopSchedule.forEach(function(sl,i){
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'
+    html+='<select class="sched-day" data-idx="'+i+'" style="padding:6px 8px;border:1.5px solid var(--g200);border-radius:8px;font-size:13px;">'
+    DAYS.forEach(function(d){
+      html+='<option value="'+d+'"'+(sl.day===d?' selected':'')+'>'+d+'</option>'
+    })
+    html+='</select>'
+    html+='<input type="time" class="sched-start" data-idx="'+i+'" value="'+(sl.start||'')+'" style="padding:6px 8px;border:1.5px solid var(--g200);border-radius:8px;font-size:13px;">'
+    html+='<span style="color:var(--g400);">~</span>'
+    html+='<input type="time" class="sched-end" data-idx="'+i+'" value="'+(sl.end||'')+'" style="padding:6px 8px;border:1.5px solid var(--g200);border-radius:8px;font-size:13px;">'
+    html+='<button class="btn btn-red btn-sm" onclick="removeScheduleSlot('+i+')"><i class="fas fa-trash"></i></button>'
+    html+='</div>'
+  })
+  el.innerHTML=html
+}
+
+window.addScheduleSlot=function(){
+  shopSchedule.push({day:'월',start:'14:00',end:'16:00'})
+  renderScheduleSlots()
+}
+
+window.removeScheduleSlot=function(i){
+  shopSchedule.splice(i,1)
+  renderScheduleSlots()
+}
+
+function collectScheduleFromDOM(){
+  var dayEls=document.querySelectorAll('.sched-day')
+  var startEls=document.querySelectorAll('.sched-start')
+  var endEls=document.querySelectorAll('.sched-end')
+  var arr=[]
+  dayEls.forEach(function(el,i){
+    arr.push({day:el.value,start:startEls[i].value,end:endEls[i].value})
+  })
+  shopSchedule=arr
+}
+
+window.saveSchedule=function(){
+  collectScheduleFromDOM()
+  api('/api/admin/shop/schedule',{method:'POST',body:JSON.stringify({schedule:shopSchedule})}).then(function(d){
+    if(d.success)toast('✅ 시간표 저장! 즉시 반영됩니다.')
+    else toast('오류: '+(d.error||''))
+  })
+}
+
+function loadScheduleFromServer(){
+  api('/api/admin/shop/schedule').then(function(d){
+    if(d.success&&Array.isArray(d.schedule)){
+      shopSchedule=d.schedule
+    } else {
+      shopSchedule=[]
+    }
+    renderScheduleSlots()
+  }).catch(function(){renderScheduleSlots()})
+}
+
+// shoplock 탭 활성화 시 데이터 로드
+var _origSwitchMainTab=window.switchMainTab
+window.switchMainTab=function(tab){
+  _origSwitchMainTab(tab)
+  if(tab==='shoplock'){
+    loadShopRequests()
+    loadShopStatus()
+    loadScheduleFromServer()
+  }
+}
 
 
 
