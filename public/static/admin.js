@@ -1317,12 +1317,7 @@ document.addEventListener('click',function(e){
   btn=e.target.closest('[data-unlock-id]')
   if(btn){
     var reqId=btn.dataset.unlockId, reqName=btn.dataset.unlockName||''
-    var mins=parseInt(prompt('몇 분간 열어줄까요? (기본 10분)','10')||'10')
-    if(isNaN(mins)||mins<=0)return
-    api('/api/admin/shop/unlock',{method:'POST',body:JSON.stringify({requestId:reqId,minutes:mins})}).then(function(d){
-      if(d.success){toast('✅ '+reqName+' 요청 승인! '+mins+'분간 상점 열립니다.');loadShopRequests();loadShopStatus()}
-      else toast('오류: '+(d.error||''))
-    })
+    openApproveModal(reqId, reqName)
     return
   }
 })
@@ -1457,19 +1452,71 @@ function loadShopStatus(){
 }
 
 window.adminUnlockShop=function(){
-  var mins=parseInt(prompt('몇 분간 상점을 열까요? (기본 10분)','10')||'10')
-  if(isNaN(mins)||mins<=0)return
-  // 직접 열기: requestId 없이 새 approved 레코드 생성
+  // prompt 대신 모달 UI 사용
+  openUnlockMinutesModal()
+}
+
+function openApproveModal(reqId, reqName){
+  var existing=document.getElementById('approve-modal')
+  if(existing)existing.remove()
+  var modal=document.createElement('div')
+  modal.id='approve-modal'
+  modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px;'
+  modal.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.18);">'+
+    '<div style="font-size:16px;font-weight:800;margin-bottom:6px;color:#0f172a;">✅ 요청 승인</div>'+
+    '<div style="font-size:13px;color:#64748b;margin-bottom:12px;"><b>'+esc(reqName)+'</b> 학생의 요청을 승인합니다.<br>몇 분간 상점을 열까요?</div>'+
+    '<input id="approveMinsInp" type="number" value="10" min="1" max="180" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;font-weight:700;text-align:center;margin-bottom:14px;box-sizing:border-box;">'+
+    '<div style="display:flex;gap:8px;">'+
+    '<button onclick="doApproveUnlock(\''+reqId+'\',\''+esc(reqName)+'\')" style="flex:1;padding:10px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">승인</button>'+
+    '<button onclick="document.getElementById(\'approve-modal\').remove()" style="padding:10px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:10px;font-size:14px;cursor:pointer;">취소</button>'+
+    '</div></div>'
+  document.body.appendChild(modal)
+  document.getElementById('approveMinsInp').focus()
+  document.getElementById('approveMinsInp').select()
+}
+
+window.doApproveUnlock=function(reqId,reqName){
+  var mins=parseInt(document.getElementById('approveMinsInp').value)||10
+  if(mins<=0)mins=10
+  document.getElementById('approve-modal').remove()
+  api('/api/admin/shop/unlock',{method:'POST',body:JSON.stringify({requestId:reqId,minutes:mins})}).then(function(d){
+    if(d.success){toast('✅ '+reqName+' 요청 승인! '+mins+'분간 상점 열립니다.');loadShopRequests();loadShopStatus()}
+    else toast('오류: '+(d.error||''))
+  })
+}
+
+function openUnlockMinutesModal(){
+  var existing=document.getElementById('unlock-min-modal')
+  if(existing)existing.remove()
+  var modal=document.createElement('div')
+  modal.id='unlock-min-modal'
+  modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px;'
+  modal.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.18);">'+
+    '<div style="font-size:16px;font-weight:800;margin-bottom:14px;color:#0f172a;">🔓 상점 열기</div>'+
+    '<div style="font-size:13px;color:#64748b;margin-bottom:12px;">몇 분간 상점을 열까요?</div>'+
+    '<input id="unlockMinsInp" type="number" value="10" min="1" max="180" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;font-weight:700;text-align:center;margin-bottom:14px;box-sizing:border-box;">'+
+    '<div style="display:flex;gap:8px;">'+
+    '<button onclick="doDirectUnlock()" style="flex:1;padding:10px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">열기</button>'+
+    '<button onclick="document.getElementById(\'unlock-min-modal\').remove()" style="padding:10px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:10px;font-size:14px;cursor:pointer;">취소</button>'+
+    '</div></div>'
+  document.body.appendChild(modal)
+  document.getElementById('unlockMinsInp').focus()
+  document.getElementById('unlockMinsInp').select()
+}
+
+window.doDirectUnlock=function(){
+  var mins=parseInt(document.getElementById('unlockMinsInp').value)||10
+  if(mins<=0)mins=10
+  document.getElementById('unlock-min-modal').remove()
   api('/api/admin/shop/direct-unlock',{method:'POST',body:JSON.stringify({minutes:mins})}).then(function(d){
-    if(d.success){toast('🔓 '+mins+'분간 상점이 열렸습니다!');loadShopStatus()}
+    if(d.success){toast('🔓 '+mins+'분간 상점이 열렸습니다!');loadShopStatus();loadShopRequests()}
     else toast('오류: '+(d.error||''))
   })
 }
 
 window.adminLockShop=function(){
-  if(!confirm('상점을 즉시 잠글까요?'))return
   api('/api/admin/shop/lock',{method:'POST'}).then(function(d){
-    if(d.success){toast('🔒 상점 잠금됨');loadShopStatus()}
+    if(d.success){toast('🔒 상점 잠금됨');loadShopStatus();loadShopRequests()}
     else toast('오류: '+(d.error||''))
   })
 }
