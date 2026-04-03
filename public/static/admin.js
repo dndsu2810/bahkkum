@@ -455,6 +455,8 @@ function renderReqList(){
 
       '<div class="req-actions">'+
 
+        (r.has_photo?'<button class="btn btn-blue btn-sm" data-rid="'+r.id+'" data-rname="'+esc(r.student_name)+'" data-raction="photo" title="사진 보기"><i class="fas fa-image"></i></button>':'')+
+
         '<button class="btn btn-gray btn-sm" data-rid="'+r.id+'" data-rnote="'+esc(r.admin_note||'')+'" data-raction="note"><i class="fas fa-pen"></i></button>'+
 
         (r.status!=='done'?'<button class="btn btn-green btn-sm" data-rid="'+r.id+'" data-raction="done"><i class="fas fa-check"></i></button>':'')+
@@ -1099,6 +1101,55 @@ document.getElementById('savecurBtn').addEventListener('click',function(){
 
 
 
+// ── 요청사항 사진 보기 모달 ──
+function openReqPhotoModal(rid, rname){
+
+  var modal=document.getElementById('req-photo-modal')
+
+  var title=document.getElementById('reqPhotoModalTitle')
+
+  var content=document.getElementById('reqPhotoModalContent')
+
+  if(!modal)return
+
+  title.textContent='📸 '+rname+' 님의 첨부 사진'
+
+  content.innerHTML='<div style="color:var(--g400);padding:20px;">로딩 중...</div>'
+
+  modal.classList.add('open')
+
+  api('/api/admin/requests/'+rid+'/photo').then(function(d){
+
+    if(d.success && d.photo){
+
+      content.innerHTML='<img src="'+d.photo+'" style="max-width:100%;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);"/>'
+
+    } else {
+
+      content.innerHTML='<div style="color:var(--g400);padding:20px;">사진을 불러올 수 없습니다.</div>'
+
+    }
+
+  }).catch(function(){
+
+    content.innerHTML='<div style="color:var(--red);padding:20px;">오류가 발생했습니다.</div>'
+
+  })
+
+}
+
+
+
+window.closeReqPhotoModal=function(){
+
+  var modal=document.getElementById('req-photo-modal')
+
+  if(modal) modal.classList.remove('open')
+
+}
+
+
+
 // ── 유틸 ──
 
 function esc(s){var r=String(s);r=r.split('&').join('&amp;');r=r.split('<').join('&lt;');r=r.split('>').join('&gt;');r=r.split(String.fromCharCode(34)).join('&#34;');return r}
@@ -1124,6 +1175,7 @@ document.addEventListener('click',function(e){
     var rid=btn.dataset.rid
     if(btn.dataset.raction==='note') openNote(rid, btn.dataset.rnote||'')
     else if(btn.dataset.raction==='done') quickDoneReq(rid)
+    else if(btn.dataset.raction==='photo') openReqPhotoModal(rid, btn.dataset.rname||'')
     return
   }
   btn=e.target.closest('[data-saction]')

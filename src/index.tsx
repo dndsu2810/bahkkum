@@ -12,6 +12,10 @@ type Bindings = {
 
   SLACK_WEBHOOK_URL: string
 
+  SLACK_BOT_TOKEN: string
+
+  SLACK_CHANNEL_ID: string
+
   NOTION_API_KEY: string
 
   NOTION_DATABASE_ID: string
@@ -556,6 +560,34 @@ app.get('/api/admin/requests', async (c) => {
 
 
 
+// 요청사항 사진 조회 (관리자)
+
+app.get('/api/admin/requests/:id/photo', async (c) => {
+
+  try {
+
+    const id = c.req.param('id')
+
+    const row = await c.env.DB.prepare(
+
+      'SELECT photo_base64 FROM requests WHERE id=?'
+
+    ).bind(id).first() as any
+
+    if (!row) return c.json({ success: false, error: '없음' }, 404)
+
+    return c.json({ success: true, photo: row.photo_base64 || null })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
+
 // 요청사항 상태 변경 (관리자)
 
 app.post('/api/admin/requests/:id/status', async (c) => {
@@ -920,6 +952,49 @@ async function sendSlack(env: Bindings, d: any) {
 
   if (!res.ok) throw new Error(`Slack ${res.status}`)
 
+  // Bot Token이 있으면 인증사진도 Slack에 업로드
+  if (d.photoBase64 && env.SLACK_BOT_TOKEN && env.SLACK_CHANNEL_ID) {
+
+    try {
+
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+
+      const ext = mime.split('/')[1] || 'jpg'
+
+      const binStr = atob(imgData)
+
+      const binArr = new Uint8Array(binStr.length)
+
+      for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+
+      const form = new FormData()
+
+      form.append('channels', env.SLACK_CHANNEL_ID)
+
+      form.append('filename', `cert_${d.name}_${Date.now()}.${ext}`)
+
+      form.append('initial_comment', `📸 ${d.name} 학생의 인증 사진`)
+
+      form.append('file', new Blob([binArr], { type: mime }), `photo.${ext}`)
+
+      await fetch('https://slack.com/api/files.upload', {
+
+        method: 'POST',
+
+        headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+
+        body: form,
+
+      })
+
+    } catch (_) {}
+
+  }
+
   return true
 
 }
@@ -1116,11 +1191,13 @@ async function sendSlackRequest(env: Bindings, d: any) {
 
   if (!env.SLACK_WEBHOOK_URL) return false
 
+  const photoNote = d.photoBase64 ? '\n📎 *사진 첨부됨* → 관리자 페이지에서 확인 가능' : ''
+
   const blocks: any[] = [
 
-    { type: 'header', text: { type: 'plain_text', text: '바꿈수학 - 선생님께 요청사항', emoji: true } },
+    { type: 'header', text: { type: 'plain_text', text: '📬 바꿈수학 - 선생님께 요청사항', emoji: true } },
 
-    { type: 'section', text: { type: 'mrkdwn', text: `*학생:* ${d.name}\n*메시지:*\n${d.message}` } },
+    { type: 'section', text: { type: 'mrkdwn', text: `*👤 학생:* ${d.name}\n*💬 메시지:*\n${d.message}${photoNote}` } },
 
     { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${d.timestamp}` }] },
 
@@ -1128,15 +1205,52 @@ async function sendSlackRequest(env: Bindings, d: any) {
 
   ]
 
-  if (d.photoBase64) {
-
-    blocks.splice(2, 0, { type: 'section', text: { type: 'mrkdwn', text: '📎 이미지 첨부 있음 (노션에서 확인)' } })
-
-  }
-
   const res = await fetch(env.SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }) })
 
   if (!res.ok) throw new Error(`Slack ${res.status}`)
+
+  // Bot Token이 있으면 이미지도 Slack에 별도 업로드
+  if (d.photoBase64 && env.SLACK_BOT_TOKEN && env.SLACK_CHANNEL_ID) {
+
+    try {
+
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+
+      const ext = mime.split('/')[1] || 'jpg'
+
+      const binStr = atob(imgData)
+
+      const binArr = new Uint8Array(binStr.length)
+
+      for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+
+      const form = new FormData()
+
+      form.append('channels', env.SLACK_CHANNEL_ID)
+
+      form.append('filename', `request_${d.name}_${Date.now()}.${ext}`)
+
+      form.append('initial_comment', `📸 ${d.name} 학생의 요청사항 첨부 사진`)
+
+      form.append('file', new Blob([binArr], { type: mime }), `photo.${ext}`)
+
+      await fetch('https://slack.com/api/files.upload', {
+
+        method: 'POST',
+
+        headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+
+        body: form,
+
+      })
+
+    } catch (_) {}
+
+  }
 
   return true
 
@@ -2300,7 +2414,7 @@ const MAIN_HTML = `<!DOCTYPE html>
 
     <div id="reqPhotoWrap" style="margin:10px 0;">
 
-      <img class="photo-prev" id="reqPrev" alt="" style="display:none;max-width:100%;max-height:180px;border-radius:var(--r-md);margin:0 auto 10px;display:none;"/>
+      <img class="photo-prev" id="reqPrev" alt="" style="display:none;max-width:100%;max-height:180px;border-radius:var(--r-md);margin:0 auto 10px;"/>
 
       <div style="display:flex;gap:8px;">
 
@@ -4529,6 +4643,21 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
 
 
+
+<!-- 사진 보기 모달 -->
+<div class="modal-ov" id="req-photo-modal" onclick="if(event.target===this)closeReqPhotoModal()">
+  <div class="modal-box" style="max-width:480px;width:95%;">
+    <div class="modal-head">
+      <span class="modal-title" id="reqPhotoModalTitle">📸 첨부 사진</span>
+      <button class="btn btn-gray btn-sm" onclick="closeReqPhotoModal()">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <div id="reqPhotoModalContent" style="min-height:80px;display:flex;align-items:center;justify-content:center;">
+        <div style="color:var(--g400);">로딩 중...</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="/static/admin.js"></script>
 </body>
