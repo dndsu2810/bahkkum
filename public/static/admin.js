@@ -1433,20 +1433,28 @@ function loadShopRequests(){
 
 function loadShopStatus(){
   var el=document.getElementById('shopStatusBadge')
+  var lockBtn=document.getElementById('adminLockBtn')
   if(!el)return
   api('/api/shop/status').then(function(d){
     if(!d.success)return
-    if(d.locked){
+    if(d.forceLocked){
       el.style.background='#fee2e2';el.style.color='#dc2626';el.style.border='1.5px solid #fca5a5'
-      el.textContent='🔒 수업 중 – 상점 잠김'
+      el.textContent='🔒 관리자 강제 잠금 중 (직접 열기 전까지 유지)'
+      if(lockBtn){lockBtn.textContent='🔒 잠금 중';lockBtn.disabled=true;lockBtn.style.opacity='0.5'}
+    } else if(d.locked){
+      el.style.background='#fee2e2';el.style.color='#dc2626';el.style.border='1.5px solid #fca5a5'
+      el.textContent='🔒 수업 시간 – 상점 잠김'
+      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
     } else if(d.unlocked){
       var exp=d.expiresAt?new Date(d.expiresAt+'Z'):null
       var remain=exp?Math.max(0,Math.ceil((exp-Date.now())/60000)):0
-      el.style.background='#f0fdf4';el.style.color='#16a34a';el.style.border='1.5px solid #86efac'
+      el.style.background='#fff7ed';el.style.color='#c2410c';el.style.border='1.5px solid #fdba74'
       el.textContent='🔓 임시 오픈 중 (약 '+remain+'분 남음)'
+      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
     } else {
       el.style.background='#f0fdf4';el.style.color='#16a34a';el.style.border='1.5px solid #86efac'
-      el.textContent='✅ 상점 열림 (수업 시간 아님)'
+      el.textContent='✅ 상점 열림'
+      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
     }
   })
 }

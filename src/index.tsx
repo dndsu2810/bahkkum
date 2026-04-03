@@ -193,7 +193,16 @@ app.get('/api/shop/status', async (c) => {
     const unlocked = !!unlockRow
     const expiresAt = unlockRow?.expires_at || null
 
-    return c.json({ success: true, isClassTime, locked: isClassTime && !unlocked, unlocked, expiresAt })
+    // 강제 잠금 상태 확인 (관리자가 즉시 잠금한 경우)
+    const forceLockRow = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='force_lock'"
+    ).first() as any
+    const forceLocked = forceLockRow?.value === '1'
+
+    // 잠금 여부: 강제잠금 OR 수업시간, 단 unlocked(열기 승인)가 있으면 열림
+    const locked = (forceLocked || isClassTime) && !unlocked
+
+    return c.json({ success: true, isClassTime, forceLocked, locked, unlocked, expiresAt })
 
   } catch (e: any) {
 
@@ -269,6 +278,10 @@ app.post('/api/admin/shop/direct-unlock', async (c) => {
   try {
     const { minutes = 10 } = await c.req.json()
     const mins = Math.max(1, Math.min(180, parseInt(minutes) || 10))
+    // 강제 잠금 해제
+    await c.env.DB.prepare(
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('force_lock', '0', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='0', updated_at=CURRENT_TIMESTAMP"
+    ).run()
     // 기존 승인된 것 만료 처리 후 새로 생성
     await c.env.DB.prepare(
       "UPDATE shop_unlock_requests SET status='expired' WHERE status='approved'"
@@ -283,21 +296,19 @@ app.post('/api/admin/shop/direct-unlock', async (c) => {
 })
 
 app.post('/api/admin/shop/lock', async (c) => {
-
   try {
-
+    // 강제 잠금 ON
+    await c.env.DB.prepare(
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('force_lock', '1', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='1', updated_at=CURRENT_TIMESTAMP"
+    ).run()
+    // 열려있는 잠금해제 요청도 모두 만료
     await c.env.DB.prepare(
       "UPDATE shop_unlock_requests SET status='expired' WHERE status='approved'"
     ).run()
-
     return c.json({ success: true })
-
   } catch (e: any) {
-
     return c.json({ success: false, error: e.message }, 500)
-
   }
-
 })
 
 
@@ -2485,8 +2496,9 @@ const MAIN_HTML = `<!DOCTYPE html>
       <!-- 상점 잠금 오버레이 -->
       <div id="shop-lock-overlay" style="display:none;position:absolute;inset:0;z-index:20;background:rgba(15,23,42,.72);backdrop-filter:blur(6px);border-radius:16px;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;">
         <div style="font-size:52px;">🔒</div>
-        <div style="color:white;font-size:18px;font-weight:900;text-align:center;">수업 중에는 상점을 이용할 수 없어요</div>
-        <div style="color:rgba(255,255,255,.7);font-size:13px;text-align:center;">선생님께 승인 요청을 보내면<br/>10분간 주문이 가능해요!</div>
+        <div style="color:white;font-size:18px;font-weight:900;text-align:center;">지금은 상점을 이용할 수 없어요</div>
+        <div id="shopLockMsg" style="color:rgba(255,255,255,.75);font-size:14px;font-weight:700;text-align:center;">수업 중입니다</div>
+        <div style="color:rgba(255,255,255,.6);font-size:12px;text-align:center;">선생님께 승인 요청을 보내면<br/>잠시 주문이 가능해요!</div>
         <button id="shopUnlockReqBtn" onclick="requestShopUnlock()" style="margin-top:8px;padding:14px 28px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;border:none;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(99,102,241,.4);">
           🙋 선생님께 상점 열기 요청
         </button>
@@ -3163,7 +3175,7 @@ function updateBannerStats(s){
 
 
 // ── 상점 잠금 상태 ──
-let SHOP_STATUS = { locked: false, unlocked: false, expiresAt: null }
+let SHOP_STATUS = { locked: false, forceLocked: false, unlocked: false, expiresAt: null }
 let shopUnlockTimer = null
 
 async function checkShopStatus() {
@@ -3173,7 +3185,6 @@ async function checkShopStatus() {
     const r = await fetch(url)
     const d = await r.json()
     SHOP_STATUS = d
-    // 잠금 해제 중이면 남은 시간 표시 갱신
     renderShopLockOverlay()
   } catch(_) {}
 }
@@ -3181,25 +3192,38 @@ async function checkShopStatus() {
 function renderShopLockOverlay() {
   const overlay = document.getElementById('shop-lock-overlay')
   if (!overlay) return
-  if (!SHOP_STATUS.locked && !SHOP_STATUS.unlocked) {
-    overlay.style.display = 'none'; return
-  }
+
   if (SHOP_STATUS.unlocked && !SHOP_STATUS.locked) {
-    // 해제 중 - 남은 시간 표시
     const exp = SHOP_STATUS.expiresAt ? new Date(SHOP_STATUS.expiresAt + 'Z') : null
     const remain = exp ? Math.max(0, Math.floor((exp.getTime() - Date.now()) / 1000)) : 0
-    if (remain <= 0) { SHOP_STATUS.unlocked = false; SHOP_STATUS.locked = false; overlay.style.display = 'none'; return }
+    if (remain <= 0) {
+      SHOP_STATUS.unlocked = false
+      overlay.style.display = 'none'
+      const b = document.getElementById('shop-unlock-badge')
+      if (b) b.style.display = 'none'
+      return
+    }
     const mm = Math.floor(remain / 60), ss = remain % 60
-    overlay.style.display = 'none'  // 해제 중엔 오버레이 숨김
+    overlay.style.display = 'none'
     const badge = document.getElementById('shop-unlock-badge')
-    if (badge) badge.textContent = '\uD83D\uDD13 ' + mm + ':' + String(ss).padStart(2,'0') + ' \uB0A8\uC74C'
+    if (badge) { badge.style.display = 'block'; badge.textContent = '\uD83D\uDD13 ' + mm + ':' + String(ss).padStart(2,'0') + ' \uB0A8\uC74C' }
     return
   }
-  // 잠긴 상태
-  overlay.style.display = 'flex'
+
+  if (SHOP_STATUS.locked) {
+    overlay.style.display = 'flex'
+    const lockMsg = document.getElementById('shopLockMsg')
+    if (lockMsg) lockMsg.textContent = SHOP_STATUS.forceLocked ? '\uAD00\uB9AC\uc790\uAC00 \uC7A0\uAD38\uC2B5\uB2C8\uB2E4' : '\uC218\uC5C5 \uC911\uC785\uB2C8\uB2E4'
+    const badge = document.getElementById('shop-unlock-badge')
+    if (badge) { badge.style.display = 'none'; badge.textContent = '' }
+    return
+  }
+
+  overlay.style.display = 'none'
   const badge = document.getElementById('shop-unlock-badge')
-  if (badge) badge.textContent = ''
+  if (badge) { badge.style.display = 'none'; badge.textContent = '' }
 }
+
 
 
 
@@ -5141,7 +5165,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
           <div id="shopStatusBadge" style="margin-bottom:12px;padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;">확인 중...</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <button class="btn btn-green btn-sm" onclick="adminUnlockShop()"><i class="fas fa-unlock"></i> 직접 열기</button>
-            <button class="btn btn-red btn-sm" onclick="adminLockShop()"><i class="fas fa-lock"></i> 즉시 잠금</button>
+            <button class="btn btn-red btn-sm" id="adminLockBtn" onclick="adminLockShop()"><i class="fas fa-lock"></i> 즉시 잠금</button>
           </div>
         </div>
       </div>
