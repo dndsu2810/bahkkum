@@ -556,16 +556,35 @@ function getDefaultMissions() {
 }
 
 // ── 프리셋 & 최근 입력 관리 ────────────────────────────────────────────────
-const DEFAULT_PRESETS = [
-  '숙제 제출하기', '숙제 오답하기'
-];
+// 기본값 버전 (바꾸면 모든 사용자 브라우저에 새 기본값 적용)
+const PRESET_VERSION = 'v3';
+const HARDCODED_DEFAULTS = ['숙제 제출하기', '숙제 오답하기'];
 
 function loadCustomPresets() {
-  try { return JSON.parse(localStorage.getItem('mogak_presets') || 'null') || [...DEFAULT_PRESETS]; }
-  catch { return [...DEFAULT_PRESETS]; }
+  try {
+    const ver = localStorage.getItem('mogak_preset_ver');
+    // 버전이 다르면 기본값으로 초기화
+    if (ver !== PRESET_VERSION) {
+      const savedDefaults = loadDefaultPresets();
+      localStorage.setItem('mogak_presets', JSON.stringify(savedDefaults));
+      localStorage.setItem('mogak_preset_ver', PRESET_VERSION);
+      return [...savedDefaults];
+    }
+    return JSON.parse(localStorage.getItem('mogak_presets') || 'null') || loadDefaultPresets();
+  } catch { return [...HARDCODED_DEFAULTS]; }
 }
 function saveCustomPresets(arr) {
   localStorage.setItem('mogak_presets', JSON.stringify(arr));
+  localStorage.setItem('mogak_preset_ver', PRESET_VERSION);
+}
+// 저장된 기본값 (선생님이 직접 설정한 기본값)
+function loadDefaultPresets() {
+  try {
+    return JSON.parse(localStorage.getItem('mogak_default_presets') || 'null') || [...HARDCODED_DEFAULTS];
+  } catch { return [...HARDCODED_DEFAULTS]; }
+}
+function saveDefaultPresets(arr) {
+  localStorage.setItem('mogak_default_presets', JSON.stringify(arr));
 }
 let PRESETS = loadCustomPresets();
 
@@ -625,7 +644,8 @@ function renderMissionEditor() {
           <button class="btn btn-blue btn-sm" onclick="addPresetFromEditor()">+ 추가</button>
         </div>
         <div class="preset-editor-btns">
-          <button class="btn btn-gray btn-sm" onclick="resetPresets()">🔄 기본값</button>
+          <button class="btn btn-gray btn-sm" onclick="resetPresets()" title="저장된 기본값으로 되돌리기">🔄 기본값으로 되돌리기</button>
+          <button class="btn btn-blue btn-sm" onclick="setAsDefault()" title="현재 목록을 기본값으로 저장">⭐ 현재를 기본값으로 저장</button>
         </div>
       </div>
     </div>
@@ -726,12 +746,20 @@ function addPresetFromEditor() {
 }
 
 function resetPresets() {
-  if (!confirm('기본값(숙제 제출하기, 숙제 오답하기)으로 초기화할까요?')) return;
-  PRESETS = [...DEFAULT_PRESETS];
+  const defaults = loadDefaultPresets();
+  if (!confirm('기본값(' + defaults.join(', ') + ')으로 초기화할까요?')) return;
+  PRESETS = [...defaults];
   saveCustomPresets(PRESETS);
   renderPresetEditList();
   refreshPresetChips();
   toast('🔄 기본값으로 초기화됐어요');
+}
+
+function setAsDefault() {
+  if (!PRESETS.length) { toast('⚠️ 항목이 없어요'); return; }
+  if (!confirm('현재 목록(' + PRESETS.join(', ') + ')을 기본값으로 저장할까요?')) return;
+  saveDefaultPresets([...PRESETS]);
+  toast('✅ 현재 목록이 기본값으로 저장됐어요!');
 }
 
 function refreshPresetChips() {
