@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>모각공 어드민</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --fire:#FE5F3C;--fire2:#FF9A2E;--fire-soft:rgba(254,95,60,.1);--fire-border:rgba(254,95,60,.25);
+  --bg:#F7F4F2;--white:#FFFFFF;--surface:#FDFCFB;
+  --gray-100:#F1EDE9;--gray-200:#E4DDD7;--gray-400:#A89D95;--gray-600:#6B5F57;--gray-800:#2C2018;
+  --green:#22A55A;--green-soft:rgba(34,165,90,.1);
+  --red:#E84545;--red-soft:rgba(232,69,69,.1);
+  --blue:#3B82F6;--blue-soft:rgba(59,130,246,.1);
+}
+body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-serif;min-height:100vh}
+
+/* ── LOGIN ── */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#1A0E08,#2C1810)}
+.login-box{background:var(--white);border-radius:24px;padding:40px 36px;width:min(400px,96vw);box-shadow:0 32px 80px rgba(0,0,0,.25);text-align:center}
+.login-logo{font-size:48px;margin-bottom:16px}
+.login-title{font-size:22px;font-weight:900;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--gray-400);margin-bottom:28px}
+.login-inp{width:100%;border:2px solid var(--gray-200);border-radius:12px;padding:14px 16px;font-family:inherit;font-size:16px;font-weight:700;outline:none;text-align:center;letter-spacing:6px;transition:border-color .2s}
+.login-inp:focus{border-color:var(--fire)}
+.login-btn{width:100%;margin-top:12px;padding:15px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer;transition:opacity .2s}
+.login-btn:hover{opacity:.9}
+.login-err{font-size:13px;color:var(--red);margin-top:10px;display:none}
+.login-err.show{display:block}
+
+/* ── LAYOUT ── */
+.app{display:none}
+.app.visible{display:flex;flex-direction:column;min-height:100vh}
+
+/* ── HEADER ── */
+.hdr{background:var(--white);border-bottom:1.5px solid var(--gray-200);padding:0 28px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 1px 8px rgba(0,0,0,.06)}
+.hdr-brand{display:flex;align-items:center;gap:10px}
+.hdr-fire{font-size:24px}
+.hdr-name{font-size:17px;font-weight:900;color:var(--gray-800)}
+.hdr-name span{color:var(--fire)}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.hdr-date{font-size:12px;color:var(--gray-400);font-weight:500}
+.hdr-kiosk{display:flex;align-items:center;gap:5px;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire);font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;text-decoration:none;transition:all .2s}
+.hdr-kiosk:hover{background:var(--fire);color:#fff}
+.logout-btn{background:var(--gray-100);border:1px solid var(--gray-200);color:var(--gray-600);font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;transition:all .2s}
+.logout-btn:hover{background:var(--red-soft);color:var(--red)}
+
+/* ── MAIN ── */
+.main{flex:1;padding:24px 28px;max-width:1100px;margin:0 auto;width:100%}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--white);border-radius:14px;padding:5px;border:1.5px solid var(--gray-200);width:fit-content}
+.tab{font-family:inherit;font-size:13px;font-weight:700;padding:9px 18px;border-radius:10px;border:none;background:transparent;color:var(--gray-400);cursor:pointer;transition:all .2s;white-space:nowrap}
+.tab.active{background:var(--fire);color:#fff;box-shadow:0 2px 12px rgba(254,95,60,.35)}
+
+/* ── SECTION TITLE ── */
+.sec-title{font-size:15px;font-weight:900;color:var(--gray-800);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.sec-title span{color:var(--fire)}
+
+/* ── STUDENT GRID (dashboard) ── */
+.student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:28px}
+.stu-card{background:var(--white);border:1.5px solid var(--gray-200);border-radius:16px;padding:18px;transition:all .2s;position:relative;overflow:hidden}
+.stu-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--fire),var(--fire2));opacity:0;transition:opacity .2s}
+.stu-card:hover{border-color:var(--fire-border);box-shadow:0 4px 20px rgba(254,95,60,.1)}
+.stu-card:hover::before{opacity:1}
+.stu-av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--fire-soft),rgba(255,154,46,.15));border:2px solid var(--fire-border);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:var(--fire);margin-bottom:10px}
+.stu-name{font-size:15px;font-weight:900;margin-bottom:6px}
+.stu-pts{font-size:13px;font-weight:700;color:var(--fire);background:var(--fire-soft);border:1px solid var(--fire-border);border-radius:20px;padding:3px 10px;display:inline-block;margin-bottom:8px}
+.stu-link-btn{width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--gray-200);background:var(--gray-100);color:var(--gray-600);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:5px}
+.stu-link-btn:hover{border-color:var(--fire-border);background:var(--fire-soft);color:var(--fire)}
+.stu-link-btn.copied{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.stu-mission-badge{font-size:11px;color:var(--gray-400);margin-bottom:6px}
+.stu-mission-badge.set{color:var(--green);font-weight:700}
+
+/* ── MISSION EDITOR ── */
+.mission-editor{background:var(--white);border-radius:20px;border:1.5px solid var(--gray-200);overflow:hidden;margin-bottom:20px}
+.editor-head{padding:18px 22px;border-bottom:1.5px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.editor-title{font-size:15px;font-weight:900}
+.student-selector{display:flex;gap:8px;flex-wrap:wrap}
+.stu-sel-btn{font-family:inherit;font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;transition:all .2s}
+.stu-sel-btn.active{background:var(--fire);border-color:var(--fire);color:#fff}
+.stu-sel-btn.has-missions{border-color:var(--green);color:var(--green)}
+.stu-sel-btn.active.has-missions{background:var(--green);border-color:var(--green);color:#fff}
+.editor-body{padding:22px}
+.no-student{text-align:center;padding:40px;color:var(--gray-400);font-size:14px}
+.selected-student-name{font-size:18px;font-weight:900;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.selected-student-name .fire-tag{font-size:13px;font-weight:700;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire);border-radius:20px;padding:3px 10px}
+
+/* Mission list */
+.mission-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.mission-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--gray-100);border-radius:12px;border:1.5px solid transparent;transition:all .2s}
+.mission-row:hover{border-color:var(--gray-200);background:var(--white)}
+.mission-drag{color:var(--gray-400);cursor:grab;font-size:14px;flex-shrink:0}
+.mission-num{font-size:11px;font-weight:900;color:var(--gray-400);width:22px;flex-shrink:0;text-align:center}
+.mission-text-input{flex:1;border:none;background:transparent;font-family:inherit;font-size:14px;font-weight:500;color:var(--gray-800);outline:none}
+.mission-text-input::placeholder{color:var(--gray-400)}
+.mission-hint-input{width:150px;border:1px solid var(--gray-200);border-radius:8px;padding:5px 8px;font-family:inherit;font-size:11px;color:var(--gray-600);outline:none;background:var(--white)}
+.mission-hint-input:focus{border-color:var(--fire-border)}
+.mission-del{width:28px;height:28px;border-radius:8px;border:none;background:var(--red-soft);color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.mission-del:hover{background:var(--red);color:#fff}
+
+/* Add mission */
+.add-mission-row{display:flex;gap:8px}
+.add-mission-inp{flex:1;border:2px dashed var(--gray-200);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14px;outline:none;background:var(--white);transition:border-color .2s;color:var(--gray-800)}
+.add-mission-inp:focus{border-color:var(--fire-border)}
+.add-mission-btn{padding:12px 18px;border-radius:12px;border:none;background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.add-mission-btn:hover{background:var(--fire);color:#fff}
+
+/* Save bar */
+.save-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--gray-100);border-top:1.5px solid var(--gray-200);gap:10px;flex-wrap:wrap}
+.save-hint{font-size:12px;color:var(--gray-400)}
+.save-btn{padding:11px 24px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:14px;font-weight:900;cursor:pointer;transition:all .2s;box-shadow:0 4px 16px rgba(254,95,60,.3)}
+.save-btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(254,95,60,.4)}
+.save-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.save-status{font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px}
+.save-status.ok{background:var(--green-soft);color:var(--green)}
+.save-status.err{background:var(--red-soft);color:var(--red)}
+
+/* ── PRESET MISSIONS ── */
+.preset-section{margin-bottom:16px}
+.preset-label{font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase}
+.preset-chips{display:flex;gap:6px;flex-wrap:wrap}
+.preset-chip{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;transition:all .15s}
+.preset-chip:hover{border-color:var(--fire-border);color:var(--fire);background:var(--fire-soft)}
+
+/* ── OVERVIEW TAB ── */
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.overview-card{background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);padding:18px}
+.ov-stu-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ov-av{width:38px;height:38px;border-radius:50%;background:var(--fire-soft);border:2px solid var(--fire-border);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:var(--fire);flex-shrink:0}
+.ov-name{font-size:14px;font-weight:900}
+.ov-pts{font-size:11px;font-weight:700;color:var(--fire);background:var(--fire-soft);border-radius:20px;padding:2px 8px;display:inline-block;margin-top:2px}
+.ov-missions{display:flex;flex-direction:column;gap:5px}
+.ov-mission-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--gray-600)}
+.ov-mission-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gray-200);flex-shrink:0}
+.no-missions-msg{font-size:11px;color:var(--gray-400);text-align:center;padding:12px 0}
+
+/* ── POINTS LOG TAB ── */
+.log-table{width:100%;border-collapse:collapse}
+.log-table th{text-align:left;font-size:11px;font-weight:700;color:var(--gray-400);padding:8px 12px;border-bottom:1.5px solid var(--gray-200);letter-spacing:.05em;text-transform:uppercase}
+.log-table td{padding:12px 12px;border-bottom:1px solid var(--gray-100);font-size:13px}
+.log-table tr:last-child td{border-bottom:none}
+.log-delta.pos{color:var(--green);font-weight:700}
+.log-delta.neg{color:var(--red);font-weight:700}
+.log-cat{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;display:inline-block}
+.log-cat.learn{background:var(--green-soft);color:var(--green)}
+.log-cat.fine{background:var(--red-soft);color:var(--red)}
+.log-cat.shop{background:var(--blue-soft);color:var(--blue)}
+.log-cat.admin{background:var(--gray-100);color:var(--gray-600)}
+
+/* ── LINK GENERATOR TAB ── */
+.link-card{background:var(--white);border:1.5px solid var(--gray-200);border-radius:16px;padding:18px 20px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.link-stu-name{font-size:15px;font-weight:900;flex:1}
+.link-url{font-size:11px;color:var(--gray-400);background:var(--gray-100);border-radius:8px;padding:8px 12px;flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace}
+.link-copy-btn{padding:9px 16px;border-radius:10px;border:1.5px solid var(--fire-border);background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0}
+.link-copy-btn:hover{background:var(--fire);color:#fff}
+.link-copy-btn.copied{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--gray-800);color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;z-index:9999;animation:toast-in .3s ease;pointer-events:none}
+@keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── REFRESH BTN ── */
+.refresh-btn{padding:7px 14px;border-radius:10px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px}
+.refresh-btn:hover{border-color:var(--fire-border);color:var(--fire)}
+.spin{animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .main{padding:16px}
+  .hdr{padding:0 16px}
+  .link-card{flex-wrap:wrap}
+  .link-url{flex:100%;order:3}
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">🔥</div>
+    <div class="login-title">모각공 어드민</div>
+    <div class="login-sub">선생님 전용 관리 화면이에요</div>
+    <input class="login-inp" type="password" id="pw-inp" placeholder="비밀번호"
+           onkeydown="if(event.key==='Enter')doLogin()"/>
+    <button class="login-btn" onclick="doLogin()">로그인</button>
+    <div class="login-err" id="login-err">비밀번호가 틀렸어요</div>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div class="app" id="app">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-brand">
+      <span class="hdr-fire">🔥</span>
+      <span class="hdr-name">모각공 <span>어드민</span></span>
+    </div>
+    <div class="hdr-right">
+      <span class="hdr-date" id="hdr-date"></span>
+      <a class="hdr-kiosk" href="https://bakuum-kiosk.pages.dev" target="_blank">🖥️ 키오스크</a>
+      <button class="logout-btn" onclick="doLogout()">로그아웃</button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('missions',this)">📋 미션 입력</button>
+      <button class="tab" onclick="switchTab('overview',this)">👀 현황 보기</button>
+      <button class="tab" onclick="switchTab('students',this)">🎓 학생 현황</button>
+      <button class="tab" onclick="switchTab('links',this)">🔗 링크 생성</button>
+    </div>
+
+    <!-- ── TAB: 미션 입력 ── -->
+    <div id="tab-missions">
+      <div class="mission-editor">
+        <div class="editor-head">
+          <div class="editor-title">📋 오늘의 미션 입력</div>
+          <div class="student-selector" id="mission-student-selector">
+            <span style="font-size:12px;color:var(--gray-400)">로딩 중...</span>
+          </div>
+        </div>
+        <div class="editor-body" id="mission-editor-body">
+          <div class="no-student">학생을 선택하면 미션을 입력할 수 있어요 👆</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: 현황 보기 ── -->
+    <div id="tab-overview" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div class="sec-title" style="margin-bottom:0">📋 오늘의 미션 <span>현황</span></div>
+        <button class="refresh-btn" onclick="loadOverview()">↻ 새로고침</button>
+      </div>
+      <div class="overview-grid" id="overview-grid">
+        <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
+      </div>
+    </div>
+
+    <!-- ── TAB: 학생 현황 ── -->
+    <div id="tab-students" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div class="sec-title" style="margin-bottom:0">🎓 학생 포인트 <span>현황</span></div>
+        <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
+      </div>
+      <div class="student-grid" id="student-grid">
+        <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
+      </div>
+      <div class="sec-title" style="margin-top:12px">📊 포인트 <span>내역</span></div>
+      <div style="background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);overflow:hidden">
+        <table class="log-table" id="log-table">
+          <thead><tr>
+            <th>학생</th><th>변동</th><th>사유</th><th>분류</th><th>일시</th>
+          </tr></thead>
+          <tbody id="log-body"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-400)">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: 링크 생성 ── -->
+    <div id="tab-links" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div class="sec-title" style="margin-bottom:0">🔗 학생별 카카오 <span>링크</span></div>
+        <button class="refresh-btn" onclick="loadLinks()">↻ 새로고침</button>
+      </div>
+      <div style="background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px;padding:12px 16px;font-size:13px;color:var(--fire);font-weight:600;margin-bottom:16px">
+        🔗 아래 링크를 카카오톡으로 각 학생에게 보내면 돼요! 학생이 링크를 누르면 본인 이름으로 모각공이 열려요.
+      </div>
+      <div id="link-list">
+        <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const KIOSK = 'https://bakuum-kiosk.pages.dev';
+const MOGAKGONG_URL = window.location.origin + window.location.pathname.replace('admin.html','index.html');
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let PW = '';
+let STUDENTS = [];
+let ALL_MISSIONS = {};   // { studentName: [{text, hint}, ...] }
+let selectedStudent = null;
+let currentMissions = [];  // missions for selected student
+let currentTab = 'missions';
+
+// ── LOGIN ────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const pw = document.getElementById('pw-inp').value.trim();
+  if (!pw) return;
+  // 키오스크 어드민 API로 인증 확인
+  try {
+    const res = await fetch(KIOSK + '/api/admin/auth', {
+      headers: { 'X-Admin-Password': pw }
+    });
+    const d = await res.json();
+    if (d.success) {
+      PW = pw;
+      sessionStorage.setItem('mogak_admin_pw', pw);
+      showApp();
+    } else {
+      showLoginErr();
+    }
+  } catch(e) {
+    showLoginErr();
+  }
+}
+function showLoginErr() {
+  document.getElementById('login-err').classList.add('show');
+  document.getElementById('pw-inp').style.borderColor = 'var(--red)';
+}
+function doLogout() {
+  PW = ''; sessionStorage.removeItem('mogak_admin_pw');
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-wrap').style.display = 'flex';
+  document.getElementById('pw-inp').value = '';
+}
+function showApp() {
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  const d = new Date();
+  document.getElementById('hdr-date').textContent =
+    d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일';
+  initApp();
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+async function initApp() {
+  await loadStudents();
+  await loadTodayMissions();
+  renderMissionStudentSelector();
+}
+
+// ── API 헬퍼 ────────────────────────────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = { headers: { 'X-Admin-Password': PW } };
+  if (method !== 'GET') {
+    opts.method = method;
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(KIOSK + path, opts);
+  return res.json();
+}
+
+// ── STUDENTS ─────────────────────────────────────────────────────────────────
+async function loadStudents() {
+  try {
+    const d = await api('/api/students');
+    if (d.success) {
+      STUDENTS = d.students;
+      renderStudentGrid();
+      renderLogTable();
+    }
+  } catch(e) { console.error(e); }
+}
+
+function renderStudentGrid() {
+  const g = document.getElementById('student-grid');
+  if (!STUDENTS.length) { g.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
+  g.innerHTML = STUDENTS.map(s => {
+    const mCount = (ALL_MISSIONS[s.name] || []).length;
+    return `<div class="stu-card">
+      <div class="stu-av">${s.name[0]}</div>
+      <div class="stu-name">${s.name}</div>
+      <div class="stu-pts">🏅 ${s.points} 포인트</div>
+      <div class="stu-mission-badge ${mCount ? 'set' : ''}">
+        ${mCount ? '✅ 오늘 미션 ' + mCount + '개' : '미션 미설정'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function renderLogTable() {
+  const tbody = document.getElementById('log-body');
+  try {
+    const rows = [];
+    for (const s of STUDENTS.slice(0,7)) {
+      const d = await api('/api/students/' + s.id);
+      if (d.success) {
+        d.history.forEach(h => rows.push({ name: s.name, ...h }));
+      }
+    }
+    rows.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    tbody.innerHTML = rows.slice(0,40).map(r => `
+      <tr>
+        <td style="font-weight:700">${r.name}</td>
+        <td><span class="log-delta ${r.delta >= 0 ? 'pos' : 'neg'}">${r.delta >= 0 ? '+' : ''}${r.delta}</span></td>
+        <td style="font-size:12px;color:var(--gray-600);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.reason}</td>
+        <td><span class="log-cat ${r.category}">${{learn:'학습',fine:'벌금',shop:'상점',admin:'조정'}[r.category]||r.category}</span></td>
+        <td style="font-size:11px;color:var(--gray-400)">${r.created_at?.slice(0,16).replace('T',' ')||'-'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray-400);padding:20px">불러오기 실패</td></tr>';
+  }
+}
+
+// ── MISSIONS (kiosk app_config에 저장) ──────────────────────────────────────
+function getTodayKey() {
+  const d = new Date();
+  return 'mogakgong_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+}
+
+async function loadTodayMissions() {
+  try {
+    // kiosk config에서 mogakgong 미션 데이터 불러오기
+    const res = await fetch(KIOSK + '/api/config');
+    const cfg = await res.json();
+    const todayKey = getTodayKey();
+    ALL_MISSIONS = cfg[todayKey] || {};
+  } catch(e) {
+    ALL_MISSIONS = {};
+  }
+}
+
+async function saveTodayMissions() {
+  try {
+    // 현재 kiosk 설정 불러오기
+    const res = await fetch(KIOSK + '/api/config');
+    const cfg = await res.json();
+    // 오늘 미션 추가
+    const todayKey = getTodayKey();
+    cfg[todayKey] = ALL_MISSIONS;
+    // 저장
+    const saveRes = await api('/api/admin/config', 'POST', cfg);
+    return saveRes.success;
+  } catch(e) {
+    return false;
+  }
+}
+
+// ── MISSION EDITOR ───────────────────────────────────────────────────────────
+function renderMissionStudentSelector() {
+  const el = document.getElementById('mission-student-selector');
+  if (!STUDENTS.length) { el.innerHTML = '<span style="font-size:12px;color:var(--gray-400)">학생 없음</span>'; return; }
+  el.innerHTML = STUDENTS.map(s => {
+    const hasMissions = (ALL_MISSIONS[s.name] || []).length > 0;
+    const isActive = selectedStudent === s.name;
+    return `<button class="stu-sel-btn ${isActive ? 'active' : ''} ${hasMissions ? 'has-missions' : ''}"
+      onclick="selectMissionStudent('${s.name}')">${s.name}${hasMissions ? ' ✓' : ''}</button>`;
+  }).join('');
+}
+
+function selectMissionStudent(name) {
+  selectedStudent = name;
+  currentMissions = (ALL_MISSIONS[name] || []).map(m => ({...m}));
+  if (currentMissions.length === 0) {
+    currentMissions = getDefaultMissions();
+  }
+  renderMissionStudentSelector();
+  renderMissionEditor();
+}
+
+function getDefaultMissions() {
+  return [
+    { text: '개념 복습', hint: '교재 읽기' },
+    { text: '유형 연습문제', hint: '풀기' },
+    { text: '틀린 문제 다시 풀기', hint: '오답 노트' },
+    { text: '심화 문제', hint: '도전 문제' },
+    { text: '선생님께 질문 정리', hint: '메모해두기' },
+  ];
+}
+
+const PRESETS = [
+  '개념 복습', '유형 연습문제', '틀린 문제 다시 풀기', '심화 문제',
+  '선생님께 질문 정리', '숙제 확인', '교재 읽기', '받아쓰기 연습',
+  '단어 암기', '독해 문제', '서술형 연습', '시험 대비'
+];
+
+function renderMissionEditor() {
+  const body = document.getElementById('mission-editor-body');
+  if (!selectedStudent) {
+    body.innerHTML = '<div class="no-student">학생을 선택하면 미션을 입력할 수 있어요 👆</div>';
+    return;
+  }
+  body.innerHTML = `
+    <div class="selected-student-name">
+      ${selectedStudent}
+      <span class="fire-tag">🔥 오늘의 미션</span>
+      <span style="font-size:12px;color:var(--gray-400);font-weight:400">총 ${currentMissions.length}개</span>
+    </div>
+    <div class="preset-section">
+      <div class="preset-label">빠른 추가</div>
+      <div class="preset-chips">${PRESETS.map(p =>
+        `<button class="preset-chip" onclick="addPreset('${p}')">${p}</button>`
+      ).join('')}</div>
+    </div>
+    <div class="mission-list" id="current-mission-list">
+      ${renderMissionRows()}
+    </div>
+    <div class="add-mission-row">
+      <input class="add-mission-inp" id="new-mission-inp" placeholder="새 미션 직접 입력..."
+             onkeydown="if(event.key==='Enter')addMission()"/>
+      <button class="add-mission-btn" onclick="addMission()">+ 추가</button>
+    </div>
+    <div class="save-bar">
+      <div class="save-hint">💡 저장하면 학생 화면에 즉시 반영돼요</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="save-status"></span>
+        <button class="save-btn" onclick="saveMissions()">저장하기 💾</button>
+      </div>
+    </div>`;
+}
+
+function renderMissionRows() {
+  if (!currentMissions.length) {
+    return '<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">미션을 추가해보세요!</div>';
+  }
+  return currentMissions.map((m, i) => `
+    <div class="mission-row" id="mrow-${i}">
+      <span class="mission-num">${i+1}</span>
+      <input class="mission-text-input" value="${escHtml(m.text)}" placeholder="미션 내용"
+             oninput="currentMissions[${i}].text=this.value"/>
+      <input class="mission-hint-input" value="${escHtml(m.hint||'')}" placeholder="세부 내용 (선택)"
+             oninput="currentMissions[${i}].hint=this.value"/>
+      <button class="mission-del" onclick="delMission(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addPreset(text) {
+  currentMissions.push({ text, hint: '' });
+  refreshMissionList();
+}
+
+function addMission() {
+  const inp = document.getElementById('new-mission-inp');
+  const val = inp?.value.trim();
+  if (!val) return;
+  currentMissions.push({ text: val, hint: '' });
+  inp.value = '';
+  refreshMissionList();
+}
+
+function delMission(i) {
+  currentMissions.splice(i, 1);
+  refreshMissionList();
+}
+
+function refreshMissionList() {
+  const el = document.getElementById('current-mission-list');
+  if (el) el.innerHTML = renderMissionRows();
+  // update count
+  const nameEl = document.querySelector('.selected-student-name span:last-child');
+  if (nameEl) nameEl.textContent = '총 ' + currentMissions.length + '개';
+}
+
+async function saveMissions() {
+  if (!selectedStudent) return;
+  ALL_MISSIONS[selectedStudent] = currentMissions.map(m => ({...m}));
+  const btn = document.querySelector('.save-btn');
+  const statusEl = document.getElementById('save-status');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  const ok = await saveTodayMissions();
+  btn.disabled = false; btn.textContent = '저장하기 💾';
+  if (ok) {
+    statusEl.className = 'save-status ok'; statusEl.textContent = '✓ 저장 완료!';
+    toast('✅ ' + selectedStudent + ' 미션 저장됨!');
+    renderMissionStudentSelector();
+    renderStudentGrid();
+  } else {
+    statusEl.className = 'save-status err'; statusEl.textContent = '⚠️ 저장 실패';
+    toast('⚠️ 저장에 실패했어요');
+  }
+  setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'save-status'; }, 3000);
+}
+
+// ── OVERVIEW ─────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  await loadTodayMissions();
+  const g = document.getElementById('overview-grid');
+  if (!STUDENTS.length) { g.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
+  g.innerHTML = STUDENTS.map(s => {
+    const missions = ALL_MISSIONS[s.name] || [];
+    return `<div class="overview-card">
+      <div class="ov-stu-header">
+        <div class="ov-av">${s.name[0]}</div>
+        <div>
+          <div class="ov-name">${s.name}</div>
+          <div class="ov-pts">🏅 ${s.points}P</div>
+        </div>
+      </div>
+      <div class="ov-missions">
+        ${missions.length ? missions.map(m => `
+          <div class="ov-mission-item">${m.text}
+            ${m.hint ? '<span style="color:var(--gray-400);font-size:10px">(${m.hint})</span>' : ''}
+          </div>`).join('')
+          : '<div class="no-missions-msg">오늘 미션 없음</div>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── LINKS ────────────────────────────────────────────────────────────────────
+function loadLinks() {
+  const el = document.getElementById('link-list');
+  if (!STUDENTS.length) { el.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
+  el.innerHTML = STUDENTS.map(s => {
+    const url = MOGAKGONG_URL + '?name=' + encodeURIComponent(s.name);
+    return `<div class="link-card">
+      <div class="link-stu-name">🔥 ${s.name}</div>
+      <div class="link-url">${url}</div>
+      <button class="link-copy-btn" id="lcb-${s.id}" onclick="copyLink('${s.id}','${encodeURIComponent(url)}','${encodeURIComponent(s.name)}')">
+        📋 복사
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function copyLink(id, encodedUrl, encodedName) {
+  const url = decodeURIComponent(encodedUrl);
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('lcb-' + id);
+    btn.textContent = '✓ 복사됨!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 복사'; btn.classList.remove('copied'); }, 2000);
+    toast('🔗 ' + decodeURIComponent(encodedName) + ' 링크 복사됨!');
+  });
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['missions','overview','students','links'].forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'overview') loadOverview();
+  if (tab === 'students') { loadStudents(); }
+  if (tab === 'links') loadLinks();
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// ── AUTO LOGIN (세션 유지) ────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  const saved = sessionStorage.getItem('mogak_admin_pw');
+  if (saved) { PW = saved; showApp(); }
+});
+</script>
+</body>
+</html>
