@@ -556,32 +556,23 @@ function getDefaultMissions() {
 }
 
 // ── 프리셋 & 최근 입력 관리 ────────────────────────────────────────────────
-// 기본값 버전 (바꾸면 모든 사용자 브라우저에 새 기본값 적용)
-const PRESET_VERSION = 'v5';
-const HARDCODED_DEFAULTS = ['숙제 제출하기', '숙제 오답하기'];
+const DEFAULT_PRESETS = ['숙제 제출하기', '숙제 오답하기'];
 
 function loadCustomPresets() {
   try {
-    const ver = localStorage.getItem('mogak_preset_ver');
-    // 버전이 다르면 기본값으로 초기화
-    if (ver !== PRESET_VERSION) {
-      const savedDefaults = loadDefaultPresets();
-      localStorage.setItem('mogak_presets', JSON.stringify(savedDefaults));
-      localStorage.setItem('mogak_preset_ver', PRESET_VERSION);
-      return [...savedDefaults];
-    }
-    return JSON.parse(localStorage.getItem('mogak_presets') || 'null') || loadDefaultPresets();
-  } catch { return [...HARDCODED_DEFAULTS]; }
+    const saved = localStorage.getItem('mogak_presets');
+    if (saved) return JSON.parse(saved);
+    // 저장된 게 없을 때만 기본값 사용
+    return [...DEFAULT_PRESETS];
+  } catch { return [...DEFAULT_PRESETS]; }
 }
 function saveCustomPresets(arr) {
   localStorage.setItem('mogak_presets', JSON.stringify(arr));
-  localStorage.setItem('mogak_preset_ver', PRESET_VERSION);
 }
-// 저장된 기본값 (선생님이 직접 설정한 기본값)
 function loadDefaultPresets() {
   try {
-    return JSON.parse(localStorage.getItem('mogak_default_presets') || 'null') || [...HARDCODED_DEFAULTS];
-  } catch { return [...HARDCODED_DEFAULTS]; }
+    return JSON.parse(localStorage.getItem('mogak_default_presets') || 'null') || [...DEFAULT_PRESETS];
+  } catch { return [...DEFAULT_PRESETS]; }
 }
 function saveDefaultPresets(arr) {
   localStorage.setItem('mogak_default_presets', JSON.stringify(arr));
@@ -611,7 +602,7 @@ function renderMissionEditor() {
     <div class="recent-section">
       <div class="preset-label">🕐 최근 입력한 미션</div>
       <div class="recent-chips">${recents.map(r =>
-        `<button class="recent-chip" onclick="addPreset(${JSON.stringify(r)})">${r}</button>`
+        `<button class="recent-chip" data-preset="${escHtml(r)}" onclick="addPresetFromChip(this)">${escHtml(r)}</button>`
       ).join('')}</div>
     </div>` : '';
 
@@ -628,7 +619,7 @@ function renderMissionEditor() {
         <button class="preset-edit-btn" id="preset-edit-btn" onclick="togglePresetEditor()">✏️ 편집</button>
       </div>
       <div class="preset-chips" id="preset-chips-wrap">${PRESETS.map(p =>
-        `<button class="preset-chip" onclick="addPreset(${JSON.stringify(p)})">${escHtml(p)}</button>`
+        `<button class="preset-chip" data-preset="${escHtml(p)}" onclick="addPresetFromChip(this)">${escHtml(p)}</button>`
       ).join('')}</div>
 
       <!-- 인라인 편집 영역 -->
@@ -681,10 +672,20 @@ function renderMissionRows() {
     </div>`).join('');
 }
 
+function addPresetFromChip(el) {
+  const text = el.getAttribute('data-preset');
+  if (!text) return;
+  addPreset(text);
+}
+
 function addPreset(text) {
-  currentMissions.push({ text, hint: '' });
-  addRecentMission(text);
+  if (!text || !text.trim()) return;
+  if (!selectedStudent) { toast('⚠️ 먼저 학생을 선택해주세요'); return; }
+  currentMissions.push({ text: text.trim(), hint: '' });
+  addRecentMission(text.trim());
   refreshMissionList();
+  // 시각 피드백
+  toast('✅ ' + text + ' 추가됨');
 }
 
 function addMission() {
@@ -811,7 +812,7 @@ function refreshPresetChips() {
   const wrap = document.getElementById('preset-chips-wrap');
   if (!wrap) return;
   wrap.innerHTML = PRESETS.map(p =>
-    `<button class="preset-chip" onclick="addPreset(${JSON.stringify(p)})">${escHtml(p)}</button>`
+    `<button class="preset-chip" data-preset="${escHtml(p)}" onclick="addPresetFromChip(this)">${escHtml(p)}</button>`
   ).join('');
 }
 
