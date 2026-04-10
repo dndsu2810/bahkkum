@@ -78,11 +78,33 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
 .mission-editor{background:var(--white);border-radius:20px;border:1.5px solid var(--gray-200);overflow:hidden;margin-bottom:20px}
 .editor-head{padding:18px 22px;border-bottom:1.5px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .editor-title{font-size:15px;font-weight:900}
-.student-selector{display:flex;gap:8px;flex-wrap:wrap}
-.stu-sel-btn{font-family:inherit;font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;transition:all .2s}
-.stu-sel-btn.active{background:var(--fire);border-color:var(--fire);color:#fff}
-.stu-sel-btn.has-missions{border-color:var(--green);color:var(--green)}
-.stu-sel-btn.active.has-missions{background:var(--green);border-color:var(--green);color:#fff}
+/* 학생 선택 - 카드형 */
+.student-selector{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;width:100%;padding:16px 0 4px}
+.stu-sel-btn{
+  font-family:inherit;font-size:15px;font-weight:900;
+  padding:14px 8px 12px;border-radius:14px;
+  border:2px solid var(--gray-200);background:var(--white);
+  color:var(--gray-600);cursor:pointer;transition:all .2s;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  position:relative;
+}
+.stu-sel-btn .sel-av{
+  width:40px;height:40px;border-radius:50%;
+  background:var(--gray-100);border:2px solid var(--gray-200);
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:900;color:var(--gray-400);
+  transition:all .2s;
+}
+.stu-sel-btn .sel-status{font-size:10px;font-weight:700;color:var(--gray-400)}
+.stu-sel-btn:hover{border-color:var(--fire-border);background:var(--fire-soft);transform:translateY(-2px)}
+.stu-sel-btn:hover .sel-av{background:var(--fire-soft);border-color:var(--fire-border);color:var(--fire)}
+.stu-sel-btn.active{background:var(--fire-soft);border-color:var(--fire);box-shadow:0 4px 16px rgba(254,95,60,.2)}
+.stu-sel-btn.active .sel-av{background:var(--fire);border-color:var(--fire);color:#fff}
+.stu-sel-btn.active .sel-status{color:var(--fire)}
+.stu-sel-btn.has-missions .sel-av{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.stu-sel-btn.has-missions .sel-status{color:var(--green)}
+.stu-sel-btn.active.has-missions{background:rgba(34,165,90,.08);border-color:var(--green)}
+.stu-sel-btn.active.has-missions .sel-av{background:var(--green);border-color:var(--green);color:#fff}
 .editor-body{padding:22px}
 .no-student{text-align:center;padding:40px;color:var(--gray-400);font-size:14px}
 .selected-student-name{font-size:18px;font-weight:900;margin-bottom:16px;display:flex;align-items:center;gap:8px}
@@ -120,10 +142,67 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
 
 /* ── PRESET MISSIONS ── */
 .preset-section{margin-bottom:16px}
-.preset-label{font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase}
+.preset-label{
+  font-size:11px;font-weight:700;color:var(--gray-400);
+  letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.preset-edit-btn{
+  font-family:inherit;font-size:11px;font-weight:700;
+  padding:3px 10px;border-radius:20px;
+  border:1.5px solid var(--gray-200);background:var(--white);
+  color:var(--gray-400);cursor:pointer;transition:all .2s;
+}
+.preset-edit-btn:hover{border-color:var(--fire-border);color:var(--fire)}
 .preset-chips{display:flex;gap:6px;flex-wrap:wrap}
-.preset-chip{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;transition:all .15s}
+.preset-chip{
+  font-family:inherit;font-size:12px;font-weight:600;
+  padding:5px 12px;border-radius:20px;
+  border:1.5px solid var(--gray-200);background:var(--white);
+  color:var(--gray-600);cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:4px;
+}
 .preset-chip:hover{border-color:var(--fire-border);color:var(--fire);background:var(--fire-soft)}
+.preset-chip .del-chip{
+  font-size:11px;color:var(--gray-400);line-height:1;
+  margin-left:2px;display:none;
+}
+.preset-edit-mode .preset-chip .del-chip{display:inline}
+.preset-chip.editing{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+/* 최근 입력 */
+.recent-section{margin-bottom:14px}
+.recent-chips{display:flex;gap:6px;flex-wrap:wrap}
+.recent-chip{
+  font-family:inherit;font-size:12px;font-weight:600;
+  padding:5px 12px;border-radius:20px;
+  border:1.5px solid rgba(59,130,246,.25);background:rgba(59,130,246,.06);
+  color:var(--blue);cursor:pointer;transition:all .15s;
+}
+.recent-chip:hover{background:var(--blue-soft);border-color:var(--blue)}
+/* 프리셋 편집 모달 */
+.preset-modal{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.45);
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.preset-modal.open{display:flex}
+.preset-modal-box{
+  background:var(--white);border-radius:20px;
+  padding:28px 24px;width:min(460px,96vw);
+  box-shadow:0 24px 60px rgba(0,0,0,.15);
+  max-height:80vh;overflow-y:auto;
+}
+.preset-modal-title{font-size:16px;font-weight:900;margin-bottom:4px}
+.preset-modal-sub{font-size:12px;color:var(--gray-400);margin-bottom:18px}
+.preset-edit-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.preset-edit-row{display:flex;align-items:center;gap:8px}
+.preset-edit-inp{
+  flex:1;border:1.5px solid var(--gray-200);border-radius:10px;
+  padding:8px 12px;font-family:inherit;font-size:13px;outline:none;
+}
+.preset-edit-inp:focus{border-color:var(--fire-border)}
+.preset-add-row{display:flex;gap:8px;margin-bottom:16px}
+.preset-modal-btns{display:flex;gap:8px;justify-content:flex-end}
 
 /* ── OVERVIEW TAB ── */
 .overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
@@ -224,6 +303,9 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
       <div class="mission-editor">
         <div class="editor-head">
           <div class="editor-title">📋 오늘의 미션 입력</div>
+        </div>
+        <div style="padding:0 22px">
+          <div style="font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">학생 선택</div>
           <div class="student-selector" id="mission-student-selector">
             <span style="font-size:12px;color:var(--gray-400)">로딩 중...</span>
           </div>
@@ -447,8 +529,14 @@ function renderMissionStudentSelector() {
   el.innerHTML = STUDENTS.map(s => {
     const hasMissions = (ALL_MISSIONS[s.name] || []).length > 0;
     const isActive = selectedStudent === s.name;
+    const mCount = (ALL_MISSIONS[s.name] || []).length;
+    const statusTxt = hasMissions ? `✅ ${mCount}개` : '미설정';
     return `<button class="stu-sel-btn ${isActive ? 'active' : ''} ${hasMissions ? 'has-missions' : ''}"
-      onclick="selectMissionStudent('${s.name}')">${s.name}${hasMissions ? ' ✓' : ''}</button>`;
+      onclick="selectMissionStudent('${s.name}')">
+      <div class="sel-av">${s.name[0]}</div>
+      <span>${s.name}</span>
+      <span class="sel-status">${statusTxt}</span>
+    </button>`;
   }).join('');
 }
 
@@ -472,28 +560,63 @@ function getDefaultMissions() {
   ];
 }
 
-const PRESETS = [
+// ── 프리셋 & 최근 입력 관리 ────────────────────────────────────────────────
+const DEFAULT_PRESETS = [
   '개념 복습', '유형 연습문제', '틀린 문제 다시 풀기', '심화 문제',
   '선생님께 질문 정리', '숙제 확인', '교재 읽기', '받아쓰기 연습',
   '단어 암기', '독해 문제', '서술형 연습', '시험 대비'
 ];
 
+function loadCustomPresets() {
+  try { return JSON.parse(localStorage.getItem('mogak_presets') || 'null') || [...DEFAULT_PRESETS]; }
+  catch { return [...DEFAULT_PRESETS]; }
+}
+function saveCustomPresets(arr) {
+  localStorage.setItem('mogak_presets', JSON.stringify(arr));
+}
+let PRESETS = loadCustomPresets();
+
+// 최근 입력 (최대 10개)
+function loadRecentMissions() {
+  try { return JSON.parse(localStorage.getItem('mogak_recent') || '[]'); }
+  catch { return []; }
+}
+function addRecentMission(text) {
+  if (!text.trim()) return;
+  let recents = loadRecentMissions();
+  recents = [text, ...recents.filter(r => r !== text)].slice(0, 10);
+  localStorage.setItem('mogak_recent', JSON.stringify(recents));
+}
+
 function renderMissionEditor() {
   const body = document.getElementById('mission-editor-body');
   if (!selectedStudent) {
-    body.innerHTML = '<div class="no-student">학생을 선택하면 미션을 입력할 수 있어요 👆</div>';
+    body.innerHTML = '<div class="no-student">위에서 학생을 선택해주세요 👆</div>';
     return;
   }
+  const recents = loadRecentMissions();
+  const recentHTML = recents.length ? `
+    <div class="recent-section">
+      <div class="preset-label">🕐 최근 입력한 미션</div>
+      <div class="recent-chips">${recents.map(r =>
+        `<button class="recent-chip" onclick="addPreset(${JSON.stringify(r)})">${r}</button>`
+      ).join('')}</div>
+    </div>` : '';
+
   body.innerHTML = `
     <div class="selected-student-name">
       ${selectedStudent}
       <span class="fire-tag">🔥 오늘의 미션</span>
       <span style="font-size:12px;color:var(--gray-400);font-weight:400">총 ${currentMissions.length}개</span>
     </div>
+    ${recentHTML}
     <div class="preset-section">
-      <div class="preset-label">빠른 추가</div>
-      <div class="preset-chips">${PRESETS.map(p =>
-        `<button class="preset-chip" onclick="addPreset('${p}')">${p}</button>`
+      <div class="preset-label">
+        <span>⚡ 빠른 추가</span>
+        <button class="preset-edit-btn" onclick="openPresetModal()">✏️ 편집</button>
+      </div>
+      <div class="preset-chips" id="preset-chips-wrap">${PRESETS.map(p =>
+        `<button class="preset-chip" onclick="addPreset(${JSON.stringify(p)})">${p}</button>`
       ).join('')}</div>
     </div>
     <div class="mission-list" id="current-mission-list">
@@ -530,6 +653,7 @@ function renderMissionRows() {
 
 function addPreset(text) {
   currentMissions.push({ text, hint: '' });
+  addRecentMission(text);
   refreshMissionList();
 }
 
@@ -538,8 +662,54 @@ function addMission() {
   const val = inp?.value.trim();
   if (!val) return;
   currentMissions.push({ text: val, hint: '' });
+  addRecentMission(val);
   inp.value = '';
   refreshMissionList();
+}
+
+// ── 프리셋 편집 모달 ─────────────────────────────────────────────────────────
+function openPresetModal() {
+  renderPresetEditList();
+  document.getElementById('preset-modal').classList.add('open');
+}
+function closePresetModal() {
+  document.getElementById('preset-modal').classList.remove('open');
+}
+function renderPresetEditList() {
+  document.getElementById('preset-edit-list').innerHTML = PRESETS.map((p, i) => `
+    <div class="preset-edit-row">
+      <input class="preset-edit-inp" value="${escHtml(p)}" id="pe-${i}" placeholder="프리셋 이름"/>
+      <button class="btn btn-red btn-xs" onclick="deletePreset(${i})">✕</button>
+    </div>`).join('');
+}
+function deletePreset(i) {
+  PRESETS.splice(i, 1);
+  saveCustomPresets(PRESETS);
+  renderPresetEditList();
+}
+function savePresets() {
+  const inputs = document.querySelectorAll('.preset-edit-inp');
+  PRESETS = Array.from(inputs).map(el => el.value.trim()).filter(Boolean);
+  saveCustomPresets(PRESETS);
+  closePresetModal();
+  // 에디터 새로고침
+  renderMissionEditor();
+  toast('✅ 프리셋 저장됨!');
+}
+function addPresetItem() {
+  const inp = document.getElementById('new-preset-inp');
+  const val = inp?.value.trim();
+  if (!val) return;
+  PRESETS.push(val);
+  saveCustomPresets(PRESETS);
+  renderPresetEditList();
+  inp.value = '';
+}
+function resetPresets() {
+  PRESETS = [...DEFAULT_PRESETS];
+  saveCustomPresets(PRESETS);
+  renderPresetEditList();
+  toast('🔄 기본값으로 초기화됐어요');
 }
 
 function delMission(i) {
@@ -659,5 +829,24 @@ window.addEventListener('load', () => {
   if (saved) { PW = saved; showApp(); }
 });
 </script>
+
+<!-- 프리셋 편집 모달 -->
+<div class="preset-modal" id="preset-modal" onclick="if(event.target===this)closePresetModal()">
+  <div class="preset-modal-box">
+    <div class="preset-modal-title">⚡ 빠른 추가 편집</div>
+    <div class="preset-modal-sub">자주 쓰는 미션을 추가하거나 삭제할 수 있어요</div>
+    <div class="preset-edit-list" id="preset-edit-list"></div>
+    <div class="preset-add-row">
+      <input class="inp" id="new-preset-inp" placeholder="새 프리셋 입력..."
+             onkeydown="if(event.key==='Enter')addPresetItem()" style="flex:1"/>
+      <button class="btn btn-blue btn-sm" onclick="addPresetItem()">+ 추가</button>
+    </div>
+    <div class="preset-modal-btns">
+      <button class="btn btn-gray btn-sm" onclick="resetPresets()">🔄 기본값</button>
+      <button class="btn btn-gray btn-sm" onclick="closePresetModal()">취소</button>
+      <button class="btn btn-blue" onclick="savePresets()">💾 저장</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
