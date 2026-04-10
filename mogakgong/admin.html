@@ -179,30 +179,25 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
   color:var(--blue);cursor:pointer;transition:all .15s;
 }
 .recent-chip:hover{background:var(--blue-soft);border-color:var(--blue)}
-/* 프리셋 편집 모달 */
-.preset-modal{
-  position:fixed;inset:0;z-index:500;
-  background:rgba(0,0,0,.45);
-  display:none;align-items:center;justify-content:center;padding:20px;
+/* 프리셋 인라인 편집 */
+.preset-editor{
+  display:none;
+  background:var(--gray-100);border-radius:14px;
+  padding:14px;margin-top:10px;
+  border:1.5px solid var(--gray-200);
 }
-.preset-modal.open{display:flex}
-.preset-modal-box{
-  background:var(--white);border-radius:20px;
-  padding:28px 24px;width:min(460px,96vw);
-  box-shadow:0 24px 60px rgba(0,0,0,.15);
-  max-height:80vh;overflow-y:auto;
-}
-.preset-modal-title{font-size:16px;font-weight:900;margin-bottom:4px}
-.preset-modal-sub{font-size:12px;color:var(--gray-400);margin-bottom:18px}
-.preset-edit-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
-.preset-edit-row{display:flex;align-items:center;gap:8px}
+.preset-editor.open{display:block}
+.preset-edit-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.preset-edit-row{display:flex;align-items:center;gap:7px}
 .preset-edit-inp{
-  flex:1;border:1.5px solid var(--gray-200);border-radius:10px;
-  padding:8px 12px;font-family:inherit;font-size:13px;outline:none;
+  flex:1;border:1.5px solid var(--gray-200);border-radius:9px;
+  padding:8px 11px;font-family:inherit;font-size:13px;
+  outline:none;background:var(--white);color:var(--gray-800);
+  transition:border-color .2s;
 }
-.preset-edit-inp:focus{border-color:var(--fire-border)}
-.preset-add-row{display:flex;gap:8px;margin-bottom:16px}
-.preset-modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.preset-edit-inp:focus{border-color:var(--fire)}
+.preset-add-row{display:flex;gap:7px;padding-top:10px;border-top:1px solid var(--gray-200)}
+.preset-editor-btns{display:flex;gap:7px;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-200)}
 
 /* ── OVERVIEW TAB ── */
 .overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
@@ -562,9 +557,7 @@ function getDefaultMissions() {
 
 // ── 프리셋 & 최근 입력 관리 ────────────────────────────────────────────────
 const DEFAULT_PRESETS = [
-  '개념 복습', '유형 연습문제', '틀린 문제 다시 풀기', '심화 문제',
-  '선생님께 질문 정리', '숙제 확인', '교재 읽기', '받아쓰기 연습',
-  '단어 암기', '독해 문제', '서술형 연습', '시험 대비'
+  '숙제 제출하기', '숙제 오답하기'
 ];
 
 function loadCustomPresets() {
@@ -613,11 +606,28 @@ function renderMissionEditor() {
     <div class="preset-section">
       <div class="preset-label">
         <span>⚡ 빠른 추가</span>
-        <button class="preset-edit-btn" onclick="openPresetModal()">✏️ 편집</button>
+        <button class="preset-edit-btn" id="preset-edit-btn" onclick="togglePresetEditor()">✏️ 편집</button>
       </div>
       <div class="preset-chips" id="preset-chips-wrap">${PRESETS.map(p =>
-        `<button class="preset-chip" onclick="addPreset(${JSON.stringify(p)})">${p}</button>`
+        `<button class="preset-chip" onclick="addPreset(${JSON.stringify(p)})">${escHtml(p)}</button>`
       ).join('')}</div>
+
+      <!-- 인라인 편집 영역 -->
+      <div class="preset-editor" id="preset-editor">
+        <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px;font-weight:600">
+          항목을 직접 수정하거나 삭제할 수 있어요. 수정 후 바깥 클릭하면 자동 저장돼요.
+        </div>
+        <div class="preset-edit-list" id="preset-edit-list"></div>
+        <div class="preset-add-row">
+          <input class="preset-edit-inp" id="preset-add-inp"
+                 placeholder="새 항목 입력..."
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();addPresetFromEditor();}"/>
+          <button class="btn btn-blue btn-sm" onclick="addPresetFromEditor()">+ 추가</button>
+        </div>
+        <div class="preset-editor-btns">
+          <button class="btn btn-gray btn-sm" onclick="resetPresets()">🔄 기본값</button>
+        </div>
+      </div>
     </div>
     <div class="mission-list" id="current-mission-list">
       ${renderMissionRows()}
@@ -668,87 +678,68 @@ function addMission() {
 }
 
 // ── 프리셋 편집 모달 ─────────────────────────────────────────────────────────
-// ── 프리셋 편집 모달 ─────────────────────────────────────────────────────────
-// 편집 중 임시 배열 (DOM에서 값 읽지 않고 JS 배열로 관리)
-let _editPresets = [];
+// ── 프리셋 인라인 편집 ───────────────────────────────────────────────────────
+let _presetEditorOpen = false;
 
-function openPresetModal() {
-  _editPresets = [...PRESETS];
-  renderPresetEditList();
-  document.getElementById('preset-modal').classList.add('open');
-  setTimeout(() => {
-    const inp = document.getElementById('new-preset-inp');
-    if (inp) inp.value = '';
-  }, 50);
-}
-
-function closePresetModal() {
-  document.getElementById('preset-modal').classList.remove('open');
+function togglePresetEditor() {
+  _presetEditorOpen = !_presetEditorOpen;
+  const editor = document.getElementById('preset-editor');
+  const btn = document.getElementById('preset-edit-btn');
+  if (!editor) return;
+  if (_presetEditorOpen) {
+    editor.classList.add('open');
+    renderPresetEditList();
+    btn.textContent = '✕ 닫기';
+  } else {
+    editor.classList.remove('open');
+    btn.textContent = '✏️ 편집';
+  }
 }
 
 function renderPresetEditList() {
   const el = document.getElementById('preset-edit-list');
   if (!el) return;
-  el.innerHTML = _editPresets.map((p, i) => `
-    <div class="preset-edit-row" id="per-${i}">
-      <span style="flex:1;font-size:13px;font-weight:600;padding:8px 4px;color:var(--gray-800)">${escHtml(p)}</span>
-      <button class="btn btn-gray btn-xs" onclick="editPresetItem(${i})" title="수정">✏️</button>
-      <button class="btn btn-red btn-xs" onclick="deletePresetItem(${i})" title="삭제">✕</button>
-    </div>`).join('') || '<div style="color:var(--gray-400);font-size:13px;text-align:center;padding:12px">프리셋이 없어요</div>';
+  if (!PRESETS.length) {
+    el.innerHTML = '<div style="color:var(--gray-400);font-size:13px;padding:8px 0">항목이 없어요. 아래에서 추가해주세요.</div>';
+    return;
+  }
+  el.innerHTML = PRESETS.map((p, i) => `
+    <div class="preset-edit-row">
+      <input class="preset-edit-inp" value="${escHtml(p)}"
+             onchange="PRESETS[${i}]=this.value.trim();saveCustomPresets(PRESETS);"
+             onblur="if(!this.value.trim()){PRESETS.splice(${i},1);saveCustomPresets(PRESETS);renderPresetEditList();refreshPresetChips();}"/>
+      <button class="btn btn-red btn-xs" onclick="PRESETS.splice(${i},1);saveCustomPresets(PRESETS);renderPresetEditList();refreshPresetChips();">✕</button>
+    </div>`).join('');
 }
 
-function editPresetItem(i) {
-  const row = document.getElementById('per-' + i);
-  if (!row) return;
-  const cur = _editPresets[i];
-  row.innerHTML = `
-    <input id="edit-inp-${i}" class="preset-edit-inp" value="${escHtml(cur)}" style="flex:1"
-           onkeydown="if(event.key==='Enter')confirmEditPreset(${i});if(event.key==='Escape')renderPresetEditList()"/>
-    <button class="btn btn-blue btn-xs" onclick="confirmEditPreset(${i})">확인</button>
-    <button class="btn btn-gray btn-xs" onclick="renderPresetEditList()">취소</button>`;
-  setTimeout(() => {
-    const inp = document.getElementById('edit-inp-' + i);
-    if (inp) { inp.focus(); inp.select(); }
-  }, 30);
-}
-
-function confirmEditPreset(i) {
-  const inp = document.getElementById('edit-inp-' + i);
-  if (!inp) return;
-  const val = inp.value.trim();
-  if (!val) return;
-  _editPresets[i] = val;
-  renderPresetEditList();
-}
-
-function deletePresetItem(i) {
-  _editPresets.splice(i, 1);
-  renderPresetEditList();
-}
-
-function addPresetItem() {
-  const inp = document.getElementById('new-preset-inp');
+function addPresetFromEditor() {
+  const inp = document.getElementById('preset-add-inp');
   if (!inp) return;
   const val = inp.value.trim();
   if (!val) { inp.focus(); return; }
-  _editPresets.push(val);
+  PRESETS.push(val);
+  saveCustomPresets(PRESETS);
   inp.value = '';
   renderPresetEditList();
+  refreshPresetChips();
   inp.focus();
 }
 
-function savePresets() {
-  PRESETS = _editPresets.filter(Boolean);
+function resetPresets() {
+  if (!confirm('기본값(숙제 제출하기, 숙제 오답하기)으로 초기화할까요?')) return;
+  PRESETS = [...DEFAULT_PRESETS];
   saveCustomPresets(PRESETS);
-  closePresetModal();
-  renderMissionEditor();
-  toast('✅ 프리셋 저장됨!');
+  renderPresetEditList();
+  refreshPresetChips();
+  toast('🔄 기본값으로 초기화됐어요');
 }
 
-function resetPresets() {
-  _editPresets = [...DEFAULT_PRESETS];
-  renderPresetEditList();
-  toast('🔄 기본값으로 초기화됐어요');
+function refreshPresetChips() {
+  const wrap = document.getElementById('preset-chips-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = PRESETS.map(p =>
+    `<button class="preset-chip" onclick="addPreset(${JSON.stringify(p)})">${escHtml(p)}</button>`
+  ).join('');
 }
 
 function delMission(i) {
@@ -869,32 +860,6 @@ window.addEventListener('load', () => {
 });
 </script>
 
-<!-- 프리셋 편집 모달 -->
-<div class="preset-modal" id="preset-modal" onclick="if(event.target===this)closePresetModal()">
-  <div class="preset-modal-box">
-    <div class="preset-modal-title">⚡ 빠른 추가 편집</div>
-    <div class="preset-modal-sub">항목을 추가하거나 ✏️ 버튼으로 수정할 수 있어요</div>
-
-    <!-- 현재 프리셋 목록 -->
-    <div class="preset-edit-list" id="preset-edit-list"></div>
-
-    <!-- 새 항목 추가 -->
-    <div style="margin-top:12px;padding-top:12px;border-top:1.5px solid var(--gray-100)">
-      <div style="font-size:11px;font-weight:700;color:var(--gray-400);margin-bottom:8px;letter-spacing:.08em;text-transform:uppercase">새 항목 추가</div>
-      <div class="preset-add-row">
-        <input class="inp" id="new-preset-inp" placeholder="예: 어휘 테스트, 독해 문제..."
-               onkeydown="if(event.key==='Enter')addPresetItem()"
-               style="flex:1;font-size:14px"/>
-        <button class="btn btn-blue btn-sm" onclick="addPresetItem()">+ 추가</button>
-      </div>
-    </div>
-
-    <div class="preset-modal-btns" style="margin-top:16px">
-      <button class="btn btn-gray btn-sm" onclick="resetPresets()">🔄 기본값</button>
-      <button class="btn btn-gray btn-sm" onclick="closePresetModal()">취소</button>
-      <button class="btn btn-blue" onclick="savePresets()">💾 저장하기</button>
-    </div>
-  </div>
-</div>
+<!-- 프리셋 편집: 인라인으로 이동 -->
 </body>
 </html>
