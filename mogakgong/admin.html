@@ -557,7 +557,7 @@ function getDefaultMissions() {
 
 // ── 프리셋 & 최근 입력 관리 ────────────────────────────────────────────────
 // 기본값 버전 (바꾸면 모든 사용자 브라우저에 새 기본값 적용)
-const PRESET_VERSION = 'v3';
+const PRESET_VERSION = 'v5';
 const HARDCODED_DEFAULTS = ['숙제 제출하기', '숙제 오답하기'];
 
 function loadCustomPresets() {
@@ -747,12 +747,57 @@ function addPresetFromEditor() {
 
 function resetPresets() {
   const defaults = loadDefaultPresets();
-  if (!confirm('기본값(' + defaults.join(', ') + ')으로 초기화할까요?')) return;
+  const msg = '기본값(' + defaults.join(', ') + ')으로 되돌릴까요?';
+  if (!confirm(msg)) return;
   PRESETS = [...defaults];
   saveCustomPresets(PRESETS);
   renderPresetEditList();
   refreshPresetChips();
-  toast('🔄 기본값으로 초기화됐어요');
+  toast('🔄 기본값으로 되돌렸어요');
+}
+
+// ── 기본값 직접 편집 ─────────────────────────────────────────────────────────
+let _defEditorOpen = false;
+function toggleDefaultEditor() {
+  _defEditorOpen = !_defEditorOpen;
+  const el = document.getElementById('default-editor-area');
+  const btn = document.getElementById('def-edit-btn');
+  if (!el || !btn) return;
+  el.style.display = _defEditorOpen ? 'block' : 'none';
+  btn.textContent = _defEditorOpen ? '▲ 접기' : '✏️ 기본값 직접 수정';
+  if (_defEditorOpen) renderDefaultList();
+}
+function renderDefaultList() {
+  const el = document.getElementById('default-list');
+  if (!el) return;
+  const defs = loadDefaultPresets();
+  el.innerHTML = defs.length
+    ? defs.map((p, i) => `
+        <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+          <input class="preset-edit-inp" value="${escHtml(p)}" data-di="${i}"
+                 style="flex:1" placeholder="기본값 항목"/>
+          <button class="btn btn-red btn-xs"
+            onclick="(function(){const d=loadDefaultPresets();d.splice(${i},1);saveDefaultPresets(d);renderDefaultList();})()">✕</button>
+        </div>`).join('')
+    : '<div style="color:var(--gray-400);font-size:12px;padding:4px 0">기본값 없음</div>';
+}
+function addDefaultItem() {
+  const inp = document.getElementById('def-add-inp');
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) { inp.focus(); return; }
+  const defs = loadDefaultPresets();
+  defs.push(val);
+  saveDefaultPresets(defs);
+  inp.value = '';
+  renderDefaultList();
+  inp.focus();
+}
+function saveDefaultItems() {
+  const inputs = document.querySelectorAll('#default-list .preset-edit-inp');
+  const vals = Array.from(inputs).map(el => el.value.trim()).filter(Boolean);
+  saveDefaultPresets(vals);
+  toast('✅ 기본값이 저장됐어요!');
 }
 
 function setAsDefault() {
