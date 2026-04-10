@@ -188,6 +188,16 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
 .toast{position:fixed;bottom:24px;right:24px;background:var(--gray-800);color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;z-index:9999;animation:toast-in .3s ease;pointer-events:none}
 @keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
+/* ── 학생 수정 모달 ── */
+.edit-modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+.edit-modal-overlay.open{display:flex}
+.edit-modal{background:var(--white);border-radius:20px;padding:26px 24px;width:min(420px,96vw);box-shadow:0 24px 60px rgba(0,0,0,.18)}
+.edit-modal-title{font-size:17px;font-weight:900;margin-bottom:4px}
+.edit-modal-sub{font-size:12px;color:var(--gray-400);margin-bottom:20px}
+.edit-field{margin-bottom:14px}
+.edit-field label{display:block;font-size:12px;font-weight:700;color:var(--gray-600);margin-bottom:6px}
+.edit-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
 @media(max-width:600px){.main{padding:14px}.hdr{padding:0 14px}.link-card{flex-wrap:wrap}.link-url{flex:100%;order:3}}
 </style>
 </head>
@@ -434,6 +444,7 @@ function renderCatSection(cat) {
       <div class="student-chips">
         ${stuList.map(n => `<div class="stu-chip">
           ${escHtml(n)}
+          <span class="stu-chip-del" style="color:var(--blue);opacity:.7" onclick="openEditStudent('${escHtml(cat)}','${escHtml(n)}')">✏️</span>
           <span class="stu-chip-del" onclick="deleteMogakStudent('${escHtml(cat)}','${escHtml(n)}')">✕</span>
         </div>`).join('')}
         ${!stuList.length ? '<span style="font-size:12px;color:var(--gray-400)">학생 없음</span>' : ''}
@@ -448,6 +459,7 @@ function renderCatSection(cat) {
       <div class="student-chips">
         ${noClass.map(s => `<div class="stu-chip">
           ${escHtml(s.name)}
+          <span class="stu-chip-del" style="color:var(--blue);opacity:.7" onclick="openEditStudent('${escHtml(cat)}','${escHtml(s.name)}')">✏️</span>
           <span class="stu-chip-del" onclick="deleteMogakStudent('${escHtml(cat)}','${escHtml(s.name)}')">✕</span>
         </div>`).join('')}
       </div>
@@ -927,6 +939,127 @@ window.addEventListener('load', () => {
   const saved = sessionStorage.getItem('mogak_admin_pw');
   if (saved) { PW = saved; showApp(); }
 });
+</script>
+
+<!-- 학생 수정 모달 -->
+<div class="edit-modal-overlay" id="edit-student-modal" onclick="if(event.target===this)closeEditStudent()">
+  <div class="edit-modal">
+    <div class="edit-modal-title">✏️ 학생 정보 수정</div>
+    <div class="edit-modal-sub" id="edit-modal-sub"></div>
+
+    <div class="edit-field">
+      <label>이름</label>
+      <input class="inp" id="edit-stu-name" placeholder="학생 이름"/>
+    </div>
+
+    <div class="edit-field">
+      <label>카테고리 (과목)</label>
+      <select class="sel" id="edit-stu-cat" style="width:100%" onchange="updateEditClassOptions()">
+        <option value="초등영어">📘 초등영어</option>
+        <option value="중고등영어">📗 중고등영어</option>
+        <option value="초등수학">📐 초등수학</option>
+        <option value="중고등수학">📏 중고등수학</option>
+      </select>
+    </div>
+
+    <div class="edit-field">
+      <label>클래스 (반)</label>
+      <select class="sel" id="edit-stu-class" style="width:100%">
+        <option value="">클래스 없음</option>
+      </select>
+    </div>
+
+    <div class="edit-modal-btns">
+      <button class="btn btn-gray btn-sm" onclick="closeEditStudent()">취소</button>
+      <button class="btn btn-red btn-sm" onclick="deleteFromEditModal()">🗑️ 삭제</button>
+      <button class="btn btn-blue" onclick="saveEditStudent()">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 학생 수정 모달 ─────────────────────────────────────────────────────────────
+let _editOrigCat = '';
+let _editOrigName = '';
+
+function openEditStudent(cat, name) {
+  _editOrigCat = cat;
+  _editOrigName = name;
+
+  document.getElementById('edit-modal-sub').textContent = name + ' 학생 정보를 수정해요';
+  document.getElementById('edit-stu-name').value = name;
+  document.getElementById('edit-stu-cat').value = cat;
+  updateEditClassOptions(cat);
+
+  // 현재 클래스 찾기
+  const stuObj = (MOGAK_DATA[cat]?.students || []).find(s => s.name === name);
+  if (stuObj) {
+    setTimeout(() => {
+      const sel = document.getElementById('edit-stu-class');
+      if (sel) sel.value = stuObj.class || '';
+    }, 30);
+  }
+
+  document.getElementById('edit-student-modal').classList.add('open');
+}
+
+function updateEditClassOptions(cat) {
+  const selectedCat = cat || document.getElementById('edit-stu-cat').value;
+  const classes = MOGAK_DATA[selectedCat]?.classes || [];
+  const sel = document.getElementById('edit-stu-class');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">클래스 없음</option>' +
+    classes.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+}
+
+function closeEditStudent() {
+  document.getElementById('edit-student-modal').classList.remove('open');
+}
+
+async function saveEditStudent() {
+  const newName = document.getElementById('edit-stu-name').value.trim();
+  const newCat = document.getElementById('edit-stu-cat').value;
+  const newClass = document.getElementById('edit-stu-class').value;
+
+  if (!newName) { toast('⚠️ 이름을 입력해주세요'); return; }
+
+  // 이름 중복 체크 (자신 제외)
+  if (newName !== _editOrigName) {
+    const allNames = [...KIOSK_STUDENTS.map(s=>s.name)];
+    CATS.forEach(c => (MOGAK_DATA[c]?.students||[]).forEach(s => { if(s.name!==_editOrigName) allNames.push(s.name); }));
+    if (allNames.includes(newName)) { toast('⚠️ 이미 있는 이름이에요'); return; }
+  }
+
+  // 기존 카테고리에서 제거
+  if (MOGAK_DATA[_editOrigCat]) {
+    MOGAK_DATA[_editOrigCat].students = MOGAK_DATA[_editOrigCat].students.filter(s => s.name !== _editOrigName);
+  }
+
+  // 미션 이름 변경
+  if (newName !== _editOrigName && ALL_MISSIONS[_editOrigName]) {
+    ALL_MISSIONS[newName] = ALL_MISSIONS[_editOrigName];
+    delete ALL_MISSIONS[_editOrigName];
+  }
+
+  // 새 카테고리에 추가
+  if (!MOGAK_DATA[newCat]) MOGAK_DATA[newCat] = {classes:[], students:[]};
+  MOGAK_DATA[newCat].students.push({ name: newName, class: newClass });
+
+  await saveMogakData();
+  if (newName !== _editOrigName) await saveTodayMissions();
+
+  if (selectedStudent === _editOrigName) selectedStudent = newName;
+
+  closeEditStudent();
+  await loadStudents();
+  toast('✅ ' + newName + ' 수정됐어요!');
+}
+
+async function deleteFromEditModal() {
+  if (!confirm(_editOrigName + ' 학생을 삭제할까요?')) return;
+  await deleteMogakStudent(_editOrigCat, _editOrigName);
+  closeEditStudent();
+}
 </script>
 </body>
 </html>
