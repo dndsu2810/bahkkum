@@ -459,7 +459,7 @@ body{
 <div class="header">
   <div>
     <div style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:3px">오늘의 미션</div>
-    <div class="student-name">김지현 <span>학생</span> 🔥</div>
+    <div class="student-name"><span id="header-name">--</span> <span>학생</span> 🔥</div>
   </div>
   <div class="date-badge" id="today-date"></div>
 </div>
@@ -774,6 +774,11 @@ const PT_BONUS_ALL   = 10;  // 전체 완료 보너스
 // URL 파라미터에서 학생 이름 읽기 (?name=민서준)
 const urlParams = new URLSearchParams(window.location.search);
 const STUDENT_NAME = urlParams.get('name') || '지현';
+// 헤더 이름 즉시 반영
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('header-name');
+  if (el) el.textContent = STUDENT_NAME;
+});
 
 // 키오스크 학생 데이터 (API에서 로드)
 let kioskStudent = null;
