@@ -324,14 +324,41 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
 
     <!-- ── TAB: 학생 현황 ── -->
     <div id="tab-students" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-        <div class="sec-title" style="margin-bottom:0">🎓 학생 포인트 <span>현황</span></div>
-        <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
+
+      <!-- 모각공 전용 학생 관리 -->
+      <div style="background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);padding:18px 20px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="sec-title" style="margin-bottom:3px">🔥 모각공 전용 학생</div>
+            <div style="font-size:12px;color:var(--gray-400)">키오스크와 별개로 모각공에서만 관리되는 학생이에요</div>
+          </div>
+          <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
+        </div>
+        <!-- 추가 입력 -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input class="inp" id="new-mogak-student" placeholder="학생 이름 입력..."
+                 onkeydown="if(event.key==='Enter')addMogakStudent()"
+                 style="flex:1;font-size:14px"/>
+          <button class="btn btn-blue" onclick="addMogakStudent()" style="white-space:nowrap">+ 추가</button>
+        </div>
+        <!-- 모각공 전용 학생 목록 -->
+        <div id="mogak-student-list" style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="color:var(--gray-400);font-size:13px">로딩 중...</span>
+        </div>
+      </div>
+
+      <!-- 키오스크 학생 (읽기 전용) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="sec-title" style="margin-bottom:3px">🖥️ 키오스크 학생 <span>(수학 수업)</span></div>
+          <div style="font-size:12px;color:var(--gray-400)">키오스크에서 관리되는 학생이에요 — 모각공 미션도 설정 가능해요</div>
+        </div>
       </div>
       <div class="student-grid" id="student-grid">
         <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
       </div>
-      <div class="sec-title" style="margin-top:12px">📊 포인트 <span>내역</span></div>
+
+      <div class="sec-title" style="margin-top:20px">📊 포인트 <span>내역</span></div>
       <div style="background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);overflow:hidden">
         <table class="log-table" id="log-table">
           <thead><tr>
@@ -366,7 +393,9 @@ const MOGAKGONG_URL = 'https://mogakgong.pages.dev/index.html';
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let PW = '';
-let STUDENTS = [];
+let KIOSK_STUDENTS = [];   // 키오스크 DB 학생 (수학 수업)
+let MOGAK_STUDENTS = [];   // 모각공 전용 학생 (app_config에 저장)
+let STUDENTS = [];         // 합친 전체 목록 (미션 편집에서 사용)
 let ALL_MISSIONS = {};   // { studentName: [{text, hint}, ...] }
 let selectedStudent = null;
 let currentMissions = [];  // missions for selected student
@@ -414,7 +443,7 @@ function showApp() {
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 async function initApp() {
-  await loadStudents();
+  await loadStudents();      // 키오스크 + 모각공 전용 학생 모두 로드
   await loadTodayMissions();
   renderMissionStudentSelector();
 }
@@ -432,21 +461,102 @@ async function api(path, method='GET', body=null) {
 }
 
 // ── STUDENTS ─────────────────────────────────────────────────────────────────
+// 모각공 전용 학생 로드/저장 (kiosk app_config에 mogak_students 키로 저장)
+async function loadMogakStudents() {
+  try {
+    const res = await fetch(KIOSK + '/api/config');
+    const cfg = await res.json();
+    MOGAK_STUDENTS = cfg.mogak_students || [];
+  } catch { MOGAK_STUDENTS = []; }
+}
+async function saveMogakStudents() {
+  try {
+    const res = await fetch(KIOSK + '/api/config');
+    const cfg = await res.json();
+    cfg.mogak_students = MOGAK_STUDENTS;
+    await api('/api/admin/config', 'POST', cfg);
+  } catch(e) { console.error(e); }
+}
+
 async function loadStudents() {
   try {
+    // 키오스크 학생 로드
     const d = await api('/api/students');
-    if (d.success) {
-      STUDENTS = d.students;
-      renderStudentGrid();
-      renderLogTable();
-    }
-  } catch(e) { console.error(e); }
+    if (d.success) KIOSK_STUDENTS = d.students;
+  } catch(e) { KIOSK_STUDENTS = []; }
+
+  // 모각공 전용 학생 로드
+  await loadMogakStudents();
+
+  // 전체 합치기 (중복 이름 제거 — 키오스크 우선)
+  const kioskNames = new Set(KIOSK_STUDENTS.map(s => s.name));
+  const mogakOnly = MOGAK_STUDENTS.filter(name => !kioskNames.has(name));
+
+  // STUDENTS = 키오스크 + 모각공 전용 (미션 편집용 통합)
+  STUDENTS = [
+    ...KIOSK_STUDENTS,
+    ...mogakOnly.map(name => ({ id: 'mogak_' + name, name, points: null, _mogakOnly: true }))
+  ];
+
+  renderStudentGrid();
+  renderMogakStudentList();
+  renderMissionStudentSelector();
+  renderLogTable();
+}
+
+// 모각공 전용 학생 추가
+async function addMogakStudent() {
+  const inp = document.getElementById('new-mogak-student');
+  if (!inp) return;
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+
+  // 중복 체크
+  const allNames = [...KIOSK_STUDENTS.map(s=>s.name), ...MOGAK_STUDENTS];
+  if (allNames.includes(name)) { toast('⚠️ 이미 있는 학생이에요'); inp.focus(); return; }
+
+  MOGAK_STUDENTS.push(name);
+  await saveMogakStudents();
+  inp.value = '';
+  await loadStudents();
+  toast('✅ ' + name + ' 추가됐어요!');
+}
+
+// 모각공 전용 학생 삭제
+async function deleteMogakStudent(name) {
+  if (!confirm(name + ' 학생을 모각공에서 삭제할까요?')) return;
+  MOGAK_STUDENTS = MOGAK_STUDENTS.filter(n => n !== name);
+  // 해당 학생 미션도 삭제
+  delete ALL_MISSIONS[name];
+  await saveMogakStudents();
+  await saveTodayMissions();
+  await loadStudents();
+  if (selectedStudent === name) { selectedStudent = null; renderMissionEditor(); }
+  toast('🗑️ ' + name + ' 삭제됐어요');
+}
+
+// 모각공 전용 학생 목록 렌더
+function renderMogakStudentList() {
+  const el = document.getElementById('mogak-student-list');
+  if (!el) return;
+  if (!MOGAK_STUDENTS.length) {
+    el.innerHTML = '<span style="color:var(--gray-400);font-size:13px">아직 추가된 학생이 없어요. 위에서 추가해보세요!</span>';
+    return;
+  }
+  el.innerHTML = MOGAK_STUDENTS.map(name => {
+    const mCount = (ALL_MISSIONS[name] || []).length;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px">
+      <span style="font-size:14px;font-weight:700">${escHtml(name)}</span>
+      ${mCount ? `<span style="font-size:11px;font-weight:700;color:var(--green)">✅ ${mCount}개</span>` : '<span style="font-size:11px;color:var(--gray-400)">미설정</span>'}
+      <button class="btn btn-red btn-xs" onclick="deleteMogakStudent('${escHtml(name)}')" style="margin-left:4px">✕</button>
+    </div>`;
+  }).join('');
 }
 
 function renderStudentGrid() {
   const g = document.getElementById('student-grid');
-  if (!STUDENTS.length) { g.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
-  g.innerHTML = STUDENTS.map(s => {
+  if (!KIOSK_STUDENTS.length) { g.innerHTML = '<div style="color:var(--gray-400)">키오스크 학생 없음</div>'; return; }
+  g.innerHTML = KIOSK_STUDENTS.map(s => {
     const mCount = (ALL_MISSIONS[s.name] || []).length;
     return `<div class="stu-card">
       <div class="stu-av">${s.name[0]}</div>
@@ -526,11 +636,12 @@ function renderMissionStudentSelector() {
     const isActive = selectedStudent === s.name;
     const mCount = (ALL_MISSIONS[s.name] || []).length;
     const statusTxt = hasMissions ? `✅ ${mCount}개` : '미설정';
+    const badge = s._mogakOnly ? '🔥' : '🖥️';
     return `<button class="stu-sel-btn ${isActive ? 'active' : ''} ${hasMissions ? 'has-missions' : ''}"
-      onclick="selectMissionStudent('${s.name}')">
+      onclick="selectMissionStudent('${escHtml(s.name)}')">
       <div class="sel-av">${s.name[0]}</div>
-      <span>${s.name}</span>
-      <span class="sel-status">${statusTxt}</span>
+      <span>${escHtml(s.name)}</span>
+      <span class="sel-status">${badge} ${statusTxt}</span>
     </button>`;
   }).join('');
 }
