@@ -1,0 +1,23 @@
+name: 모각공 자동 배포 🔥
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mogakgong/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Cloudflare Pages 배포
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Cloudflare Pages 배포
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy mogakgong --project-name=mogakgong --commit-dirty=true
