@@ -293,7 +293,19 @@ app.post('/api/admin/shop/direct-unlock', async (c) => {
     await c.env.DB.prepare(
       "UPDATE shop_unlock_requests SET status='expired' WHERE status='approved'"
     ).run()
-
+if (mode === 'schedule') {
+      // 시간표 모드: 강제 잠금/오픈 모두 해제 → 시간표가 자동 운영
+      await c.env.DB.prepare(
+        "INSERT INTO app_config (key, value, updated_at) VALUES ('force_lock', '0', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='0', updated_at=CURRENT_TIMESTAMP"
+      ).run()
+      await c.env.DB.prepare(
+        "INSERT INTO app_config (key, value, updated_at) VALUES ('force_open', '0', CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value='0', updated_at=CURRENT_TIMESTAMP"
+      ).run()
+      await c.env.DB.prepare(
+        "UPDATE shop_unlock_requests SET status='expired' WHERE status='approved'"
+      ).run()
+      return c.json({ success: true, mode: 'schedule' })
+    }
     if (mode === 'permanent') {
       // 완전 오픈: force_open=1 저장 (시간 제한 없음)
       await c.env.DB.prepare(
@@ -398,6 +410,55 @@ app.post('/api/admin/shop/schedule', async (c) => {
 
 // ── 상점 잠금해제 Slack 알림 ──────────────────────────────────────────────────
 async function sendShopUnlockSlack(env: Bindings, studentName: string) {
+// 상점 남은 재고 조회 (키오스크용)
+app.get('/api/shop/stock', async (c) => {
+  try {
+    const today = getKSTDate()
+    const monthKey = today.slice(0, 7)
+    const rows = await c.env.DB.prepare(
+      "SELECT item_id, remaining_stock, initial_stock FROM shop_stock WHERE month_key=?"
+    ).bind(monthKey).all()
+    const stock: Record<string, { remaining: number; initial: number }> = {}
+    for (const row of (rows.results as any[])) {
+      stock[row.item_id] = { remaining: Number(row.remaining_stock), initial: Number(row.initial_stock) }
+    }
+    return c.json({ success: true, stock, monthKey })
+  } catch (e: any) {
+    return c.json({ success: false, stock: {}, error: e.message })
+  }
+})
+ 
+// 이번 달 재고 채우기 (관리자용)
+app.post('/api/admin/shop/restock', async (c) => {
+  try {
+    const today = getKSTDate()
+    const monthKey = today.slice(0, 7)
+    const configRow = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='kiosk_config'"
+    ).first() as any
+    if (!configRow?.value) return c.json({ success: false, error: '설정 없음' }, 400)
+    const config = JSON.parse(configRow.value)
+    const shopItems: any[] = config.menu?.shop || []
+    let count = 0
+    for (const item of shopItems) {
+      if ((item.monthlyStock || 0) > 0) {
+        await c.env.DB.prepare(
+          `INSERT INTO shop_stock (item_id, month_key, initial_stock, remaining_stock, updated_at)
+           VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(item_id, month_key) DO UPDATE SET
+           initial_stock = excluded.initial_stock,
+           remaining_stock = excluded.remaining_stock,
+           updated_at = CURRENT_TIMESTAMP`
+        ).bind(item.id, monthKey, item.monthlyStock, item.monthlyStock).run()
+        count++
+      }
+    }
+    return c.json({ success: true, monthKey, itemsRestocked: count })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+ 
 
   if (!env.SLACK_WEBHOOK_URL) return
 
@@ -528,6 +589,43 @@ app.post('/api/submit', async (c) => {
 
     // D1: 학생 찾기
 
+    // 상점 구매 시 한도/재고 체크
+    if (category === 'shop') {
+      const today = getKSTDate()
+      const monthKey = today.slice(0, 7)
+      try {
+        const configRow = await c.env.DB.prepare(
+          "SELECT value FROM app_config WHERE key='kiosk_config'"
+        ).first() as any
+        if (configRow?.value) {
+          const config = JSON.parse(configRow.value)
+          const shopItems: any[] = config.menu?.shop || []
+          for (const item of items) {
+            const menuItem = shopItems.find((s: any) => s.id === item.id)
+            if (!menuItem) continue
+            if ((menuItem.dailyLimit || 0) > 0) {
+              const logRow = await c.env.DB.prepare(
+                "SELECT COALESCE(SUM(qty),0) as total FROM shop_purchase_log WHERE item_id=? AND purchase_date=? AND student_name=?"
+              ).bind(item.id, today, name).first() as any
+              const used = Number(logRow?.total || 0)
+              if (used + item.qty > menuItem.dailyLimit) {
+                return c.json({ success: false, error: `${item.label}: 오늘 구매 한도(하루 ${menuItem.dailyLimit}개)를 초과했어요` }, 400)
+              }
+            }
+            if ((menuItem.monthlyStock || 0) > 0) {
+              const stockRow = await c.env.DB.prepare(
+                "SELECT remaining_stock FROM shop_stock WHERE item_id=? AND month_key=?"
+              ).bind(item.id, monthKey).first() as any
+              if (stockRow !== null && stockRow !== undefined) {
+                if (Number(stockRow.remaining_stock) < item.qty) {
+                  return c.json({ success: false, error: `${item.label}: 이번 달 재고가 부족해요 (남은 수량: ${stockRow.remaining_stock}개)` }, 400)
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
     const stu = await c.env.DB.prepare('SELECT * FROM students WHERE name=?').bind(name).first() as any
 
     if (stu) {
@@ -563,7 +661,21 @@ app.post('/api/submit', async (c) => {
       }
 
     }
-
+ // 상점 구매 로그 기록 (한도 체크 & 재고 차감)
+      if (category === 'shop') {
+        const today = getKSTDate()
+        const monthKey = today.slice(0, 7)
+        for (const item of items) {
+          try {
+            await c.env.DB.prepare(
+              "INSERT INTO shop_purchase_log (item_id, student_id, student_name, qty, purchase_date) VALUES (?,?,?,?,?)"
+            ).bind(item.id || item.label, stu.id, name, item.qty, today).run()
+            await c.env.DB.prepare(
+              "UPDATE shop_stock SET remaining_stock = MAX(0, remaining_stock - ?), updated_at = CURRENT_TIMESTAMP WHERE item_id=? AND month_key=?"
+            ).bind(item.qty, item.id || item.label, monthKey).run()
+          } catch (_) {}
+        }
+      }
 
 
     const [slackR, notionR] = await Promise.allSettled([
@@ -5078,18 +5190,20 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
           <div id="menuShopList"></div>
 
-          <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;">
-
+          <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;align-items:flex-end;">
             <input class="inp" id="nSIc" placeholder="아이콘" style="width:64px;"/>
-
             <input class="inp" id="nSLbl" placeholder="항목명" style="flex:1;min-width:100px;"/>
-
-            <input class="inp" id="nSCost" placeholder="비용" type="number" style="width:80px;"/>
-
-            <input class="inp" id="nSUnit" placeholder="화폐단위" style="width:80px;"/>
-
+            <input class="inp" id="nSCost" placeholder="비용" type="number" style="width:70px;"/>
+            <input class="inp" id="nSUnit" placeholder="화폐단위" style="width:70px;"/>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <input class="inp" id="nSDailyLimit" placeholder="0" type="number" min="0" style="width:60px;" title="하루 구매 한도 (0=무제한)"/>
+              <span style="font-size:10px;color:var(--g400);text-align:center;">일한도</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <input class="inp" id="nSMonthlyStock" placeholder="0" type="number" min="0" style="width:60px;" title="월 재고 (0=무제한)"/>
+              <span style="font-size:10px;color:var(--g400);text-align:center;">월재고</span>
+            </div>
             <button class="btn btn-blue btn-sm" id="addShopBtn">추가</button>
-
           </div>
 
         </div>
@@ -5174,11 +5288,9 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
     </div>
 
-
-
-    <!-- ══ 상점 잠금 탭 ══ -->
+  <!-- ══ 상점 잠금 탭 ══ -->
     <div class="tab-panel" id="tab-shoplock">
-
+ 
       <!-- 승인 요청 목록 -->
       <div class="card">
         <div class="card-head">
@@ -5189,7 +5301,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
           <div id="shopRequestList"><div style="color:var(--g400);text-align:center;padding:16px;">로딩 중...</div></div>
         </div>
       </div>
-
+ 
       <!-- 현재 상태 -->
       <div class="card">
         <div class="card-head">
@@ -5203,14 +5315,18 @@ const ADMIN_HTML = `<!DOCTYPE html>
           </div>
         </div>
       </div>
-
+ 
       <!-- 수업 시간표 설정 -->
       <div class="card">
         <div class="card-head">
           <div class="card-title"><i class="fas fa-calendar-week"></i> 수업 시간표 설정</div>
         </div>
         <div class="card-body">
-          <div style="font-size:12px;color:var(--g500);margin-bottom:10px;">수업 시간 중에는 상점이 자동으로 잠깁니다.</div>
+          <div style="font-size:12px;color:var(--g500);margin-bottom:10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 10px;">
+            <i class="fas fa-info-circle" style="color:#0ea5e9;margin-right:4px;"></i>
+            수업 시간 중에는 상점이 자동으로 잠깁니다.<br>
+            <b>📅 시간표 모드</b>에서만 적용돼요. 강제 잠금/오픈 상태에서는 시간표가 무시됩니다.
+          </div>
           <div id="scheduleSlots"></div>
           <button class="btn btn-blue btn-sm" style="margin-top:8px;" onclick="addScheduleSlot()"><i class="fas fa-plus"></i> 시간대 추가</button>
           <div style="margin-top:14px;display:flex;gap:8px;">
@@ -5218,12 +5334,29 @@ const ADMIN_HTML = `<!DOCTYPE html>
           </div>
         </div>
       </div>
-
+ 
+      <!-- 이번 달 재고 관리 -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><i class="fas fa-box"></i> 이번 달 재고 관리</div>
+          <button class="btn btn-sm btn-green" onclick="doRestock()"><i class="fas fa-rotate"></i> 이번 달 재고 채우기</button>
+        </div>
+        <div class="card-body">
+          <div style="font-size:12px;color:var(--g500);margin-bottom:12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 10px;">
+            <i class="fas fa-info-circle" style="color:#f97316;margin-right:4px;"></i>
+            메뉴설정 → 보상 상점에서 <b>월 재고</b>를 설정한 후,<br>
+            매달 초에 <b>이번 달 재고 채우기</b> 버튼을 눌러주세요.<br>
+            학생들이 구매할 때마다 재고가 자동으로 줄어들어요.
+          </div>
+          <div id="shopStockInfo">
+            <div style="color:var(--g400);font-size:13px;">로딩 중...</div>
+          </div>
+        </div>
+      </div>
+ 
     </div>
 
-
-
-  </div><!-- /content -->
+   
 
 </div><!-- /main-screen -->
 
