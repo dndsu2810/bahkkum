@@ -459,7 +459,7 @@ body{
 <div class="header">
   <div>
     <div style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:3px">오늘의 미션</div>
-    <div class="student-name"><span id="header-name">--</span> <span>학생</span> 🔥</div>
+    <div class="student-name"><span id="header-name">--</span> <span>학생</span> 🔥 <span id="class-badge" style="display:none;font-size:12px;font-weight:700;background:rgba(59,130,246,.15);color:#3B82F6;border-radius:20px;padding:2px 10px;vertical-align:middle;margin-left:4px"></span></div>
   </div>
   <div class="date-badge" id="today-date"></div>
 </div>
@@ -592,6 +592,10 @@ function getTodayKey() {
   const d = new Date();
   return 'mogakgong_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
 }
+function getMissionKey() {
+  // 미션 키: 날짜 안에서 학생 식별 키 (이름_과목)
+  return STUDENT_KEY;
+}
 
 const DEFAULT_MISSIONS = [
   {text:'개념 복습',hint:'교재 읽기'},
@@ -606,7 +610,7 @@ async function loadMissions() {
     const res = await fetch(KIOSK_API + '/api/config');
     const cfg = await res.json();
     const todayKey = getTodayKey();
-    const loaded = cfg[todayKey]?.[STUDENT_NAME];
+    const loaded = cfg[todayKey]?.[getMissionKey()];
     missions = (loaded && loaded.length > 0) ? loaded : DEFAULT_MISSIONS;
   } catch(e) {
     missions = DEFAULT_MISSIONS;
@@ -748,7 +752,9 @@ function updateState(){
       // 오버레이 포인트 정보 업데이트
       const earnedPts = completed.length * PT_PER_MISSION + PT_BONUS_ALL;
       document.getElementById('overlay-points').textContent =
-        result.success
+        result.noKiosk
+          ? '✅ 선생님께 완료 알림이 전송됐어요!'
+          : result.success
           ? '+' + earnedPts + ' 포인트 지급 완료! 🏅'
           : '⚠️ 포인트 연동 실패 (선생님께 말해주세요)';
       setTimeout(()=>document.getElementById('overlay').classList.add('show'),400);
@@ -774,10 +780,18 @@ const PT_BONUS_ALL   = 10;  // 전체 완료 보너스
 // URL 파라미터에서 학생 이름 읽기 (?name=민서준)
 const urlParams = new URLSearchParams(window.location.search);
 const STUDENT_NAME = urlParams.get('name') || '지현';
+const STUDENT_CLASS = urlParams.get('class') || ''; // 수학 | 영어 | ''
+const STUDENT_KEY = STUDENT_NAME + (STUDENT_CLASS ? '_' + STUDENT_CLASS : '');
+
 // 헤더 이름 즉시 반영
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('header-name');
   if (el) el.textContent = STUDENT_NAME;
+  // 과목 배지 표시
+  if (STUDENT_CLASS) {
+    const badge = document.getElementById('class-badge');
+    if (badge) { badge.textContent = STUDENT_CLASS; badge.style.display = 'inline-block'; }
+  }
 });
 
 // 키오스크 학생 데이터 (API에서 로드)
@@ -803,6 +817,8 @@ function updatePointsDisplay(pts) {
 
 // 키오스크에 미션 완료 제출
 async function submitToKiosk(completedMissions) {
+  // 영어반은 키오스크 포인트 연동 안 함
+  if (STUDENT_CLASS === '영어') return { success: true, noKiosk: true };
   if (!kioskStudent) return { success: false, reason: '학생 정보 없음' };
   const totalPts = completedMissions.length * PT_PER_MISSION + PT_BONUS_ALL;
   const items = completedMissions.map(m => ({
@@ -840,7 +856,7 @@ const gDate = new Date();
 const MONTH = gDate.getMonth() + 1;
 const DAY   = gDate.getDate();
 
-const todayKey = 'modak_visited_' + STUDENT_NAME + '_' + gDate.getFullYear() + '_' + MONTH + '_' + DAY;
+const todayKey = 'modak_visited_' + STUDENT_KEY + '_' + gDate.getFullYear() + '_' + MONTH + '_' + DAY;
 const isFirstToday = !localStorage.getItem(todayKey);
 
 const GREET_LINES = isFirstToday

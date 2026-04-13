@@ -398,6 +398,8 @@ let MOGAK_STUDENTS = [];   // 모각공 전용 학생 (app_config에 저장)
 let STUDENTS = [];         // 합친 전체 목록 (미션 편집에서 사용)
 let ALL_MISSIONS = {};   // { studentName: [{text, hint}, ...] }
 let selectedStudent = null;
+let selectedStudentName = null;
+let selectedStudentCls = null;
 let currentMissions = [];  // missions for selected student
 let currentTab = 'missions';
 
@@ -466,7 +468,11 @@ async function loadMogakStudents() {
   try {
     const res = await fetch(KIOSK + '/api/config');
     const cfg = await res.json();
-    MOGAK_STUDENTS = cfg.mogak_students || [];
+    const raw = cfg.mogak_students || [];
+    // 구버전(문자열 배열) → 신버전(객체 배열) 자동 마이그레이션
+    MOGAK_STUDENTS = raw.map(s =>
+      typeof s === 'string' ? {name: s, classes: ['수학']} : s
+    );
   } catch { MOGAK_STUDENTS = []; }
 }
 async function saveMogakStudents() {
@@ -488,15 +494,37 @@ async function loadStudents() {
   // 모각공 전용 학생 로드
   await loadMogakStudents();
 
-  // 전체 합치기 (중복 이름 제거 — 키오스크 우선)
+  // 전체 합치기
   const kioskNames = new Set(KIOSK_STUDENTS.map(s => s.name));
-  const mogakOnly = MOGAK_STUDENTS.filter(name => !kioskNames.has(name));
 
-  // STUDENTS = 키오스크 + 모각공 전용 (미션 편집용 통합)
-  STUDENTS = [
-    ...KIOSK_STUDENTS,
-    ...mogakOnly.map(name => ({ id: 'mogak_' + name, name, points: null, _mogakOnly: true }))
-  ];
+  // 모각공 학생 → 수업별로 펼치기 (수학+영어 모두 수강하면 2개 항목)
+  const mogakEntries = [];
+  MOGAK_STUDENTS.forEach(s => {
+    const classes = (s.classes && s.classes.length) ? s.classes : ['수학'];
+    classes.forEach(cls => {
+      if (!kioskNames.has(s.name) || cls === '영어') {
+        mogakEntries.push({
+          id: 'mogak_' + s.name + '_' + cls,
+          name: s.name,
+          cls,
+          points: null,
+          _mogakOnly: true
+        });
+      }
+    });
+  });
+
+  // 키오스크 학생도 수학/영어 수업 모두 표시
+  const kioskEntries = [];
+  KIOSK_STUDENTS.forEach(s => {
+    const mogakStu = MOGAK_STUDENTS.find(m => m.name === s.name);
+    const classes = mogakStu?.classes || ['수학'];
+    classes.forEach(cls => {
+      kioskEntries.push({...s, cls, id: s.id + '_' + cls});
+    });
+  });
+
+  STUDENTS = [...kioskEntries, ...mogakEntries];
 
   renderStudentGrid();
   renderMogakStudentList();
@@ -515,7 +543,7 @@ async function addMogakStudent() {
   const allNames = [...KIOSK_STUDENTS.map(s=>s.name), ...MOGAK_STUDENTS];
   if (allNames.includes(name)) { toast('⚠️ 이미 있는 학생이에요'); inp.focus(); return; }
 
-  MOGAK_STUDENTS.push(name);
+  MOGAK_STUDENTS.push({ name, classes: ['수학'] });
   await saveMogakStudents();
   inp.value = '';
   await loadStudents();
@@ -525,7 +553,7 @@ async function addMogakStudent() {
 // 모각공 전용 학생 삭제
 async function deleteMogakStudent(name) {
   if (!confirm(name + ' 학생을 모각공에서 삭제할까요?')) return;
-  MOGAK_STUDENTS = MOGAK_STUDENTS.filter(n => n !== name);
+  MOGAK_STUDENTS = MOGAK_STUDENTS.filter(s => (typeof s==='string'?s:s.name) !== name);
   // 해당 학생 미션도 삭제
   delete ALL_MISSIONS[name];
   await saveMogakStudents();
@@ -543,14 +571,37 @@ function renderMogakStudentList() {
     el.innerHTML = '<span style="color:var(--gray-400);font-size:13px">아직 추가된 학생이 없어요. 위에서 추가해보세요!</span>';
     return;
   }
-  el.innerHTML = MOGAK_STUDENTS.map(name => {
-    const mCount = (ALL_MISSIONS[name] || []).length;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px">
-      <span style="font-size:14px;font-weight:700">${escHtml(name)}</span>
-      ${mCount ? `<span style="font-size:11px;font-weight:700;color:var(--green)">✅ ${mCount}개</span>` : '<span style="font-size:11px;color:var(--gray-400)">미설정</span>'}
-      <button class="btn btn-red btn-xs" onclick="deleteMogakStudent('${escHtml(name)}')" style="margin-left:4px">✕</button>
+  el.innerHTML = MOGAK_STUDENTS.map(s => {
+    const name = typeof s === 'string' ? s : s.name;
+    const classes = s.classes || ['수학'];
+    const classBadges = ['수학','영어'].map(cls => {
+      const checked = classes.includes(cls);
+      return `<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:700;cursor:pointer;color:${cls==='수학'?'#16A34A':'#3B82F6'}">
+        <input type="checkbox" ${checked?'checked':''} onchange="toggleStudentClass('${escHtml(name)}','${cls}',this.checked)"
+               style="width:14px;height:14px;accent-color:${cls==='수학'?'#16A34A':'#3B82F6'}"/> ${cls}
+      </label>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px;flex-wrap:wrap">
+      <span style="font-size:14px;font-weight:700;flex:1;min-width:60px">${escHtml(name)}</span>
+      <div style="display:flex;gap:10px">${classBadges}</div>
+      <button class="btn btn-red btn-xs" onclick="deleteMogakStudent('${escHtml(name)}')">✕</button>
     </div>`;
   }).join('');
+}
+
+async function toggleStudentClass(name, cls, checked) {
+  const stu = MOGAK_STUDENTS.find(s => (typeof s === 'string' ? s : s.name) === name);
+  if (!stu) return;
+  if (typeof stu === 'string') return;
+  if (checked) {
+    if (!stu.classes.includes(cls)) stu.classes.push(cls);
+  } else {
+    stu.classes = stu.classes.filter(c => c !== cls);
+    if (!stu.classes.length) stu.classes = ['수학']; // 최소 1개
+  }
+  await saveMogakStudents();
+  await loadStudents();
+  toast('✅ 수업 설정 변경됨');
 }
 
 function renderStudentGrid() {
@@ -632,26 +683,27 @@ function renderMissionStudentSelector() {
   const el = document.getElementById('mission-student-selector');
   if (!STUDENTS.length) { el.innerHTML = '<span style="font-size:12px;color:var(--gray-400)">학생 없음</span>'; return; }
   el.innerHTML = STUDENTS.map(s => {
-    const hasMissions = (ALL_MISSIONS[s.name] || []).length > 0;
-    const isActive = selectedStudent === s.name;
-    const mCount = (ALL_MISSIONS[s.name] || []).length;
+    const mKey = s.name + (s.cls ? '_' + s.cls : '');
+    const hasMissions = (ALL_MISSIONS[mKey] || []).length > 0;
+    const isActive = selectedStudent === mKey;
+    const mCount = (ALL_MISSIONS[mKey] || []).length;
     const statusTxt = hasMissions ? `✅ ${mCount}개` : '미설정';
-    const badge = s._mogakOnly ? '🔥' : '🖥️';
+    const clsBadge = s.cls === '영어' ? '📘' : '📐';
     return `<button class="stu-sel-btn ${isActive ? 'active' : ''} ${hasMissions ? 'has-missions' : ''}"
-      onclick="selectMissionStudent('${escHtml(s.name)}')">
+      onclick="selectMissionStudent('${escHtml(mKey)}','${escHtml(s.name)}','${escHtml(s.cls||'')}')">
       <div class="sel-av">${s.name[0]}</div>
       <span>${escHtml(s.name)}</span>
-      <span class="sel-status">${badge} ${statusTxt}</span>
+      <span class="sel-status">${clsBadge} ${escHtml(s.cls||'수학')} · ${statusTxt}</span>
     </button>`;
   }).join('');
 }
 
-function selectMissionStudent(name) {
-  selectedStudent = name;
-  currentMissions = (ALL_MISSIONS[name] || []).map(m => ({...m}));
-  if (currentMissions.length === 0) {
-    currentMissions = getDefaultMissions();
-  }
+function selectMissionStudent(mKey, name, cls) {
+  selectedStudent = mKey;       // 저장 키 (이름_수업)
+  selectedStudentName = name;   // 표시용 이름
+  selectedStudentCls = cls;     // 수업
+  currentMissions = (ALL_MISSIONS[mKey] || []).map(m => ({...m}));
+  if (currentMissions.length === 0) currentMissions = getDefaultMissions();
   renderMissionStudentSelector();
   renderMissionEditor();
 }
@@ -719,7 +771,8 @@ function renderMissionEditor() {
 
   body.innerHTML = `
     <div class="selected-student-name">
-      ${selectedStudent}
+      ${escHtml(selectedStudentName||selectedStudent)}
+      ${selectedStudentCls ? `<span style="font-size:12px;font-weight:700;background:${selectedStudentCls==='영어'?'rgba(59,130,246,.15)':'rgba(34,165,90,.15)'};color:${selectedStudentCls==='영어'?'#3B82F6':'#16A34A'};border-radius:20px;padding:2px 10px">${selectedStudentCls}</span>` : ''}
       <span class="fire-tag">🔥 오늘의 미션</span>
       <span style="font-size:12px;color:var(--gray-400);font-weight:400">총 ${currentMissions.length}개</span>
     </div>
@@ -966,7 +1019,8 @@ async function loadOverview() {
   const g = document.getElementById('overview-grid');
   if (!STUDENTS.length) { g.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
   g.innerHTML = STUDENTS.map(s => {
-    const missions = ALL_MISSIONS[s.name] || [];
+    const mKey = s.name + (s.cls ? '_' + s.cls : '');
+    const missions = ALL_MISSIONS[mKey] || [];
     return `<div class="overview-card">
       <div class="ov-stu-header">
         <div class="ov-av">${s.name[0]}</div>
@@ -991,11 +1045,14 @@ function loadLinks() {
   const el = document.getElementById('link-list');
   if (!STUDENTS.length) { el.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
   el.innerHTML = STUDENTS.map(s => {
-    const url = MOGAKGONG_URL + '?name=' + encodeURIComponent(s.name);
+    const url = MOGAKGONG_URL + '?name=' + encodeURIComponent(s.name) + (s.cls ? '&class=' + encodeURIComponent(s.cls) : '');
+    const linkId = 'lcb-' + escHtml(String(s.id)) + (s.cls||'');
+    const label = s.name + (s.cls ? ' (' + s.cls + ')' : '');
     return `<div class="link-card">
-      <div class="link-stu-name">🔥 ${s.name}</div>
+      <div class="link-stu-name">🔥 ${escHtml(label)}</div>
       <div class="link-url">${url}</div>
-      <button class="link-copy-btn" id="lcb-${s.id}" onclick="copyLink('${s.id}','${encodeURIComponent(url)}','${encodeURIComponent(s.name)}')">
+      <button class="link-copy-btn" id="${linkId}"
+        onclick="copyLink(${JSON.stringify(linkId)},${JSON.stringify(url)},${JSON.stringify(label)})">
         📋 복사
       </button>
     </div>`;
