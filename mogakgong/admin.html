@@ -322,43 +322,46 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
       </div>
     </div>
 
-    <!-- ── TAB: 학생 현황 ── -->
+    <!-- ── TAB: 학생 관리 ── -->
     <div id="tab-students" style="display:none">
 
-      <!-- 모각공 전용 학생 관리 -->
-      <div style="background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);padding:18px 20px;margin-bottom:20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-          <div>
-            <div class="sec-title" style="margin-bottom:3px">🔥 모각공 전용 학생</div>
-            <div style="font-size:12px;color:var(--gray-400)">키오스크와 별개로 모각공에서만 관리되는 학생이에요</div>
-          </div>
-          <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
-        </div>
-        <!-- 추가 입력 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:15px;font-weight:900">🎓 원생 관리</div>
+        <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
+      </div>
+
+      <!-- 영어 원생 -->
+      <div style="background:var(--white);border-radius:16px;border:1.5px solid rgba(59,130,246,.3);padding:18px 20px;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:900;color:#3B82F6;margin-bottom:12px">📘 영어 원생</div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <input class="inp" id="new-mogak-student" placeholder="학생 이름 입력..."
-                 onkeydown="if(event.key==='Enter')addMogakStudent()"
-                 style="flex:1;font-size:14px"/>
-          <button class="btn btn-blue" onclick="addMogakStudent()" style="white-space:nowrap">+ 추가</button>
+          <input class="inp" id="new-english-student" placeholder="이름 입력..."
+                 onkeydown="if(event.key==='Enter')addStudentByClass('영어')"
+                 style="flex:1"/>
+          <button class="btn" style="background:#3B82F6;color:#fff;white-space:nowrap"
+                  onclick="addStudentByClass('영어')">+ 영어 원생 추가</button>
         </div>
-        <!-- 모각공 전용 학생 목록 -->
-        <div id="mogak-student-list" style="display:flex;flex-wrap:wrap;gap:8px">
+        <div id="english-student-list" style="display:flex;flex-wrap:wrap;gap:8px">
           <span style="color:var(--gray-400);font-size:13px">로딩 중...</span>
         </div>
       </div>
 
-      <!-- 키오스크 학생 (읽기 전용) -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div>
-          <div class="sec-title" style="margin-bottom:3px">🖥️ 키오스크 학생 <span>(수학 수업)</span></div>
-          <div style="font-size:12px;color:var(--gray-400)">키오스크에서 관리되는 학생이에요 — 모각공 미션도 설정 가능해요</div>
+      <!-- 수학 원생 -->
+      <div style="background:var(--white);border-radius:16px;border:1.5px solid rgba(34,165,90,.3);padding:18px 20px;margin-bottom:20px">
+        <div style="font-size:15px;font-weight:900;color:#16A34A;margin-bottom:12px">📐 수학 원생</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input class="inp" id="new-math-student" placeholder="이름 입력..."
+                 onkeydown="if(event.key==='Enter')addStudentByClass('수학')"
+                 style="flex:1"/>
+          <button class="btn" style="background:#16A34A;color:#fff;white-space:nowrap"
+                  onclick="addStudentByClass('수학')">+ 수학 원생 추가</button>
+        </div>
+        <div id="math-student-list" style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="color:var(--gray-400);font-size:13px">로딩 중...</span>
         </div>
       </div>
-      <div class="student-grid" id="student-grid">
-        <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
-      </div>
 
-      <div class="sec-title" style="margin-top:20px">📊 포인트 <span>내역</span></div>
+      <!-- 포인트 내역 (수학 원생만) -->
+      <div style="font-size:15px;font-weight:900;margin-bottom:12px">📊 포인트 내역 <span style="font-size:12px;font-weight:500;color:var(--gray-400)">(수학)</span></div>
       <div style="background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);overflow:hidden">
         <table class="log-table" id="log-table">
           <thead><tr>
@@ -527,27 +530,39 @@ async function loadStudents() {
   STUDENTS = [...kioskEntries, ...mogakEntries];
 
   renderStudentGrid();
-  renderMogakStudentList();
+  renderStudentLists();
   renderMissionStudentSelector();
   renderLogTable();
 }
 
-// 모각공 전용 학생 추가
-async function addMogakStudent() {
-  const inp = document.getElementById('new-mogak-student');
+// 원생 추가 (cls: '수학' | '영어')
+async function addStudentByClass(cls) {
+  const inpId = cls === '영어' ? 'new-english-student' : 'new-math-student';
+  const inp = document.getElementById(inpId);
   if (!inp) return;
   const name = inp.value.trim();
   if (!name) { inp.focus(); return; }
 
-  // 중복 체크
-  const allNames = [...KIOSK_STUDENTS.map(s=>s.name), ...MOGAK_STUDENTS];
-  if (allNames.includes(name)) { toast('⚠️ 이미 있는 학생이에요'); inp.focus(); return; }
+  // 같은 수업 중복 체크
+  const exists = MOGAK_STUDENTS.some(s => {
+    const sName = typeof s === 'string' ? s : s.name;
+    const sClasses = typeof s === 'string' ? ['수학'] : (s.classes || ['수학']);
+    return sName === name && sClasses.includes(cls);
+  });
+  if (exists) { toast('⚠️ 이미 ' + cls + ' 원생으로 등록된 학생이에요'); inp.focus(); return; }
 
-  MOGAK_STUDENTS.push({ name, classes: ['수학'] });
+  // 이미 있는 학생이면 해당 수업만 추가
+  const existing = MOGAK_STUDENTS.find(s => (typeof s === 'string' ? s : s.name) === name);
+  if (existing && typeof existing === 'object') {
+    if (!existing.classes.includes(cls)) existing.classes.push(cls);
+  } else if (!existing) {
+    MOGAK_STUDENTS.push({ name, classes: [cls] });
+  }
+
   await saveMogakStudents();
   inp.value = '';
   await loadStudents();
-  toast('✅ ' + name + ' 추가됐어요!');
+  toast('✅ ' + name + ' (' + cls + ') 추가됐어요!');
 }
 
 // 모각공 전용 학생 삭제
@@ -564,44 +579,65 @@ async function deleteMogakStudent(name) {
 }
 
 // 모각공 전용 학생 목록 렌더
-function renderMogakStudentList() {
-  const el = document.getElementById('mogak-student-list');
+function renderStudentLists() {
+  renderOneClassList('영어', 'english-student-list', '#3B82F6', 'rgba(59,130,246,.1)');
+  renderOneClassList('수학', 'math-student-list', '#16A34A', 'rgba(34,165,90,.08)');
+}
+
+function renderOneClassList(cls, elId, color, bg) {
+  const el = document.getElementById(elId);
   if (!el) return;
-  if (!MOGAK_STUDENTS.length) {
-    el.innerHTML = '<span style="color:var(--gray-400);font-size:13px">아직 추가된 학생이 없어요. 위에서 추가해보세요!</span>';
+
+  // 해당 수업 학생 모으기: 모각공 + 키오스크(수학만)
+  const list = [];
+  MOGAK_STUDENTS.forEach(s => {
+    const name = typeof s === 'string' ? s : s.name;
+    const classes = typeof s === 'string' ? ['수학'] : (s.classes || ['수학']);
+    if (classes.includes(cls)) list.push({ name, source: 'mogak' });
+  });
+  if (cls === '수학') {
+    KIOSK_STUDENTS.forEach(s => {
+      if (!list.some(l => l.name === s.name)) {
+        list.push({ name: s.name, source: 'kiosk', points: s.points });
+      }
+    });
+  }
+
+  if (!list.length) {
+    el.innerHTML = '<span style="color:var(--gray-400);font-size:13px">아직 추가된 원생이 없어요</span>';
     return;
   }
-  el.innerHTML = MOGAK_STUDENTS.map(s => {
-    const name = typeof s === 'string' ? s : s.name;
-    const classes = s.classes || ['수학'];
-    const classBadges = ['수학','영어'].map(cls => {
-      const checked = classes.includes(cls);
-      return `<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:700;cursor:pointer;color:${cls==='수학'?'#16A34A':'#3B82F6'}">
-        <input type="checkbox" ${checked?'checked':''} onchange="toggleStudentClass('${escHtml(name)}','${cls}',this.checked)"
-               style="width:14px;height:14px;accent-color:${cls==='수학'?'#16A34A':'#3B82F6'}"/> ${cls}
-      </label>`;
-    }).join('');
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px;flex-wrap:wrap">
-      <span style="font-size:14px;font-weight:700;flex:1;min-width:60px">${escHtml(name)}</span>
-      <div style="display:flex;gap:10px">${classBadges}</div>
-      <button class="btn btn-red btn-xs" onclick="deleteMogakStudent('${escHtml(name)}')">✕</button>
+
+  el.innerHTML = list.map(s => {
+    const ptsHTML = s.source === 'kiosk'
+      ? `<span style="font-size:11px;color:${color}">🏅${s.points}P</span>` : '';
+    const kioskBadge = s.source === 'kiosk'
+      ? `<span style="font-size:10px;color:${color};background:${bg};border-radius:20px;padding:1px 7px;font-weight:700">키오스크</span>` : '';
+    const delBtn = s.source === 'kiosk' ? '' :
+      `<span style="font-size:12px;color:var(--gray-400);cursor:pointer" onclick="removeMogakStudentClass('${escHtml(s.name)}','${cls}')">✕</span>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 13px;background:${bg};border:1.5px solid ${color}40;border-radius:12px">
+      <span style="font-size:14px;font-weight:700">${escHtml(s.name)}</span>
+      ${kioskBadge}${ptsHTML}${delBtn}
     </div>`;
   }).join('');
 }
 
-async function toggleStudentClass(name, cls, checked) {
-  const stu = MOGAK_STUDENTS.find(s => (typeof s === 'string' ? s : s.name) === name);
-  if (!stu) return;
-  if (typeof stu === 'string') return;
-  if (checked) {
-    if (!stu.classes.includes(cls)) stu.classes.push(cls);
-  } else {
-    stu.classes = stu.classes.filter(c => c !== cls);
-    if (!stu.classes.length) stu.classes = ['수학']; // 최소 1개
+// 특정 수업에서만 제거 (다른 수업은 유지)
+async function removeMogakStudentClass(name, cls) {
+  if (!confirm(name + ' 학생을 ' + cls + ' 원생에서 제거할까요?')) return;
+  const stu = MOGAK_STUDENTS.find(s => (typeof s==='string'?s:s.name) === name);
+  if (!stu || typeof stu === 'string') return;
+  stu.classes = stu.classes.filter(c => c !== cls);
+  if (!stu.classes.length) {
+    // 모든 수업 제거 → 학생 자체 삭제
+    MOGAK_STUDENTS = MOGAK_STUDENTS.filter(s => (typeof s==='string'?s:s.name) !== name);
   }
+  delete ALL_MISSIONS[name + '_' + cls];
   await saveMogakStudents();
+  await saveTodayMissions();
+  if (selectedStudent === name + '_' + cls) { selectedStudent = null; renderMissionEditor(); }
   await loadStudents();
-  toast('✅ 수업 설정 변경됨');
+  toast('🗑️ ' + name + ' (' + cls + ') 제거됨');
 }
 
 function renderStudentGrid() {
