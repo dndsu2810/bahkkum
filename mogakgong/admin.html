@@ -4,854 +4,960 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>모각공 어드민</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
 :root{
-  --fire:#FE5F3C;--fire2:#FF9A2E;--fire-soft:rgba(254,95,60,.1);--fire-border:rgba(254,95,60,.25);
-  --bg:#F7F4F2;--white:#fff;
-  --g100:#F1EDE9;--g200:#E4DDD7;--g400:#A89D95;--g600:#6B5F57;--g800:#2C2018;
-  --green:#22A55A;--gs:rgba(34,165,90,.1);
-  --red:#E84545;--rs:rgba(232,69,69,.1);
-  --blue:#3B82F6;--bs:rgba(59,130,246,.1);
-  --purple:#8B5CF6;--ps:rgba(139,92,246,.1);
-  --orange:#F97316;--os:rgba(249,115,22,.1);
-
-  /* 카테고리 색 */
-  --c-em:#3B82F6;  --c-em-s:rgba(59,130,246,.1);   /* 초등영어 */
-  --c-hm:#8B5CF6;  --c-hm-s:rgba(139,92,246,.1);   /* 중고등영어 */
-  --c-es:#22A55A;  --c-es-s:rgba(34,165,90,.1);    /* 초등수학 */
-  --c-hs:#FE5F3C;  --c-hs-s:rgba(254,95,60,.1);    /* 중고등수학 */
+  --bg:#0C0806;
+  --surface:#161009;
+  --card:#1E1410;
+  --border:rgba(255,255,255,.08);
+  --text:#F5EDE4;
+  --muted:#7A6A5E;
+  --em-c:#60A5FA;   --em-s:rgba(96,165,250,.12);   --em-b:rgba(96,165,250,.25);
+  --hm-c:#A78BFA;   --hm-s:rgba(167,139,250,.12);  --hm-b:rgba(167,139,250,.25);
+  --es-c:#34D399;   --es-s:rgba(52,211,153,.12);   --es-b:rgba(52,211,153,.25);
+  --hs-c:#FB923C;   --hs-s:rgba(251,146,60,.12);   --hs-b:rgba(251,146,60,.25);
+  --red:#F87171;    --rs:rgba(248,113,113,.15);
+  --green:#34D399;  --gs:rgba(52,211,153,.15);
+  --blue:#60A5FA;
+  --r12:12px;--r16:16px;--r20:20px;
 }
-body{background:var(--bg);color:var(--g800);font-family:'Noto Sans KR',sans-serif;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;min-height:100%;overflow-x:hidden}
 
-/* ── LOGIN ── */
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#1A0E08,#2C1810)}
-.login-box{background:var(--white);border-radius:24px;padding:40px 36px;width:min(400px,96vw);text-align:center;box-shadow:0 32px 80px rgba(0,0,0,.25)}
-.login-logo{font-size:48px;margin-bottom:16px}
-.login-title{font-size:22px;font-weight:900;margin-bottom:4px}
-.login-sub{font-size:13px;color:var(--g400);margin-bottom:28px}
-.login-inp{width:100%;border:2px solid var(--g200);border-radius:12px;padding:14px 16px;font-family:inherit;font-size:16px;font-weight:700;outline:none;text-align:center;letter-spacing:6px;transition:border-color .2s}
-.login-inp:focus{border-color:var(--fire)}
-.login-btn{width:100%;margin-top:12px;padding:15px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer}
-.login-err{font-size:13px;color:var(--red);margin-top:10px;display:none}
+/* ─── SCREENS ─────────────────────────────────────────────────────────────── */
+.screen{display:none;min-height:100vh}
+.screen.show{display:flex;flex-direction:column}
+
+/* ─── LOGIN ───────────────────────────────────────────────────────────────── */
+#scr-login{align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(254,95,60,.15),transparent 60%)}
+.login-box{width:min(380px,100%);text-align:center}
+.login-fire{font-size:56px;margin-bottom:12px;display:block}
+.login-title{font-size:26px;font-weight:900;letter-spacing:-.02em;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:32px}
+.login-inp{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r12);
+  padding:16px;font-family:inherit;font-size:18px;font-weight:700;color:var(--text);
+  outline:none;text-align:center;letter-spacing:8px;transition:border-color .2s}
+.login-inp:focus{border-color:rgba(254,95,60,.6)}
+.login-btn{width:100%;margin-top:12px;padding:16px;border-radius:var(--r12);border:none;
+  background:linear-gradient(135deg,#FE5F3C,#FF9A2E);color:#fff;
+  font-family:inherit;font-size:15px;font-weight:900;cursor:pointer;letter-spacing:.04em;
+  box-shadow:0 8px 32px rgba(254,95,60,.4);transition:transform .15s,opacity .15s}
+.login-btn:hover{transform:translateY(-1px);opacity:.92}
+.login-err{font-size:12px;color:var(--red);margin-top:10px;display:none}
 .login-err.show{display:block}
 
-/* ── LAYOUT ── */
-.app{display:none}.app.visible{display:flex;flex-direction:column;min-height:100vh}
-.hdr{background:var(--white);border-bottom:1.5px solid var(--g200);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 1px 8px rgba(0,0,0,.06)}
-.hdr-brand{font-size:17px;font-weight:900}.hdr-brand span{color:var(--fire)}
-.hdr-right{display:flex;align-items:center;gap:8px}
-.hdr-date{font-size:12px;color:var(--g400)}
-.hdr-kiosk{display:flex;align-items:center;gap:4px;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire);font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;text-decoration:none}
-.logout-btn{background:var(--g100);border:1px solid var(--g200);color:var(--g600);font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer}
-.main{flex:1;padding:20px 24px;max-width:1100px;margin:0 auto;width:100%}
+/* ─── CATEGORY SELECT ─────────────────────────────────────────────────────── */
+#scr-cats{align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(ellipse 100% 50% at 50% -10%,rgba(255,255,255,.03),transparent 60%)}
+.cats-header{text-align:center;margin-bottom:36px}
+.cats-title{font-size:22px;font-weight:900;margin-bottom:6px}
+.cats-sub{font-size:13px;color:var(--muted)}
+.cats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;width:min(520px,100%)}
+.cat-card{padding:28px 24px;border-radius:20px;border:1.5px solid;cursor:pointer;
+  transition:transform .2s,box-shadow .2s;position:relative;overflow:hidden;text-align:left}
+.cat-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .2s;border-radius:inherit}
+.cat-card:hover{transform:translateY(-3px)}
+.cat-card:hover::before{opacity:1}
+.cat-card-em{background:var(--em-s);border-color:var(--em-b)}
+.cat-card-em:hover{box-shadow:0 16px 48px rgba(96,165,250,.25)}
+.cat-card-em::before{background:radial-gradient(circle at 80% 20%,rgba(96,165,250,.15),transparent 60%)}
+.cat-card-hm{background:var(--hm-s);border-color:var(--hm-b)}
+.cat-card-hm:hover{box-shadow:0 16px 48px rgba(167,139,250,.25)}
+.cat-card-hm::before{background:radial-gradient(circle at 80% 20%,rgba(167,139,250,.15),transparent 60%)}
+.cat-card-es{background:var(--es-s);border-color:var(--es-b)}
+.cat-card-es:hover{box-shadow:0 16px 48px rgba(52,211,153,.25)}
+.cat-card-es::before{background:radial-gradient(circle at 80% 20%,rgba(52,211,153,.15),transparent 60%)}
+.cat-card-hs{background:var(--hs-s);border-color:var(--hs-b)}
+.cat-card-hs:hover{box-shadow:0 16px 48px rgba(251,146,60,.25)}
+.cat-card-hs::before{background:radial-gradient(circle at 80% 20%,rgba(251,146,60,.15),transparent 60%)}
+.cat-icon{font-size:32px;margin-bottom:12px;display:block}
+.cat-label{font-size:18px;font-weight:900;margin-bottom:4px}
+.cat-desc{font-size:12px;opacity:.6;line-height:1.5}
+.cat-count{font-size:11px;font-weight:700;opacity:.5;margin-top:8px}
+.cats-logout{margin-top:24px;font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit}
+.cats-logout:hover{color:var(--text)}
 
-/* ── MAIN TABS ── */
-.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--white);border-radius:14px;padding:5px;border:1.5px solid var(--g200);width:fit-content;flex-wrap:wrap}
-.tab{font-family:inherit;font-size:13px;font-weight:700;padding:8px 16px;border-radius:10px;border:none;background:transparent;color:var(--g400);cursor:pointer;white-space:nowrap}
-.tab.active{background:var(--fire);color:#fff;box-shadow:0 2px 12px rgba(254,95,60,.3)}
+/* ─── ADMIN ───────────────────────────────────────────────────────────────── */
+#scr-admin{flex-direction:column}
+.admin-hdr{position:sticky;top:0;z-index:50;
+  background:rgba(12,8,6,.85);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.admin-hdr-left{display:flex;align-items:center;gap:12px}
+.back-btn{padding:6px 12px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);font-family:inherit;font-size:12px;
+  font-weight:700;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+.back-btn:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+.cat-badge{display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;
+  font-size:13px;font-weight:900;letter-spacing:.02em}
+.admin-hdr-right{display:flex;align-items:center;gap:8px}
+.hdr-date{font-size:12px;color:var(--muted)}
+.kiosk-link{font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;
+  border:1px solid var(--border);color:var(--muted);text-decoration:none;transition:all .15s}
+.kiosk-link:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
 
-/* ── 카테고리 탭 ── */
-.cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.ct{font-family:inherit;font-size:13px;font-weight:700;padding:7px 16px;border-radius:20px;border:1.5px solid var(--g200);background:var(--white);color:var(--g600);cursor:pointer;transition:all .15s}
-.ct:hover{opacity:.85}
-.ct.active-all{background:var(--g800);border-color:var(--g800);color:#fff}
-.ct.active-초등영어{background:var(--c-em);border-color:var(--c-em);color:#fff}
-.ct.active-중고등영어{background:var(--c-hm);border-color:var(--c-hm);color:#fff}
-.ct.active-초등수학{background:var(--c-es);border-color:var(--c-es);color:#fff}
-.ct.active-중고등수학{background:var(--c-hs);border-color:var(--c-hs);color:#fff}
+/* ─── ADMIN TABS ──────────────────────────────────────────────────────────── */
+.admin-tabs{display:flex;padding:16px 24px 0;gap:2px;border-bottom:1px solid var(--border);overflow-x:auto}
+.atab{font-family:inherit;font-size:13px;font-weight:700;padding:10px 18px;border:none;
+  background:transparent;color:var(--muted);cursor:pointer;border-radius:10px 10px 0 0;
+  white-space:nowrap;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px}
+.atab.active{color:var(--text);border-bottom-color:currentColor}
+.admin-body{flex:1;padding:24px;max-width:1000px;margin:0 auto;width:100%}
 
-/* ── CARD ── */
-.card{background:var(--white);border-radius:16px;border:1.5px solid var(--g200);margin-bottom:14px;overflow:hidden}
-.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1.5px solid var(--g100);gap:10px;flex-wrap:wrap}
-.card-title{font-size:14px;font-weight:900}
-.card-body{padding:16px 18px}
+/* ─── PANELS ──────────────────────────────────────────────────────────────── */
+.panel{display:none}.panel.show{display:block}
 
-/* ── BUTTONS / INPUTS ── */
-.btn{font-family:inherit;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
-.btn-fire{background:var(--fire);color:#fff}.btn-fire:hover{opacity:.9}
-.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{opacity:.9}
-.btn-green{background:var(--green);color:#fff}.btn-green:hover{opacity:.9}
-.btn-red{background:var(--red);color:#fff}.btn-red:hover{opacity:.9}
-.btn-gray{background:var(--g100);color:var(--g600);border:1.5px solid var(--g200)}.btn-gray:hover{background:var(--g200)}
-.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
-.btn-xs{padding:3px 8px;font-size:11px;border-radius:6px}
-.inp{width:100%;border:1.5px solid var(--g200);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:14px;outline:none;background:var(--white);transition:border-color .2s}
-.inp:focus{border-color:var(--fire)}
-.sel{border:1.5px solid var(--g200);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:13px;outline:none;background:var(--white);cursor:pointer}
-.refresh-btn{padding:7px 14px;border-radius:10px;border:1.5px solid var(--g200);background:var(--white);color:var(--g600);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
-.refresh-btn:hover{border-color:var(--fire-border);color:var(--fire)}
+/* ─── CARDS ───────────────────────────────────────────────────────────────── */
+.acard{background:var(--card);border:1px solid var(--border);border-radius:var(--r16);
+  margin-bottom:16px;overflow:hidden}
+.acard-head{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap}
+.acard-title{font-size:14px;font-weight:900}
+.acard-body{padding:16px 18px}
 
-/* ── 학생 셀렉터 (미션 탭) ── */
-.stu-selector{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;padding:4px 0 10px}
-.stu-btn{font-family:inherit;padding:11px 6px 9px;border-radius:12px;border:2px solid var(--g200);background:var(--white);color:var(--g600);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s}
-.stu-btn:hover{border-color:var(--fire-border);background:var(--fire-soft)}
-.stu-btn.active{border-color:var(--fire);background:var(--fire-soft)}
-.stu-btn .av{width:34px;height:34px;border-radius:50%;background:var(--g100);border:2px solid var(--g200);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:var(--g400)}
-.stu-btn.active .av{background:var(--fire);border-color:var(--fire);color:#fff}
-.stu-btn.has-m .av{background:var(--green-soft,rgba(34,165,90,.1));border-color:var(--green);color:var(--green)}
-.stu-btn.active.has-m .av{background:var(--green);border-color:var(--green);color:#fff}
-.stu-btn .sn{font-size:13px;font-weight:900;text-align:center}
-.stu-btn .ss{font-size:10px;font-weight:700;color:var(--g400)}
-.stu-btn.has-m .ss{color:var(--green)}
+/* ─── STUDENT SELECTOR ────────────────────────────────────────────────────── */
+.stu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px;padding:4px 0 12px}
+.sbtn{font-family:inherit;padding:10px 6px 8px;border-radius:12px;
+  border:1.5px solid var(--border);background:var(--surface);color:var(--muted);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s}
+.sbtn:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+.sbtn.active{background:var(--card)}
+.sbtn .av{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.06);
+  border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:900;color:var(--muted);transition:all .15s}
+.sbtn.active .av,.sbtn.has-m .av{font-weight:900}
+.sbtn .sn{font-size:13px;font-weight:700;text-align:center;color:inherit}
+.sbtn .ss{font-size:10px;text-align:center;color:var(--muted)}
+.sbtn.has-m .ss{color:var(--green)}
 
-/* ── MISSION EDITOR ── */
-.ed-wrap{background:var(--white);border-radius:18px;border:1.5px solid var(--g200);overflow:hidden;margin-bottom:20px}
-.ed-head{padding:14px 18px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.ed-title{font-size:14px;font-weight:900}
-.ed-body{padding:18px}
-.no-stu{text-align:center;padding:28px;color:var(--g400);font-size:14px}
-.sel-name{font-size:17px;font-weight:900;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.cat-pill{font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px}
-.mission-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
-.m-row{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--g100);border-radius:9px;border:1.5px solid transparent}
-.m-row:hover{background:var(--white);border-color:var(--g200)}
-.m-num{font-size:10px;font-weight:900;color:var(--g400);width:18px;text-align:center;flex-shrink:0}
-.m-text{flex:2;border:none;background:transparent;font-family:inherit;font-size:14px;font-weight:600;color:var(--g800);outline:none;min-width:60px}
-.m-hint{flex:1;border:1px solid var(--g200);border-radius:7px;padding:5px 8px;font-family:inherit;font-size:12px;color:var(--g600);outline:none;background:var(--white);min-width:50px}
-.m-hint:focus{border-color:var(--fire-border)}
-.m-del{width:24px;height:24px;border-radius:6px;border:none;background:var(--rs);color:var(--red);font-size:12px;cursor:pointer;flex-shrink:0}
+/* ─── MISSION EDITOR ──────────────────────────────────────────────────────── */
+.sel-stu-name{font-size:18px;font-weight:900;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.m-list{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.mrow{display:flex;align-items:center;gap:8px;padding:9px 10px;
+  background:rgba(255,255,255,.03);border-radius:9px;border:1px solid transparent;transition:border-color .15s}
+.mrow:hover{border-color:var(--border)}
+.m-num{font-size:10px;font-weight:900;color:var(--muted);width:18px;text-align:center;flex-shrink:0}
+.m-text{flex:2;border:none;background:transparent;font-family:inherit;font-size:14px;
+  font-weight:600;color:var(--text);outline:none;min-width:60px}
+.m-hint{flex:1;border:1px solid var(--border);border-radius:7px;padding:5px 8px;
+  font-family:inherit;font-size:12px;color:var(--muted);outline:none;
+  background:rgba(255,255,255,.04);min-width:50px}
+.m-hint:focus{border-color:rgba(255,255,255,.2)}
+.m-del{width:24px;height:24px;border-radius:6px;border:none;
+  background:var(--rs);color:var(--red);font-size:12px;cursor:pointer;flex-shrink:0}
 .add-row{display:flex;gap:8px}
-.add-inp{flex:1;border:2px dashed var(--g200);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:14px;outline:none;background:var(--white);transition:border-color .2s}
-.add-inp:focus{border-color:var(--fire-border)}
-.add-btn{padding:9px 14px;border-radius:9px;border:none;background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
-.add-btn:hover{background:var(--fire);color:#fff}
-.save-bar{display:flex;align-items:center;justify-content:space-between;padding:11px 18px;background:var(--g100);border-top:1.5px solid var(--g200);gap:10px;flex-wrap:wrap;margin:0 -18px -18px}
-.save-hint{font-size:12px;color:var(--g400)}
-.save-btn{padding:9px 20px;border-radius:11px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:14px;font-weight:900;cursor:pointer}
-.save-btn:disabled{opacity:.5;cursor:not-allowed}
+.add-inp{flex:1;border:1.5px dashed var(--border);border-radius:9px;padding:9px 12px;
+  font-family:inherit;font-size:14px;outline:none;background:transparent;
+  color:var(--text);transition:border-color .2s}
+.add-inp:focus{border-color:rgba(255,255,255,.2)}
+.add-inp::placeholder{color:var(--muted)}
+.add-btn{padding:9px 14px;border-radius:9px;border:none;
+  background:rgba(255,255,255,.08);color:var(--text);font-family:inherit;
+  font-size:13px;font-weight:700;cursor:pointer;transition:background .15s}
+.add-btn:hover{background:rgba(255,255,255,.14)}
+.save-bar{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;background:rgba(255,255,255,.03);
+  border-top:1px solid var(--border);gap:10px;flex-wrap:wrap;
+  margin:16px -18px -18px}
+.save-hint{font-size:12px;color:var(--muted)}
+.save-btn{padding:10px 22px;border-radius:10px;border:none;
+  color:#fff;font-family:inherit;font-size:14px;font-weight:900;cursor:pointer;
+  transition:opacity .15s}
+.save-btn:disabled{opacity:.4;cursor:not-allowed}
 .save-st{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px}
 .save-st.ok{background:var(--gs);color:var(--green)}
 .save-st.err{background:var(--rs);color:var(--red)}
 
-/* ── 프리셋 ── */
-.pre-sec{margin-bottom:12px}
-.pre-label{font-size:11px;font-weight:700;color:var(--g400);letter-spacing:.08em;margin-bottom:7px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
-.pre-edit-btn{font-family:inherit;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;border:1.5px solid var(--g200);background:var(--white);color:var(--g400);cursor:pointer}
-.pre-chips{display:flex;gap:5px;flex-wrap:wrap}
-.pre-chip{font-family:inherit;font-size:12px;font-weight:600;padding:4px 11px;border-radius:20px;border:1.5px solid var(--g200);background:var(--white);color:var(--g600);cursor:pointer}
-.pre-chip:hover{border-color:var(--fire-border);color:var(--fire);background:var(--fire-soft)}
-.rec-chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
-.rec-chip{font-family:inherit;font-size:12px;font-weight:600;padding:4px 11px;border-radius:20px;border:1.5px solid rgba(59,130,246,.25);background:rgba(59,130,246,.06);color:var(--blue);cursor:pointer}
-.pre-editor{display:none;background:var(--g100);border-radius:11px;padding:12px;margin-top:7px;border:1.5px solid var(--g200)}
+/* ─── PRESETS ─────────────────────────────────────────────────────────────── */
+.pre-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between}
+.pre-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.pchip{font-family:inherit;font-size:12px;font-weight:600;padding:5px 11px;border-radius:20px;
+  border:1px solid var(--border);background:rgba(255,255,255,.04);
+  color:var(--muted);cursor:pointer;transition:all .15s}
+.pchip:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+.rchip{font-family:inherit;font-size:12px;font-weight:600;padding:5px 11px;border-radius:20px;
+  border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.08);
+  color:var(--blue);cursor:pointer}
+.pre-editor{display:none;background:rgba(255,255,255,.03);border-radius:11px;
+  padding:12px;margin-top:8px;border:1px solid var(--border)}
 .pre-editor.open{display:block}
-.pe-list{display:flex;flex-direction:column;gap:6px;margin-bottom:9px}
+.pe-list{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
 .pe-row{display:flex;align-items:center;gap:6px}
-.pe-inp{flex:1;border:1.5px solid var(--g200);border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;outline:none;background:var(--white)}
-.pe-inp:focus{border-color:var(--fire)}
-.pe-add-row{display:flex;gap:6px;padding-top:8px;border-top:1px solid var(--g200)}
+.pe-inp{flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 10px;
+  font-family:inherit;font-size:13px;outline:none;background:rgba(255,255,255,.05);color:var(--text)}
+.pe-inp:focus{border-color:rgba(255,255,255,.2)}
+.pe-add{display:flex;gap:6px;padding-top:8px;border-top:1px solid var(--border)}
 
-/* ── 학생 관리 카드 ── */
-.stu-chip-wrap{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
-.stu-chip{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;font-size:13px;font-weight:700}
-.stu-chip-del{font-size:12px;color:var(--g400);cursor:pointer;line-height:1}
-.stu-chip-del:hover{color:var(--red)}
+/* ─── STUDENT MANAGEMENT ──────────────────────────────────────────────────── */
+.stu-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;
+  border-radius:20px;font-size:13px;font-weight:700;margin:3px;
+  border:1px solid var(--border);background:rgba(255,255,255,.05)}
+.stu-chip-x{font-size:12px;color:var(--muted);cursor:pointer;line-height:1;transition:color .15s}
+.stu-chip-x:hover{color:var(--red)}
+.stu-chip-edit{font-size:12px;color:var(--muted);cursor:pointer;line-height:1;transition:color .15s}
+.stu-chip-edit:hover{color:var(--blue)}
+.add-stu-row{display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border);margin-top:8px}
 
-/* ── OVERVIEW ── */
-.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.ov-card{background:var(--white);border-radius:14px;border:1.5px solid var(--g200);padding:15px}
+/* ─── OVERVIEW ────────────────────────────────────────────────────────────── */
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.ov-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
 .ov-head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
-.ov-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0}
+.ov-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:900;flex-shrink:0}
 .ov-name{font-size:13px;font-weight:900}
-.ov-sub{font-size:11px;color:var(--g400);margin-top:1px}
-.ov-m-list{display:flex;flex-direction:column;gap:3px}
-.ov-m-item{font-size:12px;color:var(--g600);display:flex;align-items:flex-start;gap:5px}
-.ov-m-item::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--g200);flex-shrink:0;margin-top:6px}
-.ov-m-hint{font-size:11px;color:var(--g400)}
-.ov-empty{font-size:11px;color:var(--g400);text-align:center;padding:8px 0}
+.ov-pts{font-size:11px;color:var(--muted);margin-top:2px}
+.ov-ms{display:flex;flex-direction:column;gap:4px}
+.ov-m{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:rgba(255,255,255,.6)}
+.ov-m::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.2);flex-shrink:0;margin-top:5px}
+.ov-mhint{font-size:11px;color:var(--muted)}
+.ov-empty{font-size:12px;color:var(--muted);text-align:center;padding:10px 0}
 
-/* ── LINK ── */
-.link-card{background:var(--white);border:1.5px solid var(--g200);border-radius:13px;padding:13px 16px;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+/* ─── LINKS ───────────────────────────────────────────────────────────────── */
+.link-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:12px 16px;margin-bottom:7px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .link-name{font-size:13px;font-weight:900;min-width:80px}
-.link-sub{font-size:11px;color:var(--g400);margin-top:1px}
-.link-url{font-size:11px;color:var(--g400);background:var(--g100);border-radius:7px;padding:6px 10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace}
-.link-copy{padding:7px 13px;border-radius:9px;border:1.5px solid var(--fire-border);background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
-.link-copy.copied{background:var(--gs);border-color:var(--green);color:var(--green)}
+.link-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.link-url{font-size:11px;color:var(--muted);background:rgba(255,255,255,.04);
+  border-radius:7px;padding:6px 10px;flex:1;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;font-family:monospace;min-width:0}
+.link-copy{padding:7px 13px;border-radius:8px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);font-family:inherit;
+  font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;transition:all .15s}
+.link-copy:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+.link-copy.copied{border-color:var(--green);color:var(--green)}
 
-/* ── LOG TABLE ── */
-.log-table{width:100%;border-collapse:collapse}
-.log-table th{text-align:left;font-size:11px;font-weight:700;color:var(--g400);padding:8px 12px;border-bottom:1.5px solid var(--g200);text-transform:uppercase}
-.log-table td{padding:10px 12px;border-bottom:1px solid var(--g100);font-size:13px}
-.log-table tr:last-child td{border-bottom:none}
-.log-pos{color:var(--green);font-weight:700}
-.log-neg{color:var(--red);font-weight:700}
-.log-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
-.log-badge.learn{background:var(--gs);color:var(--green)}
-.log-badge.fine{background:var(--rs);color:var(--red)}
-.log-badge.shop{background:var(--bs);color:var(--blue)}
-.log-badge.admin{background:var(--g100);color:var(--g600)}
+/* ─── LOG TABLE ───────────────────────────────────────────────────────────── */
+.ltable{width:100%;border-collapse:collapse}
+.ltable th{text-align:left;font-size:11px;font-weight:700;color:var(--muted);
+  padding:8px 12px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.05em}
+.ltable td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px}
+.ltable tr:last-child td{border-bottom:none}
+.lpos{color:var(--green);font-weight:700}.lneg{color:var(--red);font-weight:700}
+.lbadge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.lbadge.learn{background:var(--gs);color:var(--green)}
+.lbadge.fine{background:var(--rs);color:var(--red)}
+.lbadge.shop{background:rgba(96,165,250,.15);color:var(--blue)}
+.lbadge.admin{background:rgba(255,255,255,.08);color:var(--muted)}
 
-/* ── 카테고리 컬러 헬퍼 ── */
-.cat-초등영어{--cc:var(--c-em);--cs:var(--c-em-s)}
-.cat-중고등영어{--cc:var(--c-hm);--cs:var(--c-hm-s)}
-.cat-초등수학{--cc:var(--c-es);--cs:var(--c-es-s)}
-.cat-중고등수학{--cc:var(--c-hs);--cs:var(--c-hs-s)}
-
-/* ── TOAST ── */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--g800);color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;z-index:9999;animation:ti .3s ease;pointer-events:none}
-@keyframes ti{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-
-/* ── 모달 ── */
-.modal-ov{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+/* ─── MODAL ───────────────────────────────────────────────────────────────── */
+.modal-ov{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);
+  backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px}
 .modal-ov.open{display:flex}
-.modal-box{background:var(--white);border-radius:20px;padding:24px;width:min(420px,96vw);box-shadow:0 24px 60px rgba(0,0,0,.18)}
-.modal-title{font-size:16px;font-weight:900;margin-bottom:16px}
-.modal-field{margin-bottom:12px}
-.modal-field label{display:block;font-size:12px;font-weight:700;color:var(--g600);margin-bottom:5px}
-.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.mbox{background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:24px;width:min(400px,96vw)}
+.mbox-title{font-size:15px;font-weight:900;margin-bottom:16px}
+.mfield{margin-bottom:12px}
+.mfield label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}
+.minp{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:9px;padding:9px 12px;font-family:inherit;font-size:14px;
+  color:var(--text);outline:none;transition:border-color .2s}
+.minp:focus{border-color:rgba(255,255,255,.25)}
+.msel{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:9px;padding:9px 12px;font-family:inherit;font-size:13px;
+  color:var(--text);outline:none;cursor:pointer}
+.msel option{background:#1E1410;color:var(--text)}
+.mbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 
-@media(max-width:600px){.main{padding:14px}.hdr{padding:0 14px}.link-card{flex-wrap:wrap}.link-url{flex:100%;order:3}}
+/* ─── BUTTONS ─────────────────────────────────────────────────────────────── */
+.btn{font-family:inherit;font-size:13px;font-weight:700;padding:8px 14px;
+  border-radius:9px;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{color:#fff}.btn-primary:hover{opacity:.88}
+.btn-ghost{background:rgba(255,255,255,.08);color:var(--text)}.btn-ghost:hover{background:rgba(255,255,255,.14)}
+.btn-danger{background:var(--rs);color:var(--red)}.btn-danger:hover{background:rgba(248,113,113,.25)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-xs{padding:3px 8px;font-size:11px;border-radius:6px}
+.iinp{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:9px;padding:9px 12px;font-family:inherit;font-size:14px;
+  color:var(--text);outline:none;transition:border-color .2s}
+.iinp:focus{border-color:rgba(255,255,255,.25)}
+.iinp::placeholder{color:var(--muted)}
+.isel{background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:9px;padding:9px 12px;font-family:inherit;font-size:13px;
+  color:var(--text);outline:none;cursor:pointer}
+
+/* ─── SECTION TITLE ───────────────────────────────────────────────────────── */
+.sec{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:10px;margin-top:20px}
+.sec:first-child{margin-top:0}
+
+/* ─── MISC ────────────────────────────────────────────────────────────────── */
+.no-stu{text-align:center;padding:28px;color:var(--muted);font-size:14px}
+.empty{text-align:center;padding:28px;color:var(--muted);font-size:13px}
+.rbtn{padding:6px 12px;border-radius:8px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.rbtn:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+
+/* ─── TOAST ───────────────────────────────────────────────────────────────── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--card);border:1px solid var(--border);color:var(--text);
+  padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;
+  z-index:9999;animation:tsin .3s ease;pointer-events:none;white-space:nowrap}
+@keyframes tsin{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+@media(max-width:600px){
+  .admin-body{padding:14px}
+  .cats-grid{grid-template-columns:1fr 1fr}
+  .cat-card{padding:20px 16px}
+  .link-card .link-url{order:3;flex:100%}
+}
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
-<div class="login-wrap" id="login-wrap">
+<!-- ═══ LOGIN ════════════════════════════════════════════════════════════════ -->
+<div class="screen show" id="scr-login">
   <div class="login-box">
-    <div class="login-logo">🔥</div>
-    <div class="login-title">모각공 어드민</div>
-    <div class="login-sub">선생님 전용 관리 화면이에요</div>
-    <input class="login-inp" type="password" id="pw-inp" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <span class="login-fire">🔥</span>
+    <div class="login-title">모각공</div>
+    <div class="login-sub">선생님 전용 어드민 페이지예요</div>
+    <input class="login-inp" type="password" id="pw-inp" placeholder="••••••"
+           onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="login-btn" onclick="doLogin()">로그인</button>
     <div class="login-err" id="login-err">비밀번호가 틀렸어요</div>
   </div>
 </div>
 
-<!-- APP -->
-<div class="app" id="app">
-  <header class="hdr">
-    <div class="hdr-brand">🔥 모각공 <span>어드민</span></div>
-    <div class="hdr-right">
+<!-- ═══ CATEGORY SELECT ══════════════════════════════════════════════════════ -->
+<div class="screen" id="scr-cats">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px">
+    <div class="cats-header">
+      <div class="cats-title">어떤 수업을 관리할까요?</div>
+      <div class="cats-sub">수업을 선택하면 해당 수업 전용 화면이 열려요</div>
+    </div>
+    <div class="cats-grid">
+      <div class="cat-card cat-card-em" onclick="enterCat('초등영어')">
+        <span class="cat-icon">📘</span>
+        <div class="cat-label" style="color:var(--em-c)">초등 영어</div>
+        <div class="cat-desc">미션 체크 중심<br>포인트 없음</div>
+        <div class="cat-count" id="cnt-초등영어">원생 0명</div>
+      </div>
+      <div class="cat-card cat-card-hm" onclick="enterCat('중고등영어')">
+        <span class="cat-icon">📗</span>
+        <div class="cat-label" style="color:var(--hm-c)">중고등 영어</div>
+        <div class="cat-desc">미션 체크 중심<br>포인트 없음</div>
+        <div class="cat-count" id="cnt-중고등영어">원생 0명</div>
+      </div>
+      <div class="cat-card cat-card-es" onclick="enterCat('초등수학')">
+        <span class="cat-icon">📐</span>
+        <div class="cat-label" style="color:var(--es-c)">초등 수학</div>
+        <div class="cat-desc">키오스크 연동<br>포인트 적립</div>
+        <div class="cat-count" id="cnt-초등수학">원생 0명</div>
+      </div>
+      <div class="cat-card cat-card-hs" onclick="enterCat('중고등수학')">
+        <span class="cat-icon">📏</span>
+        <div class="cat-label" style="color:var(--hs-c)">중고등 수학</div>
+        <div class="cat-desc">키오스크 연동<br>포인트 적립</div>
+        <div class="cat-count" id="cnt-중고등수학">원생 0명</div>
+      </div>
+    </div>
+    <button class="cats-logout" onclick="doLogout()">로그아웃</button>
+  </div>
+</div>
+
+<!-- ═══ ADMIN ════════════════════════════════════════════════════════════════ -->
+<div class="screen" id="scr-admin">
+  <header class="admin-hdr">
+    <div class="admin-hdr-left">
+      <button class="back-btn" onclick="goBack()">← 수업 선택</button>
+      <div class="cat-badge" id="cat-badge"></div>
+    </div>
+    <div class="admin-hdr-right">
       <span class="hdr-date" id="hdr-date"></span>
-      <a class="hdr-kiosk" href="https://bakuum-kiosk.pages.dev" target="_blank">🖥️ 키오스크</a>
-      <button class="logout-btn" onclick="doLogout()">로그아웃</button>
+      <a class="kiosk-link" href="https://bakuum-kiosk.pages.dev" target="_blank">🖥️ 키오스크</a>
     </div>
   </header>
 
-  <main class="main">
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('missions',this)">📋 미션 입력</button>
-      <button class="tab" onclick="switchTab('overview',this)">👀 현황 보기</button>
-      <button class="tab" onclick="switchTab('students',this)">🎓 원생 관리</button>
-      <button class="tab" onclick="switchTab('links',this)">🔗 링크 생성</button>
-    </div>
+  <div class="admin-tabs">
+    <button class="atab active" onclick="switchTab('missions',this)">📋 미션 입력</button>
+    <button class="atab" onclick="switchTab('overview',this)">👀 현황 보기</button>
+    <button class="atab" onclick="switchTab('students',this)">🎓 원생 관리</button>
+    <button class="atab" onclick="switchTab('links',this)">🔗 링크 생성</button>
+    <button class="atab" id="tab-log-btn" onclick="switchTab('log',this)">📊 포인트 내역</button>
+  </div>
 
-    <!-- ── 미션 입력 ── -->
-    <div id="tab-missions">
-      <div class="ed-wrap">
-        <div class="ed-head">
-          <div class="ed-title">📋 오늘의 미션 입력</div>
+  <div class="admin-body">
+
+    <!-- 미션 입력 -->
+    <div class="panel show" id="panel-missions">
+      <div class="acard">
+        <div class="acard-head">
+          <div class="acard-title">📋 오늘의 미션 입력</div>
         </div>
-        <div style="padding:0 18px">
-          <div class="cat-tabs" id="mission-cat-tabs"></div>
-          <div class="stu-selector" id="mission-stu-sel">
-            <span style="font-size:12px;color:var(--g400)">로딩 중...</span>
-          </div>
+        <div style="padding:12px 18px 0">
+          <div class="stu-grid" id="stu-sel"></div>
         </div>
-        <div class="ed-body" id="ed-body">
-          <div class="no-stu">위에서 카테고리와 학생을 선택해주세요 👆</div>
+        <div class="acard-body" id="ed-body">
+          <div class="no-stu">위에서 학생을 선택해주세요 👆</div>
         </div>
       </div>
     </div>
 
-    <!-- ── 현황 보기 ── -->
-    <div id="tab-overview" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:15px;font-weight:900">👀 오늘의 미션 현황</div>
-        <button class="refresh-btn" onclick="loadOverview()">↻ 새로고침</button>
+    <!-- 현황 보기 -->
+    <div class="panel" id="panel-overview">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px">
+        <div style="font-size:15px;font-weight:900">오늘의 미션 현황</div>
+        <button class="rbtn" onclick="loadOverview()">↻ 새로고침</button>
       </div>
-      <div class="cat-tabs" id="overview-cat-tabs"></div>
-      <div class="ov-grid" id="ov-grid"><div style="color:var(--g400);font-size:13px">로딩 중...</div></div>
+      <div class="ov-grid" id="ov-grid"><div class="empty">로딩 중...</div></div>
     </div>
 
-    <!-- ── 원생 관리 ── -->
-    <div id="tab-students" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:15px;font-weight:900">🎓 원생 관리</div>
-        <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
+    <!-- 원생 관리 -->
+    <div class="panel" id="panel-students">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px">
+        <div style="font-size:15px;font-weight:900">원생 관리</div>
+        <button class="rbtn" onclick="loadStudents()">↻ 새로고침</button>
       </div>
-      <div class="cat-tabs" id="students-cat-tabs"></div>
-      <div id="students-body"></div>
+      <div id="stu-body"></div>
     </div>
 
-    <!-- ── 링크 생성 ── -->
-    <div id="tab-links" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:15px;font-weight:900">🔗 링크 생성</div>
-        <button class="refresh-btn" onclick="renderLinks()">↻ 새로고침</button>
+    <!-- 링크 생성 -->
+    <div class="panel" id="panel-links">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px">
+        <div style="font-size:15px;font-weight:900">링크 생성</div>
+        <button class="rbtn" onclick="renderLinks()">↻ 새로고침</button>
       </div>
-      <div style="background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:11px;padding:10px 14px;font-size:13px;color:var(--fire);font-weight:600;margin-bottom:14px">
-        🔗 링크를 카카오톡으로 학생에게 보내면 본인 이름으로 모각공이 열려요!
+      <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:11px;
+        padding:10px 14px;font-size:13px;color:var(--muted);margin-bottom:14px">
+        🔗 링크를 카카오톡으로 전송하면 학생이 직접 입장해요
       </div>
-      <div class="cat-tabs" id="links-cat-tabs"></div>
       <div id="link-list"></div>
     </div>
-  </main>
+
+    <!-- 포인트 내역 -->
+    <div class="panel" id="panel-log">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px">
+        <div style="font-size:15px;font-weight:900">포인트 내역</div>
+        <button class="rbtn" onclick="loadLog()">↻ 새로고침</button>
+      </div>
+      <div class="acard" style="overflow:auto">
+        <table class="ltable">
+          <thead><tr><th>학생</th><th>변동</th><th>사유</th><th>분류</th><th>일시</th></tr></thead>
+          <tbody id="log-body"><tr><td colspan="5" class="empty">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <!-- 키오스크 학생 카테고리 배정 모달 -->
-<div class="modal-ov" id="kiosk-cat-modal" onclick="if(event.target===this)closeKioskCatModal()">
-  <div class="modal-box">
-    <div class="modal-title">🖥️ 키오스크 학생 카테고리 배정</div>
-    <div class="modal-field">
+<div class="modal-ov" id="kiosk-modal" onclick="if(event.target===this)closeKioskModal()">
+  <div class="mbox">
+    <div class="mbox-title">🖥️ 카테고리 배정</div>
+    <div class="mfield">
       <label>학생</label>
-      <div id="kiosk-cat-name" style="font-size:15px;font-weight:900;padding:8px 0"></div>
+      <div id="kiosk-modal-name" style="font-size:15px;font-weight:900;padding:8px 0;color:var(--text)"></div>
     </div>
-    <div class="modal-field">
-      <label>카테고리 선택</label>
-      <select class="sel" id="kiosk-cat-sel" style="width:100%">
-        <option value="">카테고리 없음</option>
+    <div class="mfield">
+      <label>카테고리</label>
+      <select class="msel" id="kiosk-modal-cat">
+        <option value="">배정 없음</option>
         <option value="초등수학">📐 초등수학</option>
         <option value="중고등수학">📏 중고등수학</option>
       </select>
     </div>
-    <div class="modal-btns">
-      <button class="btn btn-gray btn-sm" onclick="closeKioskCatModal()">취소</button>
-      <button class="btn btn-fire" onclick="saveKioskCat()">저장</button>
+    <div class="mbtns">
+      <button class="btn btn-ghost btn-sm" onclick="closeKioskModal()">취소</button>
+      <button class="btn btn-primary btn-sm" id="kiosk-modal-save" onclick="saveKioskCat()">저장</button>
     </div>
   </div>
 </div>
 
 <script>
-// ── 상수 ──────────────────────────────────────────────────────────────────────
-const KIOSK = 'https://bakuum-kiosk.pages.dev';
-const MOGAKGONG_URL = 'https://mogakgong.pages.dev/index.html';
-const CATS = ['초등영어','중고등영어','초등수학','중고등수학'];
-const CAT_ICON = {'초등영어':'📘','중고등영어':'📗','초등수학':'📐','중고등수학':'📏'};
-const CAT_COLOR = {'초등영어':'var(--c-em)','중고등영어':'var(--c-hm)','초등수학':'var(--c-es)','중고등수학':'var(--c-hs)'};
-const CAT_SOFT = {'초등영어':'var(--c-em-s)','중고등영어':'var(--c-hm-s)','초등수학':'var(--c-es-s)','중고등수학':'var(--c-hs-s)'};
+// ─── 상수 ───────────────────────────────────────────────────────────────────
+const KIOSK='https://bakuum-kiosk.pages.dev';
+const BASE_URL='https://mogakgong.pages.dev/index.html';
+const CATS=['초등영어','중고등영어','초등수학','중고등수학'];
+const IS_ENGLISH={초등영어:true,중고등영어:true,초등수학:false,중고등수학:false};
+const CAT_ICON={초등영어:'📘',중고등영어:'📗',초등수학:'📐',중고등수학:'📏'};
+const CAT_COLOR={초등영어:'var(--em-c)',중고등영어:'var(--hm-c)',초등수학:'var(--es-c)',중고등수학:'var(--hs-c)'};
+const CAT_SOFT={초등영어:'var(--em-s)',중고등영어:'var(--hm-s)',초등수학:'var(--es-s)',중고등수학:'var(--hs-s)'};
 
-// ── 상태 ──────────────────────────────────────────────────────────────────────
-let PW = '';
-let KIOSK_STUDENTS = [];          // [{id,name,points,...}]
-let KIOSK_CATS = {};              // {name: '초등수학'|'중고등수학'} — app_config.kiosk_cats
-let MOGAK_STUDENTS = [];          // [{name, cat}]  cat = 4개 중 하나
-let ALL_MISSIONS = {};            // {name_cat: [{text,hint}]}
-let STUDENTS = [];                // 전체 [{name, cat, _kiosk?}]
-let selStudent = null;            // 현재 선택된 미션 학생 key (name_cat)
-let selStudentName = '';
-let selStudentCat = '';
-let missionCat = '전체';
-let overviewCat = '전체';
-let studentsCat = '전체';
-let linksCat = '전체';
-let _kioskCatTarget = null;
+// ─── 상태 ───────────────────────────────────────────────────────────────────
+let PW='', CFG={};
+let KIOSK_STUDENTS=[], KIOSK_CATS={}, MOGAK_STUDENTS=[], STUDENTS=[];
+let ALL_MISSIONS={};
+let currentCat='';
+let selKey='', selName='', selCat='';
+let currentMissions=[];
+let _kioskTarget=null;
+let _preOpen=false;
 
-// ── 로그인 ────────────────────────────────────────────────────────────────────
-async function doLogin() {
-  const pw = document.getElementById('pw-inp').value.trim();
-  if (!pw) return;
-  try {
-    const r = await fetch(KIOSK + '/api/admin/auth', {headers:{'X-Admin-Password':pw}});
-    const d = await r.json();
-    if (d.success) { PW = pw; sessionStorage.setItem('mogak_pw',pw); showApp(); }
+// ─── 로그인 ─────────────────────────────────────────────────────────────────
+async function doLogin(){
+  const pw=document.getElementById('pw-inp').value.trim();if(!pw)return;
+  try{
+    const r=await fetch(KIOSK+'/api/admin/auth',{headers:{'X-Admin-Password':pw}});
+    const d=await r.json();
+    if(d.success){PW=pw;sessionStorage.setItem('mogak_pw',pw);await showCatSelect();}
     else showLoginErr();
-  } catch { showLoginErr(); }
+  }catch{showLoginErr();}
 }
-function showLoginErr() {
+function showLoginErr(){
   document.getElementById('login-err').classList.add('show');
-  document.getElementById('pw-inp').style.borderColor = 'var(--red)';
+  document.getElementById('pw-inp').style.borderColor='var(--red)';
 }
-function doLogout() {
-  PW=''; sessionStorage.removeItem('mogak_pw');
-  document.getElementById('app').classList.remove('visible');
-  document.getElementById('login-wrap').style.display='flex';
+function doLogout(){
+  PW='';sessionStorage.removeItem('mogak_pw');
+  go('scr-login');
   document.getElementById('pw-inp').value='';
+  document.getElementById('login-err').classList.remove('show');
 }
-function showApp() {
-  document.getElementById('login-wrap').style.display='none';
-  document.getElementById('app').classList.add('visible');
-  const d=new Date();
-  document.getElementById('hdr-date').textContent=d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';
-  initApp();
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
 }
 
-// ── API ───────────────────────────────────────────────────────────────────────
-async function api(path,method='GET',body=null) {
+// ─── API ─────────────────────────────────────────────────────────────────────
+async function api(path,method='GET',body=null){
   const opts={headers:{'X-Admin-Password':PW}};
   if(method!=='GET'){opts.method=method;opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
   return (await fetch(KIOSK+path,opts)).json();
 }
-async function getConfig() {
-  const r=await fetch(KIOSK+'/api/config'); return r.json();
-}
-async function setConfig(cfg) {
-  await api('/api/admin/config','POST',cfg);
-}
+async function getCFG(){const r=await fetch(KIOSK+'/api/config');CFG=await r.json();return CFG;}
+async function setCFG(cfg){await api('/api/admin/config','POST',cfg);}
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
-async function initApp() {
+// ─── 카테고리 선택 화면 ─────────────────────────────────────────────────────
+async function showCatSelect(){
+  go('scr-cats');
   await loadStudents();
-  await loadTodayMissions();
-  renderAllCatTabs();
-  renderMissionStuSel();
+  // 카드 원생 수 업데이트
+  CATS.forEach(cat=>{
+    const el=document.getElementById('cnt-'+cat);
+    if(!el)return;
+    const n=getStudentsByCat(cat).length;
+    el.textContent='원생 '+n+'명';
+  });
 }
 
-// ── 데이터 로드 ───────────────────────────────────────────────────────────────
-async function loadStudents() {
-  // 키오스크 학생
-  try { const d=await api('/api/students'); if(d.success) KIOSK_STUDENTS=d.students; }
-  catch { KIOSK_STUDENTS=[]; }
+function enterCat(cat){
+  currentCat=cat;
+  selKey='';selName='';selCat='';currentMissions=[];
+  setupAdminForCat(cat);
+  go('scr-admin');
+  loadTodayMissions().then(()=>{renderStuSel();renderEdBody();});
+}
 
-  // 설정 로드 (모각공 학생 + 키오스크 카테고리)
-  try {
-    const cfg=await getConfig();
-    // mogak_students 마이그레이션 (구버전 호환)
-    const raw=cfg.mogak_students||[];
+function goBack(){go('scr-cats');}
+
+function setupAdminForCat(cat){
+  // 헤더 배지
+  const badge=document.getElementById('cat-badge');
+  const color=CAT_COLOR[cat];const soft=CAT_SOFT[cat];
+  badge.textContent=CAT_ICON[cat]+' '+cat;
+  badge.style.cssText=`background:${soft};color:${color};border:1px solid ${color.replace('var','').replace('(','').replace(')','')};`;
+  badge.style.background=soft;badge.style.color=color;badge.style.border=`1px solid ${color}`;
+  badge.style.padding='5px 13px';badge.style.borderRadius='20px';badge.style.fontSize='13px';badge.style.fontWeight='900';
+
+  // 날짜
+  const d=new Date();
+  document.getElementById('hdr-date').textContent=d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';
+
+  // 저장 버튼 색
+  document.querySelectorAll('.save-btn').forEach(btn=>{btn.style.background=color;});
+
+  // 포인트 탭 — 영어는 숨김
+  const logBtn=document.getElementById('tab-log-btn');
+  logBtn.style.display=IS_ENGLISH[cat]?'none':'';
+
+  // 탭 active color
+  document.querySelectorAll('.atab').forEach(t=>{t.style.setProperty('--at-c',color);});
+
+  // 탭 초기화
+  switchTabDirect('missions');
+}
+
+// ─── 탭 전환 ─────────────────────────────────────────────────────────────────
+function switchTab(panel,btn){
+  document.querySelectorAll('.atab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  switchTabDirect(panel);
+}
+function switchTabDirect(panel){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+  const el=document.getElementById('panel-'+panel);if(el)el.classList.add('show');
+  if(panel==='overview')loadOverview();
+  if(panel==='students')renderStudentsPanel();
+  if(panel==='links')renderLinks();
+  if(panel==='log')loadLog();
+}
+
+// ─── 데이터 ──────────────────────────────────────────────────────────────────
+async function loadStudents(){
+  try{const d=await api('/api/students');if(d.success)KIOSK_STUDENTS=d.students;}
+  catch{KIOSK_STUDENTS=[];}
+  try{
+    await getCFG();
+    const raw=CFG.mogak_students||[];
     MOGAK_STUDENTS=raw.map(s=>{
-      if(typeof s==='string') return {name:s,cat:'초등수학'};
-      // 구버전 classes 배열 → cat 단일값
-      if(s.classes) return {name:s.name, cat:s.classes[0]==='영어'?'초등영어':s.classes[0]||'초등수학'};
+      if(typeof s==='string')return{name:s,cat:'초등수학'};
+      if(s.classes)return{name:s.name,cat:s.classes[0]==='영어'?'초등영어':s.classes[0]||'초등수학'};
       return s;
     });
-    KIOSK_CATS=cfg.kiosk_cats||{};
-  } catch { MOGAK_STUDENTS=[]; KIOSK_CATS={}; }
+    KIOSK_CATS=CFG.kiosk_cats||{};
+  }catch{MOGAK_STUDENTS=[];KIOSK_CATS={};}
 
-  // 전체 학생 목록 합치기
   const mogakNames=new Set(MOGAK_STUDENTS.map(s=>s.name));
   STUDENTS=[
     ...MOGAK_STUDENTS.map(s=>({...s,_kiosk:false})),
-    ...KIOSK_STUDENTS
-      .filter(s=>!mogakNames.has(s.name))
-      .map(s=>({name:s.name,cat:KIOSK_CATS[s.name]||'',points:s.points,_kiosk:true}))
+    ...KIOSK_STUDENTS.filter(s=>!mogakNames.has(s.name))
+      .map(s=>({name:s.name,cat:KIOSK_CATS[s.name]||'',points:s.points,_kiosk:true,_id:s.id}))
   ];
-
-  renderStudentsBody();
 }
 
-async function saveMogakStudents() {
-  const cfg=await getConfig();
-  cfg.mogak_students=MOGAK_STUDENTS;
-  await setConfig(cfg);
+async function saveMogakStudents(){
+  await getCFG();CFG.mogak_students=MOGAK_STUDENTS;await setCFG(CFG);
 }
-async function saveKioskCats() {
-  const cfg=await getConfig();
-  cfg.kiosk_cats=KIOSK_CATS;
-  await setConfig(cfg);
+async function saveKioskCatsData(){
+  await getCFG();CFG.kiosk_cats=KIOSK_CATS;await setCFG(CFG);
 }
 
-// ── 미션 ──────────────────────────────────────────────────────────────────────
-function getTodayKey() {
-  const d=new Date();
-  return 'mogakgong_'+d.getFullYear()+'_'+(d.getMonth()+1)+'_'+d.getDate();
+function getStudentsByCat(cat){return STUDENTS.filter(s=>s.cat===cat);}
+
+function getTodayKey(){const d=new Date();return'mogakgong_'+d.getFullYear()+'_'+(d.getMonth()+1)+'_'+d.getDate();}
+async function loadTodayMissions(){
+  try{await getCFG();ALL_MISSIONS=CFG[getTodayKey()]||{};}catch{ALL_MISSIONS={};}
 }
-async function loadTodayMissions() {
-  try { const cfg=await getConfig(); ALL_MISSIONS=cfg[getTodayKey()]||{}; }
-  catch { ALL_MISSIONS={}; }
-}
-async function saveTodayMissions() {
-  try { const cfg=await getConfig(); cfg[getTodayKey()]=ALL_MISSIONS; await setConfig(cfg); return true; }
-  catch { return false; }
+async function saveTodayMissions(){
+  try{await getCFG();CFG[getTodayKey()]=ALL_MISSIONS;await setCFG(CFG);return true;}catch{return false;}
 }
 
-// ── 카테고리 탭 렌더 ─────────────────────────────────────────────────────────
-const TAB_FILTER_MAP = {
-  'mission-cat-tabs': ()=>missionCat,
-  'overview-cat-tabs': ()=>overviewCat,
-  'students-cat-tabs': ()=>studentsCat,
-  'links-cat-tabs': ()=>linksCat,
-};
-const TAB_SET_MAP = {
-  'mission-cat-tabs': v=>{missionCat=v;renderMissionStuSel();},
-  'overview-cat-tabs': v=>{overviewCat=v;renderOverviewGrid();},
-  'students-cat-tabs': v=>{studentsCat=v;renderStudentsBody();},
-  'links-cat-tabs': v=>{linksCat=v;renderLinks();},
-};
-
-function renderCatTabs(elId) {
-  const el=document.getElementById(elId);
-  if(!el) return;
-  const cur=TAB_FILTER_MAP[elId]();
-  const all=['전체',...CATS];
-  el.innerHTML=all.map(c=>{
-    const isActive=cur===c;
-    const cls=isActive?(c==='전체'?'active-all':'active-'+c):'';
-    return `<button class="ct ${cls}" onclick="TAB_SET_MAP['${elId}']('${c}');renderCatTabs('${elId}')">${c==='전체'?'전체':(CAT_ICON[c]+' '+c)}</button>`;
-  }).join('');
-}
-function renderAllCatTabs() {
-  Object.keys(TAB_FILTER_MAP).forEach(id=>renderCatTabs(id));
-}
-
-// ── 미션 학생 셀렉터 ─────────────────────────────────────────────────────────
-function getFilteredStudents(cat) {
-  if(cat==='전체') return STUDENTS.filter(s=>s.cat);
-  return STUDENTS.filter(s=>s.cat===cat);
-}
-
-function renderMissionStuSel() {
-  const el=document.getElementById('mission-stu-sel');
-  if(!el) return;
-  const list=getFilteredStudents(missionCat);
-  if(!list.length){el.innerHTML='<span style="font-size:12px;color:var(--g400)">해당 카테고리에 학생이 없어요</span>';return;}
+// ─── 미션 입력 ───────────────────────────────────────────────────────────────
+function renderStuSel(){
+  const el=document.getElementById('stu-sel');if(!el)return;
+  const list=getStudentsByCat(currentCat);
+  if(!list.length){el.innerHTML='<div class="empty" style="padding:16px 0">원생을 먼저 추가해주세요 →</div>';return;}
+  const color=CAT_COLOR[currentCat];
   el.innerHTML=list.map(s=>{
-    const key=s.name+'_'+s.cat;
+    const key=s.name+'_'+currentCat;
     const mc=(ALL_MISSIONS[key]||[]).length;
-    const isActive=selStudent===key;
-    const hasM=mc>0;
-    return `<button class="stu-btn ${isActive?'active':''} ${hasM?'has-m':''}"
-      onclick="selectStudent('${esc(key)}','${esc(s.name)}','${esc(s.cat)}')">
-      <div class="av">${s.name[0]}</div>
-      <span class="sn">${esc(s.name)}</span>
-      <span class="ss">${CAT_ICON[s.cat]||''} ${hasM?'✅'+mc+'개':'미설정'}</span>
+    const isAct=selKey===key;const hasM=mc>0;
+    return `<button class="sbtn ${isAct?'active':''} ${hasM?'has-m':''}"
+      style="${isAct?`border-color:${color};`:''}${hasM?`--at:var(--green);`:''}"
+      onclick="selectStu('${esc(key)}','${esc(s.name)}','${esc(currentCat)}')">
+      <div class="av" style="${isAct?`background:${color};border-color:${color};color:#fff`:hasM?`border-color:var(--green);color:var(--green)`:''}">
+        ${s.name[0]}
+      </div>
+      <span class="sn" style="${isAct?`color:${color}`:''}">${esc(s.name)}</span>
+      <span class="ss">${hasM?'✅ '+mc+'개':'미설정'}</span>
     </button>`;
   }).join('');
 }
 
-let currentMissions=[];
-function selectStudent(key,name,cat) {
-  selStudent=key; selStudentName=name; selStudentCat=cat;
+function selectStu(key,name,cat){
+  selKey=key;selName=name;selCat=cat;
   currentMissions=(ALL_MISSIONS[key]||[]).map(m=>({...m}));
-  if(!currentMissions.length) currentMissions=[{text:'',hint:''},{text:'',hint:''}];
-  renderMissionStuSel();
-  renderEdBody();
+  if(!currentMissions.length)currentMissions=[{text:'',hint:''},{text:'',hint:''}];
+  renderStuSel();renderEdBody();
 }
 
-// ── 미션 에디터 ───────────────────────────────────────────────────────────────
-function renderEdBody() {
-  const el=document.getElementById('ed-body');
-  if(!el) return;
-  if(!selStudent){el.innerHTML='<div class="no-stu">위에서 학생을 선택해주세요 👆</div>';return;}
-  const color=CAT_COLOR[selStudentCat]||'var(--fire)';
-  const soft=CAT_SOFT[selStudentCat]||'var(--fire-soft)';
-  const recents=loadRecents();
+function renderEdBody(){
+  const el=document.getElementById('ed-body');if(!el)return;
+  if(!selKey){el.innerHTML='<div class="no-stu">위에서 학생을 선택해주세요 👆</div>';return;}
+  const color=CAT_COLOR[selCat];const soft=CAT_SOFT[selCat];
+  const recs=loadRecs();
   el.innerHTML=`
-    <div class="sel-name">
-      ${esc(selStudentName)}
-      <span class="cat-pill" style="background:${soft};color:${color}">${CAT_ICON[selStudentCat]||''} ${esc(selStudentCat)}</span>
-      <span style="font-size:12px;color:var(--g400);font-weight:400" id="m-cnt">총 ${currentMissions.filter(m=>m.text).length}개</span>
+    <div class="sel-stu-name">
+      ${esc(selName)}
+      <span style="font-size:11px;font-weight:700;background:${soft};color:${color};border-radius:20px;padding:3px 10px">${CAT_ICON[selCat]} ${esc(selCat)}</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400" id="m-cnt">총 ${currentMissions.filter(m=>m.text.trim()).length}개</span>
     </div>
-    ${recents.length?`<div style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--g400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">🕐 최근 입력</div>
-      <div class="rec-chips">${recents.map(r=>`<button class="rec-chip" data-p="${esc(r)}" onclick="addFromChip(this)">${esc(r)}</button>`).join('')}</div>
+    ${recs.length?`<div style="margin-bottom:12px">
+      <div class="pre-label">🕐 최근 입력</div>
+      <div class="pre-chips">${recs.map(r=>`<button class="rchip" data-p="${esc(r)}" onclick="addChip(this)">${esc(r)}</button>`).join('')}</div>
     </div>`:''}
-    <div style="margin-bottom:10px">
+    <div style="margin-bottom:12px">
       <div class="pre-label">
         <span>⚡ 빠른 추가</span>
-        <button class="pre-edit-btn" id="pre-edit-btn" onclick="togglePreEditor()">✏️ 편집</button>
+        <button class="btn btn-ghost btn-xs" id="pe-btn" onclick="togglePE()">✏️ 편집</button>
       </div>
-      <div class="pre-chips" id="pre-chips">${loadPresets().map(p=>`<button class="pre-chip" data-p="${esc(p)}" onclick="addFromChip(this)">${esc(p)}</button>`).join('')}</div>
+      <div class="pre-chips" id="pre-chips">${getPre().map(p=>`<button class="pchip" data-p="${esc(p)}" onclick="addChip(this)">${esc(p)}</button>`).join('')}</div>
       <div class="pre-editor" id="pre-editor">
-        <div style="font-size:12px;color:var(--g600);margin-bottom:8px">수정 후 바깥 클릭 자동저장 · ✕로 삭제</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">수정 후 바깥 클릭 자동저장 · ✕ 삭제</div>
         <div class="pe-list" id="pe-list"></div>
-        <div class="pe-add-row">
-          <input class="pe-inp" id="pe-add-inp" placeholder="새 항목..." onkeydown="if(event.key==='Enter'){event.preventDefault();addPresetItem();}"/>
-          <button class="btn btn-blue btn-sm" onclick="addPresetItem()">+ 추가</button>
+        <div class="pe-add">
+          <input class="pe-inp" id="pe-add-inp" placeholder="새 항목..." onkeydown="if(event.key==='Enter'){event.preventDefault();addPEItem();}"/>
+          <button class="btn btn-ghost btn-sm" onclick="addPEItem()">+ 추가</button>
         </div>
       </div>
     </div>
-    <div class="mission-list" id="m-list">${renderMRows()}</div>
+    <div class="m-list" id="m-list">${renderMRows()}</div>
     <div class="add-row">
-      <input class="add-inp" id="add-inp" placeholder="새 미션 입력..." onkeydown="if(event.key==='Enter')addMission()"/>
+      <input class="add-inp" id="add-inp" placeholder="새 미션 직접 입력..." onkeydown="if(event.key==='Enter')addMission()"/>
       <button class="add-btn" onclick="addMission()">+ 추가</button>
     </div>
     <div class="save-bar">
       <div class="save-hint">💡 저장하면 학생 화면에 즉시 반영돼요</div>
       <div style="display:flex;align-items:center;gap:10px">
         <span id="save-st"></span>
-        <button class="save-btn" onclick="saveMissions()">저장하기 💾</button>
+        <button class="save-btn btn-primary" onclick="saveMissions()">저장하기 💾</button>
       </div>
     </div>`;
+  // 저장 버튼 색 재적용
+  document.querySelectorAll('.save-btn').forEach(b=>{b.style.background=CAT_COLOR[currentCat];});
 }
 
-function renderMRows() {
-  if(!currentMissions.filter(m=>m.text).length&&!currentMissions.length)
-    return '<div style="text-align:center;padding:14px;color:var(--g400);font-size:13px">미션을 추가해보세요!</div>';
-  return currentMissions.map((m,i)=>`
-    <div class="m-row">
+function renderMRows(){
+  const valid=currentMissions;
+  if(!valid.length)return'<div style="text-align:center;padding:14px;color:var(--muted);font-size:13px">미션을 추가해보세요!</div>';
+  return valid.map((m,i)=>`
+    <div class="mrow">
       <span class="m-num">${i+1}</span>
-      <input class="m-text" value="${esc(m.text)}" placeholder="미션 내용" oninput="currentMissions[${i}].text=this.value;updateMCnt()"/>
-      <input class="m-hint" value="${esc(m.hint||'')}" placeholder="세부 내용 (선택)" oninput="currentMissions[${i}].hint=this.value"/>
+      <input class="m-text" value="${esc(m.text)}" placeholder="미션 내용"
+             oninput="currentMissions[${i}].text=this.value;updateCnt()"/>
+      <input class="m-hint" value="${esc(m.hint||'')}" placeholder="세부 내용 (선택)"
+             oninput="currentMissions[${i}].hint=this.value"/>
       <button class="m-del" onclick="delM(${i})">✕</button>
     </div>`).join('');
 }
-function updateMCnt(){const el=document.getElementById('m-cnt');if(el)el.textContent='총 '+currentMissions.filter(m=>m.text).length+'개';}
-function refreshMList(){const el=document.getElementById('m-list');if(el)el.innerHTML=renderMRows();updateMCnt();}
+function updateCnt(){const e=document.getElementById('m-cnt');if(e)e.textContent='총 '+currentMissions.filter(m=>m.text.trim()).length+'개';}
+function refreshML(){const e=document.getElementById('m-list');if(e)e.innerHTML=renderMRows();updateCnt();}
 
-function addFromChip(el){const t=el.getAttribute('data-p');if(t)addMissionText(t);}
-function addMission(){const inp=document.getElementById('add-inp');if(!inp)return;const v=inp.value.trim();if(!v)return;addMissionText(v);inp.value='';}
-function addMissionText(text){
-  if(!selStudent){toast('⚠️ 먼저 학생을 선택해주세요');return;}
-  currentMissions.push({text,hint:''});
-  addRecent(text);
-  refreshMList();
+function addChip(el){const t=el.getAttribute('data-p');if(t)addMText(t);}
+function addMission(){const i=document.getElementById('add-inp');if(!i)return;const v=i.value.trim();if(!v)return;addMText(v);i.value='';}
+function addMText(t){
+  if(!selKey){toast('⚠️ 먼저 학생을 선택해주세요');return;}
+  currentMissions.push({text:t,hint:''});addRec(t);refreshML();
 }
-function delM(i){currentMissions.splice(i,1);refreshMList();}
+function delM(i){currentMissions.splice(i,1);refreshML();}
 
 async function saveMissions(){
-  if(!selStudent) return;
-  ALL_MISSIONS[selStudent]=currentMissions.filter(m=>m.text.trim()).map(m=>({...m}));
+  if(!selKey)return;
+  ALL_MISSIONS[selKey]=currentMissions.filter(m=>m.text.trim()).map(m=>({...m}));
   const btn=document.querySelector('.save-btn');
   const st=document.getElementById('save-st');
-  btn.disabled=true;btn.textContent='저장 중...';
+  if(btn){btn.disabled=true;btn.textContent='저장 중...';}
   const ok=await saveTodayMissions();
-  btn.disabled=false;btn.textContent='저장하기 💾';
-  if(ok){st.className='save-st ok';st.textContent='✓ 저장 완료!';toast('✅ '+selStudentName+' 미션 저장됨!');renderMissionStuSel();}
-  else{st.className='save-st err';st.textContent='⚠️ 저장 실패';}
+  if(btn){btn.disabled=false;btn.textContent='저장하기 💾';}
+  if(ok){if(st){st.className='save-st ok';st.textContent='✓ 저장 완료!';}toast('✅ '+selName+' 미션 저장됨!');renderStuSel();}
+  else{if(st){st.className='save-st err';st.textContent='⚠️ 저장 실패';}}
   setTimeout(()=>{if(st){st.textContent='';st.className='save-st';}},3000);
 }
 
-// ── 프리셋 ────────────────────────────────────────────────────────────────────
-const DEF_PRESETS=['숙제 제출하기','숙제 오답하기'];
-function loadPresets(){try{const s=localStorage.getItem('mogak_presets');return s?JSON.parse(s):[...DEF_PRESETS];}catch{return[...DEF_PRESETS];}}
-function savePresets(arr){localStorage.setItem('mogak_presets',JSON.stringify(arr));}
-function loadRecents(){try{return JSON.parse(localStorage.getItem('mogak_recent')||'[]');}catch{return[];}}
-function addRecent(t){if(!t.trim())return;let r=loadRecents();r=[t,...r.filter(x=>x!==t)].slice(0,10);localStorage.setItem('mogak_recent',JSON.stringify(r));}
+// ─── 프리셋 ──────────────────────────────────────────────────────────────────
+const DEF_PRE=['숙제 제출하기','숙제 오답하기'];
+function getPre(){try{const s=localStorage.getItem('mogak_presets');return s?JSON.parse(s):[...DEF_PRE];}catch{return[...DEF_PRE];}}
+function savePre(a){localStorage.setItem('mogak_presets',JSON.stringify(a));}
+function loadRecs(){try{return JSON.parse(localStorage.getItem('mogak_recent')||'[]');}catch{return[];}}
+function addRec(t){if(!t.trim())return;let r=loadRecs();r=[t,...r.filter(x=>x!==t)].slice(0,10);localStorage.setItem('mogak_recent',JSON.stringify(r));}
 
-let _preOpen=false;
-function togglePreEditor(){
+function togglePE(){
   _preOpen=!_preOpen;
   const ed=document.getElementById('pre-editor');
-  const btn=document.getElementById('pre-edit-btn');
+  const btn=document.getElementById('pe-btn');
   if(!ed||!btn)return;
-  if(_preOpen){ed.classList.add('open');renderPeList();btn.textContent='✕ 닫기';}
+  if(_preOpen){ed.classList.add('open');renderPEList();btn.textContent='✕ 닫기';}
   else{ed.classList.remove('open');btn.textContent='✏️ 편집';}
 }
-function renderPeList(){
+function renderPEList(){
   const el=document.getElementById('pe-list');if(!el)return;
-  const P=loadPresets();
+  const P=getPre();
   el.innerHTML=P.length?P.map((p,i)=>`<div class="pe-row">
-    <input class="pe-inp" value="${esc(p)}" onchange="(function(){const P=loadPresets();P[${i}]=this.value.trim();savePresets(P);refreshPreChips();}).call(this)"
-           onblur="(function(){const P=loadPresets();if(!this.value.trim()){P.splice(${i},1);savePresets(P);renderPeList();refreshPreChips();}}).call(this)"/>
-    <button class="btn btn-red btn-xs" onclick="(function(){const P=loadPresets();P.splice(${i},1);savePresets(P);renderPeList();refreshPreChips();})()">✕</button>
-  </div>`).join(''):'<div style="color:var(--g400);font-size:13px">항목 없음</div>';
+    <input class="pe-inp" value="${esc(p)}"
+      onchange="(function(me){const P=getPre();P[${i}]=me.value.trim();savePre(P);refreshPreChips();}).call(this,this)"
+      onblur="(function(me){const P=getPre();if(!me.value.trim()){P.splice(${i},1);savePre(P);renderPEList();refreshPreChips();}}).call(this,this)"/>
+    <button class="btn btn-danger btn-xs" onclick="(function(){const P=getPre();P.splice(${i},1);savePre(P);renderPEList();refreshPreChips();})()">✕</button>
+  </div>`).join(''):'<div style="color:var(--muted);font-size:13px">항목 없음</div>';
 }
-function addPresetItem(){
-  const inp=document.getElementById('pe-add-inp');if(!inp)return;
-  const v=inp.value.trim();if(!v){inp.focus();return;}
-  const P=loadPresets();P.push(v);savePresets(P);inp.value='';renderPeList();refreshPreChips();inp.focus();
+function addPEItem(){
+  const i=document.getElementById('pe-add-inp');if(!i)return;
+  const v=i.value.trim();if(!v){i.focus();return;}
+  const P=getPre();P.push(v);savePre(P);i.value='';renderPEList();refreshPreChips();i.focus();
 }
 function refreshPreChips(){
   const el=document.getElementById('pre-chips');if(!el)return;
-  el.innerHTML=loadPresets().map(p=>`<button class="pre-chip" data-p="${esc(p)}" onclick="addFromChip(this)">${esc(p)}</button>`).join('');
+  el.innerHTML=getPre().map(p=>`<button class="pchip" data-p="${esc(p)}" onclick="addChip(this)">${esc(p)}</button>`).join('');
 }
 
-// ── 현황 보기 ─────────────────────────────────────────────────────────────────
+// ─── 현황 보기 ───────────────────────────────────────────────────────────────
 async function loadOverview(){
   await loadTodayMissions();
-  renderCatTabs('overview-cat-tabs');
-  renderOverviewGrid();
-}
-function renderOverviewGrid(){
   const el=document.getElementById('ov-grid');if(!el)return;
-  const list=getFilteredStudents(overviewCat);
-  if(!list.length){el.innerHTML='<div style="color:var(--g400)">해당 카테고리에 학생이 없어요</div>';return;}
-  const color=overviewCat!=='전체'?CAT_COLOR[overviewCat]:'var(--fire)';
-  const soft=overviewCat!=='전체'?CAT_SOFT[overviewCat]:'var(--fire-soft)';
+  const list=getStudentsByCat(currentCat);
+  if(!list.length){el.innerHTML='<div class="empty">원생을 먼저 추가해주세요</div>';return;}
+  const color=CAT_COLOR[currentCat];const soft=CAT_SOFT[currentCat];
+  const isEng=IS_ENGLISH[currentCat];
   el.innerHTML=list.map(s=>{
-    const key=s.name+'_'+s.cat;
+    const key=s.name+'_'+currentCat;
     const ms=ALL_MISSIONS[key]||[];
-    const c=CAT_COLOR[s.cat]||'var(--fire)';
-    const cs=CAT_SOFT[s.cat]||'var(--fire-soft)';
-    const ptsHTML=s._kiosk&&s.points!=null?`<div class="ov-sub">🏅 ${s.points}P</div>`:'';
+    const ptsHTML=!isEng&&s.points!=null?`<div class="ov-pts">🏅 ${s.points}P</div>`:'';
     return `<div class="ov-card">
       <div class="ov-head">
-        <div class="ov-av" style="background:${cs};color:${c}">${s.name[0]}</div>
+        <div class="ov-av" style="background:${soft};color:${color}">${s.name[0]}</div>
         <div>
           <div class="ov-name">${esc(s.name)}</div>
-          <div class="ov-sub">${CAT_ICON[s.cat]||''} ${esc(s.cat)}</div>
           ${ptsHTML}
         </div>
       </div>
-      <div class="ov-m-list">${ms.length
-        ?ms.map(m=>`<div class="ov-m-item"><div><div>${esc(m.text)}</div>${m.hint?`<div class="ov-m-hint">${esc(m.hint)}</div>`:''}</div></div>`).join('')
+      <div class="ov-ms">${ms.length
+        ?ms.map(m=>`<div class="ov-m"><div><div>${esc(m.text)}</div>${m.hint?`<div class="ov-mhint">${esc(m.hint)}</div>`:''}</div></div>`).join('')
         :'<div class="ov-empty">미션 없음</div>'
       }</div>
     </div>`;
   }).join('');
 }
 
-// ── 원생 관리 ─────────────────────────────────────────────────────────────────
-function renderStudentsBody(){
-  renderCatTabs('students-cat-tabs');
-  const el=document.getElementById('students-body');
-  if(!el) return;
-  if(studentsCat==='전체'){
-    el.innerHTML=CATS.map(c=>renderCatCard(c)).join('');
-  } else {
-    el.innerHTML=renderCatCard(studentsCat);
-  }
-}
-
-function renderCatCard(cat) {
-  const color=CAT_COLOR[cat];
-  const soft=CAT_SOFT[cat];
-  const isMath=cat.includes('수학');
-
-  // 이 카테고리 학생들
-  const mogakStus=MOGAK_STUDENTS.filter(s=>s.cat===cat);
-  const kioskStus=isMath?KIOSK_STUDENTS.filter(s=>KIOSK_CATS[s.name]===cat):[];
+// ─── 원생 관리 ───────────────────────────────────────────────────────────────
+function renderStudentsPanel(){
+  const el=document.getElementById('stu-body');if(!el)return;
+  const isMath=!IS_ENGLISH[currentCat];
+  const color=CAT_COLOR[currentCat];const soft=CAT_SOFT[currentCat];
+  const mogakStus=MOGAK_STUDENTS.filter(s=>s.cat===currentCat);
+  const kioskStus=isMath?KIOSK_STUDENTS.filter(s=>KIOSK_CATS[s.name]===currentCat):[];
   const unassigned=isMath?KIOSK_STUDENTS.filter(s=>!KIOSK_CATS[s.name]):[];
 
-  const mogakChips=mogakStus.map(s=>`
-    <div class="stu-chip" style="background:${soft};border:1.5px solid ${color}30">
-      ${esc(s.name)}
-      <span class="stu-chip-del" onclick="deleteMogakStu('${esc(s.name)}','${esc(cat)}')">✕</span>
-    </div>`).join('');
+  let html='';
 
-  const kioskChips=kioskStus.map(s=>`
-    <div class="stu-chip" style="background:${soft};border:1.5px solid ${color}30">
-      🖥️ ${esc(s.name)} <span style="font-size:11px;color:${color}">🏅${s.points}P</span>
-      <span class="stu-chip-del" style="color:var(--blue)" onclick="openKioskCatModal('${esc(s.name)}')">✏️</span>
-    </div>`).join('');
+  // 원생 목록
+  html+=`<div class="acard"><div class="acard-head"><div class="acard-title">${CAT_ICON[currentCat]} ${currentCat} 원생</div></div><div class="acard-body">`;
+  
+  if(!mogakStus.length&&!kioskStus.length){
+    html+='<div style="color:var(--muted);font-size:13px;margin-bottom:10px">아직 원생이 없어요</div>';
+  } else {
+    html+='<div style="display:flex;flex-wrap:wrap;margin-bottom:10px">';
+    mogakStus.forEach(s=>{
+      html+=`<div class="stu-chip">
+        ${esc(s.name)}
+        <span class="stu-chip-x" onclick="deleteStu('${esc(s.name)}','${esc(currentCat)}')">✕</span>
+      </div>`;
+    });
+    kioskStus.forEach(s=>{
+      const ptsBadge=!IS_ENGLISH[currentCat]?`<span style="font-size:11px;color:${color}">🏅${s.points}P</span>`:'';
+      html+=`<div class="stu-chip" style="border-color:${color}30">
+        🖥️ ${esc(s.name)} ${ptsBadge}
+        <span class="stu-chip-edit" onclick="openKioskModal('${esc(s.name)}')">✏️</span>
+      </div>`;
+    });
+    html+='</div>';
+  }
 
-  // 미배정 키오스크 학생 (수학 카테고리에만 표시)
-  const unassignedHTML=isMath&&unassigned.length?`
-    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--g200)">
-      <div style="font-size:11px;font-weight:700;color:var(--g400);margin-bottom:6px">🖥️ 카테고리 미배정 키오스크 학생</div>
-      <div class="stu-chip-wrap">${unassigned.map(s=>`
-        <div class="stu-chip" style="background:var(--g100);border:1.5px solid var(--g200)">
-          ${esc(s.name)} <span style="font-size:11px;color:var(--g400)">🏅${s.points}P</span>
-          <span class="stu-chip-del" style="color:var(--blue)" onclick="openKioskCatModal('${esc(s.name)}')">+ 배정</span>
+  html+=`<div class="add-stu-row">
+    <input class="iinp" id="add-stu-inp" placeholder="이름 입력..." onkeydown="if(event.key==='Enter')addStu()" style="flex:1"/>
+    <button class="btn btn-primary" style="background:${color}" onclick="addStu()">+ 추가</button>
+  </div></div></div>`;
+
+  // 미배정 키오스크 (수학만)
+  if(isMath&&unassigned.length){
+    html+=`<div class="acard"><div class="acard-head"><div class="acard-title">🖥️ 카테고리 미배정 키오스크 학생</div></div><div class="acard-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">아래 학생들은 키오스크에 있지만 카테고리가 배정되지 않았어요</div>
+      <div style="display:flex;flex-wrap:wrap">
+        ${unassigned.map(s=>`<div class="stu-chip">
+          ${esc(s.name)} <span style="font-size:11px;color:var(--muted)">🏅${s.points}P</span>
+          <span class="stu-chip-edit" style="color:var(--blue)" onclick="openKioskModal('${esc(s.name)}')">+ 배정</span>
         </div>`).join('')}
       </div>
-    </div>`:'';
+    </div></div>`;
+  }
 
-  return `<div style="background:var(--white);border-radius:16px;border:2px solid ${color}40;padding:18px 20px;margin-bottom:14px">
-    <div style="font-size:15px;font-weight:900;color:${color};margin-bottom:12px">${CAT_ICON[cat]} ${cat}</div>
-    <div class="stu-chip-wrap">
-      ${mogakChips||''}
-      ${kioskChips||''}
-      ${!mogakChips&&!kioskChips?`<span style="font-size:13px;color:var(--g400)">원생이 없어요</span>`:''}
-    </div>
-    ${unassignedHTML}
-    <div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--g200)">
-      <input class="inp" id="add-stu-${cat}" placeholder="이름 입력..."
-             onkeydown="if(event.key==='Enter')addMogakStu('${esc(cat)}')" style="flex:1"/>
-      <button class="btn" style="background:${color};color:#fff" onclick="addMogakStu('${esc(cat)}')">+ 추가</button>
-    </div>
-  </div>`;
+  el.innerHTML=html;
 }
 
-async function addMogakStu(cat){
-  const inp=document.getElementById('add-stu-'+cat);if(!inp)return;
+async function addStu(){
+  const inp=document.getElementById('add-stu-inp');if(!inp)return;
   const name=inp.value.trim();if(!name){inp.focus();return;}
-  const exists=MOGAK_STUDENTS.some(s=>s.name===name&&s.cat===cat)
-    ||(cat.includes('수학')&&KIOSK_STUDENTS.some(s=>s.name===name&&KIOSK_CATS[s.name]===cat));
-  if(exists){toast('⚠️ 이미 있는 학생이에요');return;}
-  MOGAK_STUDENTS.push({name,cat});
+  if(MOGAK_STUDENTS.some(s=>s.name===name&&s.cat===currentCat)){toast('⚠️ 이미 있는 학생이에요');return;}
+  MOGAK_STUDENTS.push({name,cat:currentCat});
   inp.value='';
   await saveMogakStudents();
   await loadStudents();
+  renderStudentsPanel();renderStuSel();
   toast('✅ '+name+' 추가됨!');
 }
 
-async function deleteMogakStu(name,cat){
-  if(!confirm(name+' 학생을 '+cat+' 목록에서 삭제할까요?'))return;
+async function deleteStu(name,cat){
+  if(!confirm(name+' 학생을 삭제할까요?'))return;
   MOGAK_STUDENTS=MOGAK_STUDENTS.filter(s=>!(s.name===name&&s.cat===cat));
   delete ALL_MISSIONS[name+'_'+cat];
-  await saveMogakStudents();
-  await saveTodayMissions();
-  if(selStudent===name+'_'+cat){selStudent=null;renderEdBody();}
-  await loadStudents();
+  await saveMogakStudents();await saveTodayMissions();
+  if(selKey===name+'_'+cat){selKey='';renderEdBody();}
+  await loadStudents();renderStudentsPanel();renderStuSel();
   toast('🗑️ '+name+' 삭제됨');
 }
 
-// ── 키오스크 학생 카테고리 모달 ───────────────────────────────────────────────
-function openKioskCatModal(name){
-  _kioskCatTarget=name;
-  document.getElementById('kiosk-cat-name').textContent=name;
-  document.getElementById('kiosk-cat-sel').value=KIOSK_CATS[name]||'';
-  document.getElementById('kiosk-cat-modal').classList.add('open');
+// ─── 키오스크 카테고리 모달 ─────────────────────────────────────────────────
+function openKioskModal(name){
+  _kioskTarget=name;
+  document.getElementById('kiosk-modal-name').textContent=name;
+  document.getElementById('kiosk-modal-cat').value=KIOSK_CATS[name]||'';
+  const btn=document.getElementById('kiosk-modal-save');
+  btn.style.background=CAT_COLOR[currentCat]||'var(--es-c)';
+  document.getElementById('kiosk-modal').classList.add('open');
 }
-function closeKioskCatModal(){
-  document.getElementById('kiosk-cat-modal').classList.remove('open');
-  _kioskCatTarget=null;
-}
+function closeKioskModal(){document.getElementById('kiosk-modal').classList.remove('open');_kioskTarget=null;}
 async function saveKioskCat(){
-  if(!_kioskCatTarget)return;
-  const cat=document.getElementById('kiosk-cat-sel').value;
-  if(cat) KIOSK_CATS[_kioskCatTarget]=cat;
-  else delete KIOSK_CATS[_kioskCatTarget];
-  await saveKioskCats();
-  closeKioskCatModal();
-  await loadStudents();
-  toast('✅ '+_kioskCatTarget+' 카테고리 설정됨!');
+  if(!_kioskTarget)return;
+  const cat=document.getElementById('kiosk-modal-cat').value;
+  if(cat)KIOSK_CATS[_kioskTarget]=cat;else delete KIOSK_CATS[_kioskTarget];
+  await saveKioskCatsData();closeKioskModal();
+  await loadStudents();renderStudentsPanel();renderStuSel();
+  toast('✅ '+_kioskTarget+' 배정 완료!');
 }
 
-// ── 링크 생성 ─────────────────────────────────────────────────────────────────
+// ─── 링크 생성 ───────────────────────────────────────────────────────────────
 function renderLinks(){
-  renderCatTabs('links-cat-tabs');
   const el=document.getElementById('link-list');if(!el)return;
-  const list=getFilteredStudents(linksCat);
-  if(!list.length){el.innerHTML='<div style="color:var(--g400)">해당 카테고리에 학생이 없어요</div>';return;}
-
-  // 카테고리별 그룹핑
-  const groups={};
-  CATS.forEach(c=>{groups[c]=[];});
-  list.forEach(s=>{if(s.cat&&groups[s.cat])groups[s.cat].push(s);});
-
-  const catsToShow=linksCat==='전체'?CATS:[linksCat];
-  el.innerHTML=catsToShow.map(cat=>{
-    const stus=groups[cat]||[];
-    if(!stus.length) return '';
-    return `<div style="margin-bottom:18px">
-      <div style="font-size:12px;font-weight:900;color:${CAT_COLOR[cat]};letter-spacing:.06em;margin-bottom:8px;text-transform:uppercase">${CAT_ICON[cat]} ${cat}</div>
-      ${stus.map(s=>{
-        const url=MOGAKGONG_URL+'?name='+encodeURIComponent(s.name)+'&class='+encodeURIComponent(s.cat);
-        const lid='lcb-'+s.name+'-'+s.cat;
-        return `<div class="link-card">
-          <div>
-            <div class="link-name">${esc(s.name)}</div>
-            <div class="link-sub">${s._kiosk?'키오스크':'모각공'}</div>
-          </div>
-          <div class="link-url">${url}</div>
-          <button class="link-copy" id="${esc(lid)}"
-            onclick="copyLink(${JSON.stringify(lid)},${JSON.stringify(url)},${JSON.stringify(s.name+' ('+s.cat+')')})">📋 복사</button>
-        </div>`;
-      }).join('')}
+  const list=getStudentsByCat(currentCat);
+  if(!list.length){el.innerHTML='<div class="empty">원생을 먼저 추가해주세요</div>';return;}
+  el.innerHTML=list.map(s=>{
+    const url=BASE_URL+'?name='+encodeURIComponent(s.name)+'&class='+encodeURIComponent(currentCat);
+    const lid='lcb-'+s.name;
+    return `<div class="link-card">
+      <div>
+        <div class="link-name">${esc(s.name)}</div>
+        <div class="link-sub">${s._kiosk?'키오스크 연동':'모각공'}</div>
+      </div>
+      <div class="link-url">${url}</div>
+      <button class="link-copy" id="${esc(lid)}"
+        onclick="copyLink(${JSON.stringify(lid)},${JSON.stringify(url)},${JSON.stringify(s.name)})">📋 복사</button>
     </div>`;
   }).join('');
 }
 
-function copyLink(id,url,label){
+function copyLink(id,url,name){
   navigator.clipboard.writeText(url).then(()=>{
     const btn=document.getElementById(id);
     if(btn){btn.textContent='✓ 복사됨!';btn.classList.add('copied');setTimeout(()=>{btn.textContent='📋 복사';btn.classList.remove('copied');},2000);}
-    toast('🔗 '+label+' 복사됨!');
+    toast('🔗 '+name+' 링크 복사됨!');
   });
 }
 
-// ── 포인트 내역 ───────────────────────────────────────────────────────────────
-async function renderLogTable(){
+// ─── 포인트 내역 ─────────────────────────────────────────────────────────────
+async function loadLog(){
   const tbody=document.getElementById('log-body');if(!tbody)return;
+  tbody.innerHTML='<tr><td colspan="5" class="empty">로딩 중...</td></tr>';
+  const catStus=getStudentsByCat(currentCat).filter(s=>s._kiosk||KIOSK_STUDENTS.some(k=>k.name===s.name));
   const rows=[];
-  const mathStus=KIOSK_STUDENTS.slice(0,7);
-  for(const s of mathStus){
-    try{const d=await api('/api/students/'+s.id);if(d.success)d.history.forEach(h=>rows.push({name:s.name,...h}));}catch{}
+  for(const s of catStus.slice(0,10)){
+    const ks=KIOSK_STUDENTS.find(k=>k.name===s.name);
+    if(!ks)continue;
+    try{const d=await api('/api/students/'+ks._id||ks.id);if(d.success)d.history.forEach(h=>rows.push({name:s.name,...h}));}catch{}
   }
   rows.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  tbody.innerHTML=rows.slice(0,40).map(r=>`<tr>
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="5" class="empty">내역이 없어요</td></tr>';return;}
+  tbody.innerHTML=rows.slice(0,50).map(r=>`<tr>
     <td style="font-weight:700">${esc(r.name)}</td>
-    <td><span class="${r.delta>=0?'log-pos':'log-neg'}">${r.delta>=0?'+':''}${r.delta}</span></td>
-    <td style="font-size:12px;color:var(--g600);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.reason)}</td>
-    <td><span class="log-badge ${r.category}">${{learn:'학습',fine:'벌금',shop:'상점',admin:'조정'}[r.category]||r.category}</span></td>
-    <td style="font-size:11px;color:var(--g400)">${(r.created_at||'').slice(0,16).replace('T',' ')}</td>
+    <td><span class="${r.delta>=0?'lpos':'lneg'}">${r.delta>=0?'+':''}${r.delta}</span></td>
+    <td style="font-size:12px;color:rgba(255,255,255,.5);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.reason)}</td>
+    <td><span class="lbadge ${r.category}">${{learn:'학습',fine:'벌금',shop:'상점',admin:'조정'}[r.category]||r.category}</span></td>
+    <td style="font-size:11px;color:var(--muted)">${(r.created_at||'').slice(0,16).replace('T',' ')}</td>
   </tr>`).join('');
 }
 
-// ── 탭 전환 ──────────────────────────────────────────────────────────────────
-function switchTab(tab,btn){
-  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  ['missions','overview','students','links'].forEach(t=>{
-    const el=document.getElementById('tab-'+t);
-    if(el) el.style.display=t===tab?'block':'none';
-  });
-  if(tab==='overview'){renderCatTabs('overview-cat-tabs');loadOverview();}
-  if(tab==='students') loadStudents();
-  if(tab==='links'){renderCatTabs('links-cat-tabs');renderLinks();}
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function toast(msg){
+  const el=document.createElement('div');el.className='toast';el.textContent=msg;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),2500);
 }
 
-// ── UTILS ─────────────────────────────────────────────────────────────────────
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-function toast(msg){const el=document.createElement('div');el.className='toast';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),2500);}
-
-// ── AUTO LOGIN ────────────────────────────────────────────────────────────────
-window.addEventListener('load',()=>{
+// ─── AUTO LOGIN ──────────────────────────────────────────────────────────────
+window.addEventListener('load',async()=>{
   const saved=sessionStorage.getItem('mogak_pw');
-  if(saved){PW=saved;showApp();}
+  if(saved){PW=saved;await showCatSelect();}
 });
 </script>
 </body>
