@@ -9,12 +9,11 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --fire:#FE5F3C;--fire2:#FF9A2E;--fire-soft:rgba(254,95,60,.1);--fire-border:rgba(254,95,60,.25);
-  --bg:#F7F4F2;--white:#FFFFFF;
+  --bg:#F7F4F2;--white:#FFFFFF;--surface:#FDFCFB;
   --gray-100:#F1EDE9;--gray-200:#E4DDD7;--gray-400:#A89D95;--gray-600:#6B5F57;--gray-800:#2C2018;
   --green:#22A55A;--green-soft:rgba(34,165,90,.1);
   --red:#E84545;--red-soft:rgba(232,69,69,.1);
   --blue:#3B82F6;--blue-soft:rgba(59,130,246,.1);
-  --purple:#8B5CF6;--purple-soft:rgba(139,92,246,.1);
 }
 body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-serif;min-height:100vh}
 
@@ -26,199 +25,256 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
 .login-sub{font-size:13px;color:var(--gray-400);margin-bottom:28px}
 .login-inp{width:100%;border:2px solid var(--gray-200);border-radius:12px;padding:14px 16px;font-family:inherit;font-size:16px;font-weight:700;outline:none;text-align:center;letter-spacing:6px;transition:border-color .2s}
 .login-inp:focus{border-color:var(--fire)}
-.login-btn{width:100%;margin-top:12px;padding:15px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer}
+.login-btn{width:100%;margin-top:12px;padding:15px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer;transition:opacity .2s}
+.login-btn:hover{opacity:.9}
 .login-err{font-size:13px;color:var(--red);margin-top:10px;display:none}
 .login-err.show{display:block}
 
 /* ── LAYOUT ── */
 .app{display:none}
 .app.visible{display:flex;flex-direction:column;min-height:100vh}
-.hdr{background:var(--white);border-bottom:1.5px solid var(--gray-200);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 1px 8px rgba(0,0,0,.06)}
-.hdr-brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:900}
-.hdr-brand span{color:var(--fire)}
-.hdr-right{display:flex;align-items:center;gap:8px}
-.hdr-date{font-size:12px;color:var(--gray-400)}
-.hdr-kiosk{display:flex;align-items:center;gap:4px;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire);font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;text-decoration:none}
-.logout-btn{background:var(--gray-100);border:1px solid var(--gray-200);color:var(--gray-600);font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer}
-.main{flex:1;padding:20px 24px;max-width:1100px;margin:0 auto;width:100%}
+
+/* ── HEADER ── */
+.hdr{background:var(--white);border-bottom:1.5px solid var(--gray-200);padding:0 28px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 1px 8px rgba(0,0,0,.06)}
+.hdr-brand{display:flex;align-items:center;gap:10px}
+.hdr-fire{font-size:24px}
+.hdr-name{font-size:17px;font-weight:900;color:var(--gray-800)}
+.hdr-name span{color:var(--fire)}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.hdr-date{font-size:12px;color:var(--gray-400);font-weight:500}
+.hdr-kiosk{display:flex;align-items:center;gap:5px;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire);font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;text-decoration:none;transition:all .2s}
+.hdr-kiosk:hover{background:var(--fire);color:#fff}
+.logout-btn{background:var(--gray-100);border:1px solid var(--gray-200);color:var(--gray-600);font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;transition:all .2s}
+.logout-btn:hover{background:var(--red-soft);color:var(--red)}
+
+/* ── MAIN ── */
+.main{flex:1;padding:24px 28px;max-width:1100px;margin:0 auto;width:100%}
 
 /* ── TABS ── */
-.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--white);border-radius:14px;padding:5px;border:1.5px solid var(--gray-200);width:fit-content;flex-wrap:wrap}
-.tab{font-family:inherit;font-size:13px;font-weight:700;padding:8px 16px;border-radius:10px;border:none;background:transparent;color:var(--gray-400);cursor:pointer;white-space:nowrap}
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--white);border-radius:14px;padding:5px;border:1.5px solid var(--gray-200);width:fit-content}
+.tab{font-family:inherit;font-size:13px;font-weight:700;padding:9px 18px;border-radius:10px;border:none;background:transparent;color:var(--gray-400);cursor:pointer;transition:all .2s;white-space:nowrap}
 .tab.active{background:var(--fire);color:#fff;box-shadow:0 2px 12px rgba(254,95,60,.35)}
 
-/* ── CARD ── */
-.card{background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);margin-bottom:16px;overflow:hidden}
-.card-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1.5px solid var(--gray-100);gap:10px;flex-wrap:wrap}
-.card-title{font-size:15px;font-weight:900}
-.card-body{padding:16px 20px}
+/* ── SECTION TITLE ── */
+.sec-title{font-size:15px;font-weight:900;color:var(--gray-800);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.sec-title span{color:var(--fire)}
 
-/* ── BUTTONS ── */
-.btn{font-family:inherit;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;border:none;transition:all .15s}
-.btn-blue{background:var(--blue);color:#fff}
-.btn-blue:hover{opacity:.9}
-.btn-red{background:var(--red);color:#fff}
-.btn-red:hover{opacity:.9}
-.btn-gray{background:var(--gray-100);color:var(--gray-600);border:1.5px solid var(--gray-200)}
-.btn-gray:hover{background:var(--gray-200)}
-.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
-.btn-xs{padding:3px 8px;font-size:11px;border-radius:6px}
-.inp{width:100%;border:1.5px solid var(--gray-200);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:14px;outline:none;background:var(--white);transition:border-color .2s}
-.inp:focus{border-color:var(--fire)}
-.sel{border:1.5px solid var(--gray-200);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:13px;outline:none;background:var(--white);cursor:pointer}
-.refresh-btn{padding:7px 14px;border-radius:10px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
-.refresh-btn:hover{border-color:var(--fire-border);color:var(--fire)}
-
-/* ── STUDENT SELECTOR (미션 탭) ── */
-.student-selector{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;padding:12px 0 4px}
-.stu-sel-btn{font-family:inherit;font-size:14px;font-weight:900;padding:12px 6px 10px;border-radius:12px;border:2px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px}
-.stu-sel-btn .sel-av{width:36px;height:36px;border-radius:50%;background:var(--gray-100);border:2px solid var(--gray-200);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:var(--gray-400)}
-.stu-sel-btn .sel-status{font-size:10px;font-weight:700;color:var(--gray-400)}
-.stu-sel-btn:hover{border-color:var(--fire-border);background:var(--fire-soft)}
-.stu-sel-btn.active{background:var(--fire-soft);border-color:var(--fire)}
-.stu-sel-btn.active .sel-av{background:var(--fire);border-color:var(--fire);color:#fff}
-.stu-sel-btn.has-missions .sel-av{background:var(--green-soft);border-color:var(--green);color:var(--green)}
-.stu-sel-btn.has-missions .sel-status{color:var(--green)}
-.stu-sel-btn.active.has-missions .sel-av{background:var(--green);border-color:var(--green);color:#fff}
-
-/* ── 카테고리 필터 ── */
-.cat-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.cat-btn{font-family:inherit;font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;transition:all .15s}
-.cat-btn.active{border-color:var(--fire);background:var(--fire-soft);color:var(--fire)}
-.cat-btn.cat-초등영어.active{border-color:#3B82F6;background:var(--blue-soft);color:#3B82F6}
-.cat-btn.cat-중고등영어.active{border-color:#8B5CF6;background:var(--purple-soft);color:#8B5CF6}
-.cat-btn.cat-초등수학.active{border-color:#22A55A;background:var(--green-soft);color:#22A55A}
-.cat-btn.cat-중고등수학.active{border-color:#FE5F3C;background:var(--fire-soft);color:#FE5F3C}
-
-/* ── 카테고리 섹션 ── */
-.cat-section{margin-bottom:20px}
-.cat-section-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:12px 12px 0 0;font-size:14px;font-weight:900;cursor:pointer}
-.cat-section-head.cat-초등영어{background:var(--blue-soft);color:#1D4ED8;border:1.5px solid rgba(59,130,246,.25)}
-.cat-section-head.cat-중고등영어{background:var(--purple-soft);color:#6D28D9;border:1.5px solid rgba(139,92,246,.25)}
-.cat-section-head.cat-초등수학{background:var(--green-soft);color:#166534;border:1.5px solid rgba(34,165,90,.25)}
-.cat-section-head.cat-중고등수학{background:var(--fire-soft);color:#C2410C;border:1.5px solid rgba(254,95,60,.25)}
-.cat-section-body{background:var(--white);border:1.5px solid var(--gray-200);border-top:none;border-radius:0 0 12px 12px;padding:14px}
-
-/* ── 클래스 그룹 ── */
-.class-group{margin-bottom:12px}
-.class-label{font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
-.class-label-del{font-size:10px;cursor:pointer;color:var(--red);opacity:.6}
-.class-label-del:hover{opacity:1}
-.student-chips{display:flex;flex-wrap:wrap;gap:6px}
-.stu-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:13px;font-weight:700;background:var(--gray-100);border:1.5px solid var(--gray-200);color:var(--gray-800)}
-.stu-chip.kiosk{background:rgba(34,165,90,.08);border-color:rgba(34,165,90,.3);color:#166534}
-.stu-chip-del{font-size:12px;color:var(--gray-400);cursor:pointer;line-height:1}
-.stu-chip-del:hover{color:var(--red)}
-
-/* ── 학생 추가 폼 ── */
-.add-stu-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed var(--gray-200)}
+/* ── STUDENT GRID (dashboard) ── */
+.student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:28px}
+.stu-card{background:var(--white);border:1.5px solid var(--gray-200);border-radius:16px;padding:18px;transition:all .2s;position:relative;overflow:hidden}
+.stu-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--fire),var(--fire2));opacity:0;transition:opacity .2s}
+.stu-card:hover{border-color:var(--fire-border);box-shadow:0 4px 20px rgba(254,95,60,.1)}
+.stu-card:hover::before{opacity:1}
+.stu-av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--fire-soft),rgba(255,154,46,.15));border:2px solid var(--fire-border);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:var(--fire);margin-bottom:10px}
+.stu-name{font-size:15px;font-weight:900;margin-bottom:6px}
+.stu-pts{font-size:13px;font-weight:700;color:var(--fire);background:var(--fire-soft);border:1px solid var(--fire-border);border-radius:20px;padding:3px 10px;display:inline-block;margin-bottom:8px}
+.stu-link-btn{width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--gray-200);background:var(--gray-100);color:var(--gray-600);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:5px}
+.stu-link-btn:hover{border-color:var(--fire-border);background:var(--fire-soft);color:var(--fire)}
+.stu-link-btn.copied{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.stu-mission-badge{font-size:11px;color:var(--gray-400);margin-bottom:6px}
+.stu-mission-badge.set{color:var(--green);font-weight:700}
 
 /* ── MISSION EDITOR ── */
 .mission-editor{background:var(--white);border-radius:20px;border:1.5px solid var(--gray-200);overflow:hidden;margin-bottom:20px}
-.editor-head{padding:16px 20px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.editor-head{padding:18px 22px;border-bottom:1.5px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .editor-title{font-size:15px;font-weight:900}
-.editor-body{padding:20px}
-.no-student{text-align:center;padding:32px;color:var(--gray-400);font-size:14px}
-.selected-student-name{font-size:18px;font-weight:900;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.fire-tag{font-size:12px;font-weight:700;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire);border-radius:20px;padding:3px 10px}
+/* 학생 선택 - 카드형 */
+.student-selector{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;width:100%;padding:16px 0 4px}
+.stu-sel-btn{
+  font-family:inherit;font-size:15px;font-weight:900;
+  padding:14px 8px 12px;border-radius:14px;
+  border:2px solid var(--gray-200);background:var(--white);
+  color:var(--gray-600);cursor:pointer;transition:all .2s;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  position:relative;
+}
+.stu-sel-btn .sel-av{
+  width:40px;height:40px;border-radius:50%;
+  background:var(--gray-100);border:2px solid var(--gray-200);
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:900;color:var(--gray-400);
+  transition:all .2s;
+}
+.stu-sel-btn .sel-status{font-size:10px;font-weight:700;color:var(--gray-400)}
+.stu-sel-btn:hover{border-color:var(--fire-border);background:var(--fire-soft);transform:translateY(-2px)}
+.stu-sel-btn:hover .sel-av{background:var(--fire-soft);border-color:var(--fire-border);color:var(--fire)}
+.stu-sel-btn.active{background:var(--fire-soft);border-color:var(--fire);box-shadow:0 4px 16px rgba(254,95,60,.2)}
+.stu-sel-btn.active .sel-av{background:var(--fire);border-color:var(--fire);color:#fff}
+.stu-sel-btn.active .sel-status{color:var(--fire)}
+.stu-sel-btn.has-missions .sel-av{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.stu-sel-btn.has-missions .sel-status{color:var(--green)}
+.stu-sel-btn.active.has-missions{background:rgba(34,165,90,.08);border-color:var(--green)}
+.stu-sel-btn.active.has-missions .sel-av{background:var(--green);border-color:var(--green);color:#fff}
+.editor-body{padding:22px}
+.no-student{text-align:center;padding:40px;color:var(--gray-400);font-size:14px}
+.selected-student-name{font-size:18px;font-weight:900;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.selected-student-name .fire-tag{font-size:13px;font-weight:700;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire);border-radius:20px;padding:3px 10px}
 
-/* ── MISSION ROWS ── */
-.mission-list{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
-.mission-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gray-100);border-radius:10px;border:1.5px solid transparent}
+/* Mission list */
+.mission-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.mission-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--gray-100);border-radius:12px;border:1.5px solid transparent;transition:all .2s}
 .mission-row:hover{border-color:var(--gray-200);background:var(--white)}
-.mission-num{font-size:10px;font-weight:900;color:var(--gray-400);width:20px;flex-shrink:0;text-align:center}
-.mission-text-input{flex:2;border:none;background:transparent;font-family:inherit;font-size:14px;font-weight:600;color:var(--gray-800);outline:none;min-width:80px}
-.mission-hint-input{flex:1;border:1px solid var(--gray-200);border-radius:8px;padding:5px 9px;font-family:inherit;font-size:12px;color:var(--gray-600);outline:none;background:var(--white);min-width:60px}
+.mission-drag{color:var(--gray-400);cursor:grab;font-size:14px;flex-shrink:0}
+.mission-num{font-size:11px;font-weight:900;color:var(--gray-400);width:22px;flex-shrink:0;text-align:center}
+.mission-text-input{flex:1;border:none;background:transparent;font-family:inherit;font-size:14px;font-weight:500;color:var(--gray-800);outline:none}
+.mission-text-input::placeholder{color:var(--gray-400)}
+.mission-hint-input{width:150px;border:1px solid var(--gray-200);border-radius:8px;padding:5px 8px;font-family:inherit;font-size:11px;color:var(--gray-600);outline:none;background:var(--white)}
 .mission-hint-input:focus{border-color:var(--fire-border)}
-.mission-del{width:26px;height:26px;border-radius:7px;border:none;background:var(--red-soft);color:var(--red);font-size:13px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.mission-del{width:28px;height:28px;border-radius:8px;border:none;background:var(--red-soft);color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.mission-del:hover{background:var(--red);color:#fff}
+
+/* Add mission */
 .add-mission-row{display:flex;gap:8px}
-.add-mission-inp{flex:1;border:2px dashed var(--gray-200);border-radius:10px;padding:10px 13px;font-family:inherit;font-size:14px;outline:none;background:var(--white);transition:border-color .2s}
+.add-mission-inp{flex:1;border:2px dashed var(--gray-200);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14px;outline:none;background:var(--white);transition:border-color .2s;color:var(--gray-800)}
 .add-mission-inp:focus{border-color:var(--fire-border)}
-.add-mission-btn{padding:10px 16px;border-radius:10px;border:none;background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.add-mission-btn{padding:12px 18px;border-radius:12px;border:none;background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
 .add-mission-btn:hover{background:var(--fire);color:#fff}
-.save-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--gray-100);border-top:1.5px solid var(--gray-200);gap:10px;flex-wrap:wrap;margin:0 -20px -20px}
+
+/* Save bar */
+.save-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--gray-100);border-top:1.5px solid var(--gray-200);gap:10px;flex-wrap:wrap}
 .save-hint{font-size:12px;color:var(--gray-400)}
-.save-btn{padding:10px 22px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:14px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(254,95,60,.3)}
-.save-btn:disabled{opacity:.5;cursor:not-allowed}
-.save-status{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px}
+.save-btn{padding:11px 24px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--fire),var(--fire2));color:#fff;font-family:inherit;font-size:14px;font-weight:900;cursor:pointer;transition:all .2s;box-shadow:0 4px 16px rgba(254,95,60,.3)}
+.save-btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(254,95,60,.4)}
+.save-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.save-status{font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px}
 .save-status.ok{background:var(--green-soft);color:var(--green)}
 .save-status.err{background:var(--red-soft);color:var(--red)}
 
-/* ── 프리셋 ── */
-.preset-section{margin-bottom:14px}
-.preset-label{font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
-.preset-edit-btn{font-family:inherit;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-400);cursor:pointer}
+/* ── PRESET MISSIONS ── */
+.preset-section{margin-bottom:16px}
+.preset-label{
+  font-size:11px;font-weight:700;color:var(--gray-400);
+  letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.preset-edit-btn{
+  font-family:inherit;font-size:11px;font-weight:700;
+  padding:3px 10px;border-radius:20px;
+  border:1.5px solid var(--gray-200);background:var(--white);
+  color:var(--gray-400);cursor:pointer;transition:all .2s;
+}
+.preset-edit-btn:hover{border-color:var(--fire-border);color:var(--fire)}
 .preset-chips{display:flex;gap:6px;flex-wrap:wrap}
-.preset-chip{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer}
+.preset-chip{
+  font-family:inherit;font-size:12px;font-weight:600;
+  padding:5px 12px;border-radius:20px;
+  border:1.5px solid var(--gray-200);background:var(--white);
+  color:var(--gray-600);cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:4px;
+}
 .preset-chip:hover{border-color:var(--fire-border);color:var(--fire);background:var(--fire-soft)}
-.recent-section{margin-bottom:12px}
+.preset-chip .del-chip{
+  font-size:11px;color:var(--gray-400);line-height:1;
+  margin-left:2px;display:none;
+}
+.preset-edit-mode .preset-chip .del-chip{display:inline}
+.preset-chip.editing{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+/* 최근 입력 */
+.recent-section{margin-bottom:14px}
 .recent-chips{display:flex;gap:6px;flex-wrap:wrap}
-.recent-chip{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(59,130,246,.25);background:rgba(59,130,246,.06);color:var(--blue);cursor:pointer}
-.preset-editor{display:none;background:var(--gray-100);border-radius:12px;padding:13px;margin-top:8px;border:1.5px solid var(--gray-200)}
+.recent-chip{
+  font-family:inherit;font-size:12px;font-weight:600;
+  padding:5px 12px;border-radius:20px;
+  border:1.5px solid rgba(59,130,246,.25);background:rgba(59,130,246,.06);
+  color:var(--blue);cursor:pointer;transition:all .15s;
+}
+.recent-chip:hover{background:var(--blue-soft);border-color:var(--blue)}
+/* 프리셋 인라인 편집 */
+.preset-editor{
+  display:none;
+  background:var(--gray-100);border-radius:14px;
+  padding:14px;margin-top:10px;
+  border:1.5px solid var(--gray-200);
+}
 .preset-editor.open{display:block}
-.preset-edit-list{display:flex;flex-direction:column;gap:7px;margin-bottom:10px}
+.preset-edit-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
 .preset-edit-row{display:flex;align-items:center;gap:7px}
-.preset-edit-inp{flex:1;border:1.5px solid var(--gray-200);border-radius:9px;padding:7px 10px;font-family:inherit;font-size:13px;outline:none;background:var(--white)}
+.preset-edit-inp{
+  flex:1;border:1.5px solid var(--gray-200);border-radius:9px;
+  padding:8px 11px;font-family:inherit;font-size:13px;
+  outline:none;background:var(--white);color:var(--gray-800);
+  transition:border-color .2s;
+}
 .preset-edit-inp:focus{border-color:var(--fire)}
-.preset-add-row{display:flex;gap:7px;padding-top:8px;border-top:1px solid var(--gray-200)}
-.preset-editor-btns{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-200)}
+.preset-add-row{display:flex;gap:7px;padding-top:10px;border-top:1px solid var(--gray-200)}
+.preset-editor-btns{display:flex;gap:7px;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-200)}
 
-/* ── OVERVIEW ── */
-.overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
-.overview-card{background:var(--white);border-radius:14px;border:1.5px solid var(--gray-200);padding:16px}
-.ov-stu-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.ov-av{width:36px;height:36px;border-radius:50%;background:var(--fire-soft);border:2px solid var(--fire-border);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:var(--fire);flex-shrink:0}
+/* ── OVERVIEW TAB ── */
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.overview-card{background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);padding:18px}
+.ov-stu-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ov-av{width:38px;height:38px;border-radius:50%;background:var(--fire-soft);border:2px solid var(--fire-border);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:var(--fire);flex-shrink:0}
 .ov-name{font-size:14px;font-weight:900}
-.ov-sub{font-size:11px;color:var(--gray-400);margin-top:2px}
-.ov-missions{display:flex;flex-direction:column;gap:4px}
-.ov-mission-item{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--gray-600)}
-.ov-mission-item::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--gray-200);flex-shrink:0;margin-top:5px}
-.ov-hint{font-size:11px;color:var(--gray-400);margin-top:1px}
-.no-missions-msg{font-size:11px;color:var(--gray-400);text-align:center;padding:10px 0}
+.ov-pts{font-size:11px;font-weight:700;color:var(--fire);background:var(--fire-soft);border-radius:20px;padding:2px 8px;display:inline-block;margin-top:2px}
+.ov-missions{display:flex;flex-direction:column;gap:5px}
+.ov-mission-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--gray-600)}
+.ov-mission-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gray-200);flex-shrink:0}
+.no-missions-msg{font-size:11px;color:var(--gray-400);text-align:center;padding:12px 0}
 
-/* ── LINK TAB ── */
-.link-card{background:var(--white);border:1.5px solid var(--gray-200);border-radius:14px;padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
-.link-stu-name{font-size:14px;font-weight:900;min-width:80px}
-.link-stu-sub{font-size:11px;color:var(--gray-400);margin-top:2px}
-.link-url{font-size:11px;color:var(--gray-400);background:var(--gray-100);border-radius:8px;padding:7px 11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace}
-.link-copy-btn{padding:8px 14px;border-radius:10px;border:1.5px solid var(--fire-border);background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0}
+/* ── POINTS LOG TAB ── */
+.log-table{width:100%;border-collapse:collapse}
+.log-table th{text-align:left;font-size:11px;font-weight:700;color:var(--gray-400);padding:8px 12px;border-bottom:1.5px solid var(--gray-200);letter-spacing:.05em;text-transform:uppercase}
+.log-table td{padding:12px 12px;border-bottom:1px solid var(--gray-100);font-size:13px}
+.log-table tr:last-child td{border-bottom:none}
+.log-delta.pos{color:var(--green);font-weight:700}
+.log-delta.neg{color:var(--red);font-weight:700}
+.log-cat{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;display:inline-block}
+.log-cat.learn{background:var(--green-soft);color:var(--green)}
+.log-cat.fine{background:var(--red-soft);color:var(--red)}
+.log-cat.shop{background:var(--blue-soft);color:var(--blue)}
+.log-cat.admin{background:var(--gray-100);color:var(--gray-600)}
+
+/* ── LINK GENERATOR TAB ── */
+.link-card{background:var(--white);border:1.5px solid var(--gray-200);border-radius:16px;padding:18px 20px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.link-stu-name{font-size:15px;font-weight:900;flex:1}
+.link-url{font-size:11px;color:var(--gray-400);background:var(--gray-100);border-radius:8px;padding:8px 12px;flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace}
+.link-copy-btn{padding:9px 16px;border-radius:10px;border:1.5px solid var(--fire-border);background:var(--fire-soft);color:var(--fire);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0}
+.link-copy-btn:hover{background:var(--fire);color:#fff}
 .link-copy-btn.copied{background:var(--green-soft);border-color:var(--green);color:var(--green)}
 
 /* ── TOAST ── */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--gray-800);color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;z-index:9999;animation:toast-in .3s ease;pointer-events:none}
 @keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
-/* ── 학생 수정 모달 ── */
-.edit-modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
-.edit-modal-overlay.open{display:flex}
-.edit-modal{background:var(--white);border-radius:20px;padding:26px 24px;width:min(420px,96vw);box-shadow:0 24px 60px rgba(0,0,0,.18)}
-.edit-modal-title{font-size:17px;font-weight:900;margin-bottom:4px}
-.edit-modal-sub{font-size:12px;color:var(--gray-400);margin-bottom:20px}
-.edit-field{margin-bottom:14px}
-.edit-field label{display:block;font-size:12px;font-weight:700;color:var(--gray-600);margin-bottom:6px}
-.edit-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+/* ── REFRESH BTN ── */
+.refresh-btn{padding:7px 14px;border-radius:10px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px}
+.refresh-btn:hover{border-color:var(--fire-border);color:var(--fire)}
+.spin{animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-@media(max-width:600px){.main{padding:14px}.hdr{padding:0 14px}.link-card{flex-wrap:wrap}.link-url{flex:100%;order:3}}
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .main{padding:16px}
+  .hdr{padding:0 16px}
+  .link-card{flex-wrap:wrap}
+  .link-url{flex:100%;order:3}
+}
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- ── LOGIN ── -->
 <div class="login-wrap" id="login-wrap">
   <div class="login-box">
     <div class="login-logo">🔥</div>
     <div class="login-title">모각공 어드민</div>
     <div class="login-sub">선생님 전용 관리 화면이에요</div>
-    <input class="login-inp" type="password" id="pw-inp" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <input class="login-inp" type="password" id="pw-inp" placeholder="비밀번호"
+           onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="login-btn" onclick="doLogin()">로그인</button>
     <div class="login-err" id="login-err">비밀번호가 틀렸어요</div>
   </div>
 </div>
 
-<!-- APP -->
+<!-- ── APP ── -->
 <div class="app" id="app">
+
+  <!-- HEADER -->
   <header class="hdr">
-    <div class="hdr-brand">🔥 모각공 <span>어드민</span></div>
+    <div class="hdr-brand">
+      <span class="hdr-fire">🔥</span>
+      <span class="hdr-name">모각공 <span>어드민</span></span>
+    </div>
     <div class="hdr-right">
       <span class="hdr-date" id="hdr-date"></span>
       <a class="hdr-kiosk" href="https://bakuum-kiosk.pages.dev" target="_blank">🖥️ 키오스크</a>
@@ -226,97 +282,145 @@ body{background:var(--bg);color:var(--gray-800);font-family:'Noto Sans KR',sans-
     </div>
   </header>
 
+  <!-- MAIN -->
   <main class="main">
+
+    <!-- TABS -->
     <div class="tabs">
       <button class="tab active" onclick="switchTab('missions',this)">📋 미션 입력</button>
       <button class="tab" onclick="switchTab('overview',this)">👀 현황 보기</button>
-      <button class="tab" onclick="switchTab('students',this)">🎓 학생 관리</button>
+      <button class="tab" onclick="switchTab('students',this)">🎓 학생 현황</button>
       <button class="tab" onclick="switchTab('links',this)">🔗 링크 생성</button>
     </div>
 
-    <!-- ── 미션 입력 ── -->
+    <!-- ── TAB: 미션 입력 ── -->
     <div id="tab-missions">
       <div class="mission-editor">
         <div class="editor-head">
           <div class="editor-title">📋 오늘의 미션 입력</div>
         </div>
-        <div style="padding:0 20px">
-          <div class="cat-filter" id="mission-cat-filter"></div>
+        <div style="padding:0 22px">
+          <div style="font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">학생 선택</div>
           <div class="student-selector" id="mission-student-selector">
             <span style="font-size:12px;color:var(--gray-400)">로딩 중...</span>
           </div>
         </div>
         <div class="editor-body" id="mission-editor-body">
-          <div class="no-student">위에서 학생을 선택해주세요 👆</div>
+          <div class="no-student">학생을 선택하면 미션을 입력할 수 있어요 👆</div>
         </div>
       </div>
     </div>
 
-    <!-- ── 현황 보기 ── -->
+    <!-- ── TAB: 현황 보기 ── -->
     <div id="tab-overview" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:15px;font-weight:900">📋 오늘의 미션 현황</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div class="cat-filter" id="overview-cat-filter" style="margin-bottom:0"></div>
-          <button class="refresh-btn" onclick="loadOverview()">↻ 새로고침</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div class="sec-title" style="margin-bottom:0">📋 오늘의 미션 <span>현황</span></div>
+        <button class="refresh-btn" onclick="loadOverview()">↻ 새로고침</button>
+      </div>
+      <div class="overview-grid" id="overview-grid">
+        <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
+      </div>
+    </div>
+
+    <!-- ── TAB: 학생 현황 ── -->
+    <div id="tab-students" style="display:none">
+
+      <!-- 모각공 전용 학생 관리 -->
+      <div style="background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);padding:18px 20px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="sec-title" style="margin-bottom:3px">🔥 모각공 전용 학생</div>
+            <div style="font-size:12px;color:var(--gray-400)">키오스크와 별개로 모각공에서만 관리되는 학생이에요</div>
+          </div>
+          <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
+        </div>
+        <!-- 추가 입력 -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input class="inp" id="new-mogak-student" placeholder="학생 이름 입력..."
+                 onkeydown="if(event.key==='Enter')addMogakStudent()"
+                 style="flex:1;font-size:14px"/>
+          <button class="btn btn-blue" onclick="addMogakStudent()" style="white-space:nowrap">+ 추가</button>
+        </div>
+        <!-- 모각공 전용 학생 목록 -->
+        <div id="mogak-student-list" style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="color:var(--gray-400);font-size:13px">로딩 중...</span>
         </div>
       </div>
-      <div class="overview-grid" id="overview-grid"><div style="color:var(--gray-400);font-size:13px">로딩 중...</div></div>
-    </div>
 
-    <!-- ── 학생 관리 ── -->
-    <div id="tab-students" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:15px;font-weight:900">🎓 학생 관리</div>
-        <button class="refresh-btn" onclick="loadStudents()">↻ 새로고침</button>
+      <!-- 키오스크 학생 (읽기 전용) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="sec-title" style="margin-bottom:3px">🖥️ 키오스크 학생 <span>(수학 수업)</span></div>
+          <div style="font-size:12px;color:var(--gray-400)">키오스크에서 관리되는 학생이에요 — 모각공 미션도 설정 가능해요</div>
+        </div>
       </div>
-      <div id="student-categories"></div>
+      <div class="student-grid" id="student-grid">
+        <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
+      </div>
+
+      <div class="sec-title" style="margin-top:20px">📊 포인트 <span>내역</span></div>
+      <div style="background:var(--white);border-radius:16px;border:1.5px solid var(--gray-200);overflow:hidden">
+        <table class="log-table" id="log-table">
+          <thead><tr>
+            <th>학생</th><th>변동</th><th>사유</th><th>분류</th><th>일시</th>
+          </tr></thead>
+          <tbody id="log-body"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-400)">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- ── 링크 생성 ── -->
+    <!-- ── TAB: 링크 생성 ── -->
     <div id="tab-links" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:15px;font-weight:900">🔗 학생별 링크</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div class="sec-title" style="margin-bottom:0">🔗 학생별 카카오 <span>링크</span></div>
         <button class="refresh-btn" onclick="loadLinks()">↻ 새로고침</button>
       </div>
-      <div style="background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px;padding:12px 16px;font-size:13px;color:var(--fire);font-weight:600;margin-bottom:14px">
-        🔗 링크를 카카오톡으로 학생에게 보내면 본인 이름으로 모각공이 열려요!
+      <div style="background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px;padding:12px 16px;font-size:13px;color:var(--fire);font-weight:600;margin-bottom:16px">
+        🔗 아래 링크를 카카오톡으로 각 학생에게 보내면 돼요! 학생이 링크를 누르면 본인 이름으로 모각공이 열려요.
       </div>
-      <div id="link-list"><div style="color:var(--gray-400);font-size:13px">로딩 중...</div></div>
+      <div id="link-list">
+        <div style="color:var(--gray-400);font-size:13px">로딩 중...</div>
+      </div>
     </div>
+
   </main>
 </div>
 
 <script>
-// ── 설정 ─────────────────────────────────────────────────────────────────────
+// ── CONFIG ──────────────────────────────────────────────────────────────────
 const KIOSK = 'https://bakuum-kiosk.pages.dev';
 const MOGAKGONG_URL = 'https://mogakgong.pages.dev/index.html';
-const CATS = ['초등영어','중고등영어','초등수학','중고등수학'];
-const KIOSK_CATS = ['초등수학','중고등수학']; // 키오스크 학생이 들어갈 카테고리
 
-// ── 상태 ─────────────────────────────────────────────────────────────────────
+// ── STATE ────────────────────────────────────────────────────────────────────
 let PW = '';
-let KIOSK_STUDENTS = [];
-// MOGAK_DATA 구조: { 카테고리: { classes:[...], students:[{name,class}] } }
-let MOGAK_DATA = {};
-let STUDENTS = [];       // 전체 (미션 편집용)
-let ALL_MISSIONS = {};
+let KIOSK_STUDENTS = [];   // 키오스크 DB 학생 (수학 수업)
+let MOGAK_STUDENTS = [];   // 모각공 전용 학생 (app_config에 저장)
+let STUDENTS = [];         // 합친 전체 목록 (미션 편집에서 사용)
+let ALL_MISSIONS = {};   // { studentName: [{text, hint}, ...] }
 let selectedStudent = null;
-let currentMissions = [];
+let currentMissions = [];  // missions for selected student
 let currentTab = 'missions';
-let missionCatFilter = '전체';
-let overviewCatFilter = '전체';
 
-// ── 로그인 ────────────────────────────────────────────────────────────────────
+// ── LOGIN ────────────────────────────────────────────────────────────────────
 async function doLogin() {
   const pw = document.getElementById('pw-inp').value.trim();
   if (!pw) return;
+  // 키오스크 어드민 API로 인증 확인
   try {
-    const res = await fetch(KIOSK + '/api/admin/auth', { headers: {'X-Admin-Password': pw} });
+    const res = await fetch(KIOSK + '/api/admin/auth', {
+      headers: { 'X-Admin-Password': pw }
+    });
     const d = await res.json();
-    if (d.success) { PW = pw; sessionStorage.setItem('mogak_admin_pw', pw); showApp(); }
-    else showLoginErr();
-  } catch { showLoginErr(); }
+    if (d.success) {
+      PW = pw;
+      sessionStorage.setItem('mogak_admin_pw', pw);
+      showApp();
+    } else {
+      showLoginErr();
+    }
+  } catch(e) {
+    showLoginErr();
+  }
 }
 function showLoginErr() {
   document.getElementById('login-err').classList.add('show');
@@ -332,289 +436,208 @@ function showApp() {
   document.getElementById('login-wrap').style.display = 'none';
   document.getElementById('app').classList.add('visible');
   const d = new Date();
-  document.getElementById('hdr-date').textContent = d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일';
+  document.getElementById('hdr-date').textContent =
+    d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일';
   initApp();
 }
 
-// ── API ───────────────────────────────────────────────────────────────────────
+// ── INIT ─────────────────────────────────────────────────────────────────────
+async function initApp() {
+  await loadStudents();      // 키오스크 + 모각공 전용 학생 모두 로드
+  await loadTodayMissions();
+  renderMissionStudentSelector();
+}
+
+// ── API 헬퍼 ────────────────────────────────────────────────────────────────
 async function api(path, method='GET', body=null) {
-  const opts = { headers: {'X-Admin-Password': PW} };
-  if (method !== 'GET') { opts.method = method; opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const opts = { headers: { 'X-Admin-Password': PW } };
+  if (method !== 'GET') {
+    opts.method = method;
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
   const res = await fetch(KIOSK + path, opts);
   return res.json();
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
-async function initApp() {
-  await loadStudents();
-  await loadTodayMissions();
-  renderMissionCatFilter();
-  renderMissionStudentSelector();
-}
-
-// ── 학생 로드 ─────────────────────────────────────────────────────────────────
-async function loadMogakData() {
+// ── STUDENTS ─────────────────────────────────────────────────────────────────
+// 모각공 전용 학생 로드/저장 (kiosk app_config에 mogak_students 키로 저장)
+async function loadMogakStudents() {
   try {
     const res = await fetch(KIOSK + '/api/config');
     const cfg = await res.json();
-    const saved = cfg.mogak_data || {};
-    // 각 카테고리 초기화
-    MOGAK_DATA = {};
-    CATS.forEach(cat => {
-      MOGAK_DATA[cat] = {
-        classes: saved[cat]?.classes || [],
-        students: saved[cat]?.students || []
-      };
-    });
-  } catch {
-    MOGAK_DATA = {};
-    CATS.forEach(cat => { MOGAK_DATA[cat] = {classes:[], students:[]}; });
-  }
+    MOGAK_STUDENTS = cfg.mogak_students || [];
+  } catch { MOGAK_STUDENTS = []; }
 }
-async function saveMogakData() {
+async function saveMogakStudents() {
   try {
     const res = await fetch(KIOSK + '/api/config');
     const cfg = await res.json();
-    cfg.mogak_data = MOGAK_DATA;
+    cfg.mogak_students = MOGAK_STUDENTS;
     await api('/api/admin/config', 'POST', cfg);
   } catch(e) { console.error(e); }
 }
 
 async function loadStudents() {
   try {
+    // 키오스크 학생 로드
     const d = await api('/api/students');
     if (d.success) KIOSK_STUDENTS = d.students;
-  } catch { KIOSK_STUDENTS = []; }
-  await loadMogakData();
+  } catch(e) { KIOSK_STUDENTS = []; }
 
-  // 전체 학생 목록 합치기
-  const allNames = new Set();
-  STUDENTS = [];
-  KIOSK_STUDENTS.forEach(s => { allNames.add(s.name); STUDENTS.push({...s, _kiosk:true}); });
-  CATS.forEach(cat => {
-    (MOGAK_DATA[cat]?.students || []).forEach(s => {
-      if (!allNames.has(s.name)) { allNames.add(s.name); STUDENTS.push({id:'mogak_'+s.name, name:s.name, points:null, _mogakOnly:true, _cat:cat, _class:s.class}); }
-    });
-  });
+  // 모각공 전용 학생 로드
+  await loadMogakStudents();
 
-  renderStudentCategories();
+  // 전체 합치기 (중복 이름 제거 — 키오스크 우선)
+  const kioskNames = new Set(KIOSK_STUDENTS.map(s => s.name));
+  const mogakOnly = MOGAK_STUDENTS.filter(name => !kioskNames.has(name));
+
+  // STUDENTS = 키오스크 + 모각공 전용 (미션 편집용 통합)
+  STUDENTS = [
+    ...KIOSK_STUDENTS,
+    ...mogakOnly.map(name => ({ id: 'mogak_' + name, name, points: null, _mogakOnly: true }))
+  ];
+
+  renderStudentGrid();
+  renderMogakStudentList();
   renderMissionStudentSelector();
+  renderLogTable();
 }
 
-// ── 학생 관리 화면 ────────────────────────────────────────────────────────────
-const CAT_COLORS = {'초등영어':'cat-초등영어','중고등영어':'cat-중고등영어','초등수학':'cat-초등수학','중고등수학':'cat-중고등수학'};
-const CAT_ICONS = {'초등영어':'📘','중고등영어':'📗','초등수학':'📐','중고등수학':'📏'};
-
-function renderStudentCategories() {
-  const el = document.getElementById('student-categories');
-  if (!el) return;
-  el.innerHTML = CATS.map(cat => renderCatSection(cat)).join('');
-}
-
-function renderCatSection(cat) {
-  const data = MOGAK_DATA[cat] || {classes:[], students:[]};
-  const isKioskCat = KIOSK_CATS.includes(cat);
-  const colorCls = CAT_COLORS[cat];
-  const icon = CAT_ICONS[cat];
-
-  // 키오스크 학생 (해당 카테고리면 표시)
-  const kioskStudents = isKioskCat ? KIOSK_STUDENTS : [];
-
-  // 클래스별 모각공 학생
-  const classGroups = {};
-  data.students.forEach(s => {
-    const cls = s.class || '미분류';
-    if (!classGroups[cls]) classGroups[cls] = [];
-    classGroups[cls].push(s.name);
-  });
-
-  // 클래스 없는 학생
-  const noClass = data.students.filter(s => !s.class || s.class === '미분류');
-
-  let chipsHTML = '';
-
-  // 클래스별 렌더
-  data.classes.forEach(cls => {
-    const stuList = classGroups[cls] || [];
-    chipsHTML += `<div class="class-group">
-      <div class="class-label">
-        ${escHtml(cls)}
-        <span class="class-label-del" onclick="deleteClass('${escHtml(cat)}','${escHtml(cls)}')">✕ 클래스 삭제</span>
-      </div>
-      <div class="student-chips">
-        ${stuList.map(n => `<div class="stu-chip">
-          ${escHtml(n)}
-          <span class="stu-chip-del" style="color:var(--blue);opacity:.7" onclick="openEditStudent('${escHtml(cat)}','${escHtml(n)}')">✏️</span>
-          <span class="stu-chip-del" onclick="deleteMogakStudent('${escHtml(cat)}','${escHtml(n)}')">✕</span>
-        </div>`).join('')}
-        ${!stuList.length ? '<span style="font-size:12px;color:var(--gray-400)">학생 없음</span>' : ''}
-      </div>
-    </div>`;
-  });
-
-  // 미분류 학생
-  if (noClass.length) {
-    chipsHTML += `<div class="class-group">
-      <div class="class-label">미분류</div>
-      <div class="student-chips">
-        ${noClass.map(s => `<div class="stu-chip">
-          ${escHtml(s.name)}
-          <span class="stu-chip-del" style="color:var(--blue);opacity:.7" onclick="openEditStudent('${escHtml(cat)}','${escHtml(s.name)}')">✏️</span>
-          <span class="stu-chip-del" onclick="deleteMogakStudent('${escHtml(cat)}','${escHtml(s.name)}')">✕</span>
-        </div>`).join('')}
-      </div>
-    </div>`;
-  }
-
-  // 키오스크 학생
-  if (kioskStudents.length) {
-    chipsHTML += `<div class="class-group">
-      <div class="class-label">🖥️ 키오스크 연동 (수정 불가)</div>
-      <div class="student-chips">
-        ${kioskStudents.map(s => `<div class="stu-chip kiosk">🖥️ ${escHtml(s.name)} <span style="font-size:11px;color:#16A34A">🏅${s.points}P</span></div>`).join('')}
-      </div>
-    </div>`;
-  }
-
-  if (!chipsHTML) chipsHTML = '<div style="font-size:13px;color:var(--gray-400);padding:4px 0">학생이 없어요. 아래에서 추가해보세요!</div>';
-
-  // 클래스 목록 옵션
-  const classOptions = data.classes.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
-
-  return `<div class="cat-section">
-    <div class="cat-section-head ${colorCls}">${icon} ${cat}
-      <span style="font-size:12px;font-weight:600;opacity:.7">${data.students.length + kioskStudents.length}명</span>
-    </div>
-    <div class="cat-section-body">
-      ${chipsHTML}
-      <!-- 클래스 추가 -->
-      <div class="add-stu-form">
-        <input class="inp" id="new-class-${cat}" placeholder="새 클래스 이름 (예: A반, 월수반)" style="flex:1;min-width:100px"/>
-        <button class="btn btn-gray btn-sm" onclick="addClass('${escHtml(cat)}')">+ 클래스 추가</button>
-      </div>
-      <!-- 학생 추가 -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <input class="inp" id="new-stu-name-${cat}" placeholder="학생 이름" style="flex:1;min-width:80px"/>
-        <select class="sel" id="new-stu-class-${cat}" style="min-width:90px">
-          <option value="">클래스 없음</option>
-          ${classOptions}
-        </select>
-        <button class="btn btn-blue btn-sm" onclick="addMogakStudent('${escHtml(cat)}')">+ 학생 추가</button>
-      </div>
-    </div>
-  </div>`;
-}
-
-// ── 클래스 추가/삭제 ──────────────────────────────────────────────────────────
-async function addClass(cat) {
-  const inp = document.getElementById('new-class-' + cat);
+// 모각공 전용 학생 추가
+async function addMogakStudent() {
+  const inp = document.getElementById('new-mogak-student');
   if (!inp) return;
   const name = inp.value.trim();
   if (!name) { inp.focus(); return; }
-  if (!MOGAK_DATA[cat]) MOGAK_DATA[cat] = {classes:[], students:[]};
-  if (MOGAK_DATA[cat].classes.includes(name)) { toast('⚠️ 이미 있는 클래스예요'); return; }
-  MOGAK_DATA[cat].classes.push(name);
+
+  // 중복 체크
+  const allNames = [...KIOSK_STUDENTS.map(s=>s.name), ...MOGAK_STUDENTS];
+  if (allNames.includes(name)) { toast('⚠️ 이미 있는 학생이에요'); inp.focus(); return; }
+
+  MOGAK_STUDENTS.push(name);
+  await saveMogakStudents();
   inp.value = '';
-  await saveMogakData();
-  renderStudentCategories();
-  toast('✅ ' + name + ' 클래스 추가됨!');
-}
-async function deleteClass(cat, cls) {
-  if (!confirm(cls + ' 클래스를 삭제할까요? (학생은 미분류로 이동돼요)')) return;
-  MOGAK_DATA[cat].classes = MOGAK_DATA[cat].classes.filter(c => c !== cls);
-  // 해당 클래스 학생들 미분류로
-  MOGAK_DATA[cat].students = MOGAK_DATA[cat].students.map(s => s.class === cls ? {...s, class:''} : s);
-  await saveMogakData();
-  renderStudentCategories();
-  toast('🗑️ ' + cls + ' 삭제됨');
-}
-
-// ── 학생 추가/삭제 ────────────────────────────────────────────────────────────
-async function addMogakStudent(cat) {
-  const nameInp = document.getElementById('new-stu-name-' + cat);
-  const classInp = document.getElementById('new-stu-class-' + cat);
-  if (!nameInp) return;
-  const name = nameInp.value.trim();
-  if (!name) { nameInp.focus(); return; }
-
-  // 중복 체크 (전체)
-  const allNames = [...KIOSK_STUDENTS.map(s=>s.name)];
-  CATS.forEach(c => (MOGAK_DATA[c]?.students||[]).forEach(s => allNames.push(s.name)));
-  if (allNames.includes(name)) { toast('⚠️ 이미 있는 학생이에요'); return; }
-
-  if (!MOGAK_DATA[cat]) MOGAK_DATA[cat] = {classes:[], students:[]};
-  MOGAK_DATA[cat].students.push({ name, class: classInp?.value || '' });
-  nameInp.value = '';
-  await saveMogakData();
   await loadStudents();
-  toast('✅ ' + name + ' 추가됨!');
+  toast('✅ ' + name + ' 추가됐어요!');
 }
-async function deleteMogakStudent(cat, name) {
-  if (!confirm(name + ' 학생을 삭제할까요?')) return;
-  MOGAK_DATA[cat].students = MOGAK_DATA[cat].students.filter(s => s.name !== name);
+
+// 모각공 전용 학생 삭제
+async function deleteMogakStudent(name) {
+  if (!confirm(name + ' 학생을 모각공에서 삭제할까요?')) return;
+  MOGAK_STUDENTS = MOGAK_STUDENTS.filter(n => n !== name);
+  // 해당 학생 미션도 삭제
   delete ALL_MISSIONS[name];
-  await saveMogakData();
+  await saveMogakStudents();
   await saveTodayMissions();
-  if (selectedStudent === name) { selectedStudent = null; renderMissionEditor(); }
   await loadStudents();
-  toast('🗑️ ' + name + ' 삭제됨');
+  if (selectedStudent === name) { selectedStudent = null; renderMissionEditor(); }
+  toast('🗑️ ' + name + ' 삭제됐어요');
 }
 
-// ── 미션 로드/저장 ────────────────────────────────────────────────────────────
+// 모각공 전용 학생 목록 렌더
+function renderMogakStudentList() {
+  const el = document.getElementById('mogak-student-list');
+  if (!el) return;
+  if (!MOGAK_STUDENTS.length) {
+    el.innerHTML = '<span style="color:var(--gray-400);font-size:13px">아직 추가된 학생이 없어요. 위에서 추가해보세요!</span>';
+    return;
+  }
+  el.innerHTML = MOGAK_STUDENTS.map(name => {
+    const mCount = (ALL_MISSIONS[name] || []).length;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--fire-soft);border:1.5px solid var(--fire-border);border-radius:12px">
+      <span style="font-size:14px;font-weight:700">${escHtml(name)}</span>
+      ${mCount ? `<span style="font-size:11px;font-weight:700;color:var(--green)">✅ ${mCount}개</span>` : '<span style="font-size:11px;color:var(--gray-400)">미설정</span>'}
+      <button class="btn btn-red btn-xs" onclick="deleteMogakStudent('${escHtml(name)}')" style="margin-left:4px">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderStudentGrid() {
+  const g = document.getElementById('student-grid');
+  if (!KIOSK_STUDENTS.length) { g.innerHTML = '<div style="color:var(--gray-400)">키오스크 학생 없음</div>'; return; }
+  g.innerHTML = KIOSK_STUDENTS.map(s => {
+    const mCount = (ALL_MISSIONS[s.name] || []).length;
+    return `<div class="stu-card">
+      <div class="stu-av">${s.name[0]}</div>
+      <div class="stu-name">${s.name}</div>
+      <div class="stu-pts">🏅 ${s.points} 포인트</div>
+      <div class="stu-mission-badge ${mCount ? 'set' : ''}">
+        ${mCount ? '✅ 오늘 미션 ' + mCount + '개' : '미션 미설정'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function renderLogTable() {
+  const tbody = document.getElementById('log-body');
+  try {
+    const rows = [];
+    for (const s of STUDENTS.slice(0,7)) {
+      const d = await api('/api/students/' + s.id);
+      if (d.success) {
+        d.history.forEach(h => rows.push({ name: s.name, ...h }));
+      }
+    }
+    rows.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    tbody.innerHTML = rows.slice(0,40).map(r => `
+      <tr>
+        <td style="font-weight:700">${r.name}</td>
+        <td><span class="log-delta ${r.delta >= 0 ? 'pos' : 'neg'}">${r.delta >= 0 ? '+' : ''}${r.delta}</span></td>
+        <td style="font-size:12px;color:var(--gray-600);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.reason}</td>
+        <td><span class="log-cat ${r.category}">${{learn:'학습',fine:'벌금',shop:'상점',admin:'조정'}[r.category]||r.category}</span></td>
+        <td style="font-size:11px;color:var(--gray-400)">${r.created_at?.slice(0,16).replace('T',' ')||'-'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray-400);padding:20px">불러오기 실패</td></tr>';
+  }
+}
+
+// ── MISSIONS (kiosk app_config에 저장) ──────────────────────────────────────
 function getTodayKey() {
   const d = new Date();
   return 'mogakgong_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
 }
+
 async function loadTodayMissions() {
   try {
+    // kiosk config에서 mogakgong 미션 데이터 불러오기
     const res = await fetch(KIOSK + '/api/config');
     const cfg = await res.json();
-    ALL_MISSIONS = cfg[getTodayKey()] || {};
-  } catch { ALL_MISSIONS = {}; }
+    const todayKey = getTodayKey();
+    ALL_MISSIONS = cfg[todayKey] || {};
+  } catch(e) {
+    ALL_MISSIONS = {};
+  }
 }
+
 async function saveTodayMissions() {
   try {
+    // 현재 kiosk 설정 불러오기
     const res = await fetch(KIOSK + '/api/config');
     const cfg = await res.json();
-    cfg[getTodayKey()] = ALL_MISSIONS;
-    await api('/api/admin/config', 'POST', cfg);
-    return true;
-  } catch { return false; }
-}
-
-// ── 미션 탭 카테고리 필터 ────────────────────────────────────────────────────
-function renderMissionCatFilter() {
-  const el = document.getElementById('mission-cat-filter');
-  if (!el) return;
-  const all = ['전체', ...CATS];
-  el.innerHTML = all.map(c => `<button class="cat-btn ${c!=='전체'?'cat-'+c:''} ${missionCatFilter===c?'active':''}"
-    onclick="missionCatFilter='${c}';renderMissionCatFilter();renderMissionStudentSelector()">${c}</button>`).join('');
-}
-
-// ── 미션 학생 셀렉터 ──────────────────────────────────────────────────────────
-function getStudentCat(name) {
-  for (const cat of CATS) {
-    if ((MOGAK_DATA[cat]?.students||[]).some(s=>s.name===name)) return cat;
-    if (KIOSK_CATS.includes(cat) && KIOSK_STUDENTS.some(s=>s.name===name)) return cat;
+    // 오늘 미션 추가
+    const todayKey = getTodayKey();
+    cfg[todayKey] = ALL_MISSIONS;
+    // 저장
+    const saveRes = await api('/api/admin/config', 'POST', cfg);
+    return saveRes.success;
+  } catch(e) {
+    return false;
   }
-  return null;
 }
 
+// ── MISSION EDITOR ───────────────────────────────────────────────────────────
 function renderMissionStudentSelector() {
   const el = document.getElementById('mission-student-selector');
-  if (!el) return;
-  let list = STUDENTS;
-  if (missionCatFilter !== '전체') {
-    list = STUDENTS.filter(s => getStudentCat(s.name) === missionCatFilter);
-  }
-  if (!list.length) { el.innerHTML = '<span style="font-size:12px;color:var(--gray-400)">해당 카테고리 학생 없음</span>'; return; }
-  el.innerHTML = list.map(s => {
-    const mCount = (ALL_MISSIONS[s.name]||[]).length;
-    const hasMissions = mCount > 0;
+  if (!STUDENTS.length) { el.innerHTML = '<span style="font-size:12px;color:var(--gray-400)">학생 없음</span>'; return; }
+  el.innerHTML = STUDENTS.map(s => {
+    const hasMissions = (ALL_MISSIONS[s.name] || []).length > 0;
     const isActive = selectedStudent === s.name;
-    const statusTxt = hasMissions ? ('✅ '+mCount+'개') : '미설정';
-    const badge = s._kiosk ? '🖥️' : '🔥';
-    return `<button class="stu-sel-btn ${isActive?'active':''} ${hasMissions?'has-missions':''}"
+    const mCount = (ALL_MISSIONS[s.name] || []).length;
+    const statusTxt = hasMissions ? `✅ ${mCount}개` : '미설정';
+    const badge = s._mogakOnly ? '🔥' : '🖥️';
+    return `<button class="stu-sel-btn ${isActive ? 'active' : ''} ${hasMissions ? 'has-missions' : ''}"
       onclick="selectMissionStudent('${escHtml(s.name)}')">
       <div class="sel-av">${s.name[0]}</div>
       <span>${escHtml(s.name)}</span>
@@ -625,50 +648,70 @@ function renderMissionStudentSelector() {
 
 function selectMissionStudent(name) {
   selectedStudent = name;
-  currentMissions = (ALL_MISSIONS[name]||[]).map(m=>({...m}));
-  if (!currentMissions.length) currentMissions = getDefaultMissions();
+  currentMissions = (ALL_MISSIONS[name] || []).map(m => ({...m}));
+  if (currentMissions.length === 0) {
+    currentMissions = getDefaultMissions();
+  }
   renderMissionStudentSelector();
   renderMissionEditor();
 }
 
 function getDefaultMissions() {
-  return [{text:'개념 복습',hint:''},{text:'유형 연습문제',hint:''}];
+  return [
+    { text: '개념 복습', hint: '교재 읽기' },
+    { text: '유형 연습문제', hint: '풀기' },
+    { text: '틀린 문제 다시 풀기', hint: '오답 노트' },
+    { text: '심화 문제', hint: '도전 문제' },
+    { text: '선생님께 질문 정리', hint: '메모해두기' },
+  ];
 }
 
-// ── 프리셋 ─────────────────────────────────────────────────────────────────────
-const DEFAULT_PRESETS = ['숙제 제출하기','숙제 오답하기'];
+// ── 프리셋 & 최근 입력 관리 ────────────────────────────────────────────────
+const DEFAULT_PRESETS = ['숙제 제출하기', '숙제 오답하기'];
+
 function loadCustomPresets() {
-  try { const s=localStorage.getItem('mogak_presets'); return s?JSON.parse(s):[...DEFAULT_PRESETS]; }
-  catch { return [...DEFAULT_PRESETS]; }
+  try {
+    const saved = localStorage.getItem('mogak_presets');
+    if (saved) return JSON.parse(saved);
+    // 저장된 게 없을 때만 기본값 사용
+    return [...DEFAULT_PRESETS];
+  } catch { return [...DEFAULT_PRESETS]; }
 }
-function saveCustomPresets(arr) { localStorage.setItem('mogak_presets',JSON.stringify(arr)); }
+function saveCustomPresets(arr) {
+  localStorage.setItem('mogak_presets', JSON.stringify(arr));
+}
 function loadDefaultPresets() {
-  try { return JSON.parse(localStorage.getItem('mogak_default_presets')||'null')||[...DEFAULT_PRESETS]; }
-  catch { return [...DEFAULT_PRESETS]; }
+  try {
+    return JSON.parse(localStorage.getItem('mogak_default_presets') || 'null') || [...DEFAULT_PRESETS];
+  } catch { return [...DEFAULT_PRESETS]; }
 }
-function saveDefaultPresets(arr) { localStorage.setItem('mogak_default_presets',JSON.stringify(arr)); }
+function saveDefaultPresets(arr) {
+  localStorage.setItem('mogak_default_presets', JSON.stringify(arr));
+}
 let PRESETS = loadCustomPresets();
 
+// 최근 입력 (최대 10개)
 function loadRecentMissions() {
-  try { return JSON.parse(localStorage.getItem('mogak_recent')||'[]'); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('mogak_recent') || '[]'); }
+  catch { return []; }
 }
 function addRecentMission(text) {
   if (!text.trim()) return;
-  let r = loadRecentMissions();
-  r = [text, ...r.filter(x=>x!==text)].slice(0,10);
-  localStorage.setItem('mogak_recent', JSON.stringify(r));
+  let recents = loadRecentMissions();
+  recents = [text, ...recents.filter(r => r !== text)].slice(0, 10);
+  localStorage.setItem('mogak_recent', JSON.stringify(recents));
 }
 
-// ── 미션 에디터 렌더 ─────────────────────────────────────────────────────────
 function renderMissionEditor() {
   const body = document.getElementById('mission-editor-body');
-  if (!body) return;
-  if (!selectedStudent) { body.innerHTML = '<div class="no-student">위에서 학생을 선택해주세요 👆</div>'; return; }
+  if (!selectedStudent) {
+    body.innerHTML = '<div class="no-student">위에서 학생을 선택해주세요 👆</div>';
+    return;
+  }
   const recents = loadRecentMissions();
-
   const recentHTML = recents.length ? `
     <div class="recent-section">
-      <div class="preset-label">🕐 최근 입력</div>
+      <div class="preset-label">🕐 최근 입력한 미션</div>
       <div class="recent-chips">${recents.map(r =>
         `<button class="recent-chip" data-preset="${escHtml(r)}" onclick="addPresetFromChip(this)">${escHtml(r)}</button>`
       ).join('')}</div>
@@ -676,9 +719,9 @@ function renderMissionEditor() {
 
   body.innerHTML = `
     <div class="selected-student-name">
-      ${escHtml(selectedStudent)}
+      ${selectedStudent}
       <span class="fire-tag">🔥 오늘의 미션</span>
-      <span style="font-size:12px;color:var(--gray-400);font-weight:400" id="mission-count-lbl">총 ${currentMissions.length}개</span>
+      <span style="font-size:12px;color:var(--gray-400);font-weight:400">총 ${currentMissions.length}개</span>
     </div>
     ${recentHTML}
     <div class="preset-section">
@@ -689,21 +732,28 @@ function renderMissionEditor() {
       <div class="preset-chips" id="preset-chips-wrap">${PRESETS.map(p =>
         `<button class="preset-chip" data-preset="${escHtml(p)}" onclick="addPresetFromChip(this)">${escHtml(p)}</button>`
       ).join('')}</div>
+
+      <!-- 인라인 편집 영역 -->
       <div class="preset-editor" id="preset-editor">
-        <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">수정 후 바깥 클릭하면 자동 저장 / ✕로 삭제</div>
+        <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px;font-weight:600">
+          항목을 직접 수정하거나 삭제할 수 있어요. 수정 후 바깥 클릭하면 자동 저장돼요.
+        </div>
         <div class="preset-edit-list" id="preset-edit-list"></div>
         <div class="preset-add-row">
-          <input class="preset-edit-inp" id="preset-add-inp" placeholder="새 항목..."
-                 onkeydown="if(event.key==='Enter'){event.preventDefault();addPresetItem();}"/>
-          <button class="btn btn-blue btn-sm" onclick="addPresetItem()">+ 추가</button>
+          <input class="preset-edit-inp" id="preset-add-inp"
+                 placeholder="새 항목 입력..."
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();addPresetFromEditor();}"/>
+          <button class="btn btn-blue btn-sm" onclick="addPresetFromEditor()">+ 추가</button>
         </div>
         <div class="preset-editor-btns">
-          <button class="btn btn-gray btn-sm" onclick="resetPresets()">🔄 기본값으로</button>
-          <button class="btn btn-gray btn-sm" onclick="setAsDefault()">📌 현재를 기본값으로</button>
+          <button class="btn btn-gray btn-sm" onclick="resetPresets()" title="저장된 기본값으로 되돌리기">🔄 기본값으로 되돌리기</button>
+          <button class="btn btn-blue btn-sm" onclick="setAsDefault()" title="현재 목록을 기본값으로 저장">⭐ 현재를 기본값으로 저장</button>
         </div>
       </div>
     </div>
-    <div class="mission-list" id="current-mission-list">${renderMissionRows()}</div>
+    <div class="mission-list" id="current-mission-list">
+      ${renderMissionRows()}
+    </div>
     <div class="add-mission-row">
       <input class="add-mission-inp" id="new-mission-inp" placeholder="새 미션 직접 입력..."
              onkeydown="if(event.key==='Enter')addMission()"/>
@@ -719,9 +769,11 @@ function renderMissionEditor() {
 }
 
 function renderMissionRows() {
-  if (!currentMissions.length) return '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:13px">미션을 추가해보세요!</div>';
-  return currentMissions.map((m,i) => `
-    <div class="mission-row">
+  if (!currentMissions.length) {
+    return '<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">미션을 추가해보세요!</div>';
+  }
+  return currentMissions.map((m, i) => `
+    <div class="mission-row" id="mrow-${i}">
       <span class="mission-num">${i+1}</span>
       <input class="mission-text-input" value="${escHtml(m.text)}" placeholder="미션 내용"
              oninput="currentMissions[${i}].text=this.value"/>
@@ -731,38 +783,166 @@ function renderMissionRows() {
     </div>`).join('');
 }
 
-function refreshMissionList() {
-  const el = document.getElementById('current-mission-list');
-  if (el) el.innerHTML = renderMissionRows();
-  const lbl = document.getElementById('mission-count-lbl');
-  if (lbl) lbl.textContent = '총 ' + currentMissions.length + '개';
-}
-
 function addPresetFromChip(el) {
   const text = el.getAttribute('data-preset');
-  if (text) addPreset(text);
+  if (!text) return;
+  addPreset(text);
 }
+
 function addPreset(text) {
-  if (!text||!text.trim()) return;
+  if (!text || !text.trim()) return;
   if (!selectedStudent) { toast('⚠️ 먼저 학생을 선택해주세요'); return; }
-  currentMissions.push({text:text.trim(), hint:''});
+  currentMissions.push({ text: text.trim(), hint: '' });
   addRecentMission(text.trim());
   refreshMissionList();
+  // 시각 피드백
+  toast('✅ ' + text + ' 추가됨');
 }
+
 function addMission() {
   const inp = document.getElementById('new-mission-inp');
   const val = inp?.value.trim();
   if (!val) return;
-  currentMissions.push({text:val, hint:''});
+  currentMissions.push({ text: val, hint: '' });
   addRecentMission(val);
   inp.value = '';
   refreshMissionList();
 }
-function delMission(i) { currentMissions.splice(i,1); refreshMissionList(); }
+
+// ── 프리셋 편집 모달 ─────────────────────────────────────────────────────────
+// ── 프리셋 인라인 편집 ───────────────────────────────────────────────────────
+let _presetEditorOpen = false;
+
+function togglePresetEditor() {
+  _presetEditorOpen = !_presetEditorOpen;
+  const editor = document.getElementById('preset-editor');
+  const btn = document.getElementById('preset-edit-btn');
+  if (!editor) return;
+  if (_presetEditorOpen) {
+    editor.classList.add('open');
+    renderPresetEditList();
+    btn.textContent = '✕ 닫기';
+  } else {
+    editor.classList.remove('open');
+    btn.textContent = '✏️ 편집';
+  }
+}
+
+function renderPresetEditList() {
+  const el = document.getElementById('preset-edit-list');
+  if (!el) return;
+  if (!PRESETS.length) {
+    el.innerHTML = '<div style="color:var(--gray-400);font-size:13px;padding:8px 0">항목이 없어요. 아래에서 추가해주세요.</div>';
+    return;
+  }
+  el.innerHTML = PRESETS.map((p, i) => `
+    <div class="preset-edit-row">
+      <input class="preset-edit-inp" value="${escHtml(p)}"
+             onchange="PRESETS[${i}]=this.value.trim();saveCustomPresets(PRESETS);"
+             onblur="if(!this.value.trim()){PRESETS.splice(${i},1);saveCustomPresets(PRESETS);renderPresetEditList();refreshPresetChips();}"/>
+      <button class="btn btn-red btn-xs" onclick="PRESETS.splice(${i},1);saveCustomPresets(PRESETS);renderPresetEditList();refreshPresetChips();">✕</button>
+    </div>`).join('');
+}
+
+function addPresetFromEditor() {
+  const inp = document.getElementById('preset-add-inp');
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) { inp.focus(); return; }
+  PRESETS.push(val);
+  saveCustomPresets(PRESETS);
+  inp.value = '';
+  renderPresetEditList();
+  refreshPresetChips();
+  inp.focus();
+}
+
+function resetPresets() {
+  const defaults = loadDefaultPresets();
+  const msg = '기본값(' + defaults.join(', ') + ')으로 되돌릴까요?';
+  if (!confirm(msg)) return;
+  PRESETS = [...defaults];
+  saveCustomPresets(PRESETS);
+  renderPresetEditList();
+  refreshPresetChips();
+  toast('🔄 기본값으로 되돌렸어요');
+}
+
+// ── 기본값 직접 편집 ─────────────────────────────────────────────────────────
+let _defEditorOpen = false;
+function toggleDefaultEditor() {
+  _defEditorOpen = !_defEditorOpen;
+  const el = document.getElementById('default-editor-area');
+  const btn = document.getElementById('def-edit-btn');
+  if (!el || !btn) return;
+  el.style.display = _defEditorOpen ? 'block' : 'none';
+  btn.textContent = _defEditorOpen ? '▲ 접기' : '✏️ 기본값 직접 수정';
+  if (_defEditorOpen) renderDefaultList();
+}
+function renderDefaultList() {
+  const el = document.getElementById('default-list');
+  if (!el) return;
+  const defs = loadDefaultPresets();
+  el.innerHTML = defs.length
+    ? defs.map((p, i) => `
+        <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+          <input class="preset-edit-inp" value="${escHtml(p)}" data-di="${i}"
+                 style="flex:1" placeholder="기본값 항목"/>
+          <button class="btn btn-red btn-xs"
+            onclick="(function(){const d=loadDefaultPresets();d.splice(${i},1);saveDefaultPresets(d);renderDefaultList();})()">✕</button>
+        </div>`).join('')
+    : '<div style="color:var(--gray-400);font-size:12px;padding:4px 0">기본값 없음</div>';
+}
+function addDefaultItem() {
+  const inp = document.getElementById('def-add-inp');
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) { inp.focus(); return; }
+  const defs = loadDefaultPresets();
+  defs.push(val);
+  saveDefaultPresets(defs);
+  inp.value = '';
+  renderDefaultList();
+  inp.focus();
+}
+function saveDefaultItems() {
+  const inputs = document.querySelectorAll('#default-list .preset-edit-inp');
+  const vals = Array.from(inputs).map(el => el.value.trim()).filter(Boolean);
+  saveDefaultPresets(vals);
+  toast('✅ 기본값이 저장됐어요!');
+}
+
+function setAsDefault() {
+  if (!PRESETS.length) { toast('⚠️ 항목이 없어요'); return; }
+  if (!confirm('현재 목록(' + PRESETS.join(', ') + ')을 기본값으로 저장할까요?')) return;
+  saveDefaultPresets([...PRESETS]);
+  toast('✅ 현재 목록이 기본값으로 저장됐어요!');
+}
+
+function refreshPresetChips() {
+  const wrap = document.getElementById('preset-chips-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = PRESETS.map(p =>
+    `<button class="preset-chip" data-preset="${escHtml(p)}" onclick="addPresetFromChip(this)">${escHtml(p)}</button>`
+  ).join('');
+}
+
+function delMission(i) {
+  currentMissions.splice(i, 1);
+  refreshMissionList();
+}
+
+function refreshMissionList() {
+  const el = document.getElementById('current-mission-list');
+  if (el) el.innerHTML = renderMissionRows();
+  // update count
+  const nameEl = document.querySelector('.selected-student-name span:last-child');
+  if (nameEl) nameEl.textContent = '총 ' + currentMissions.length + '개';
+}
 
 async function saveMissions() {
   if (!selectedStudent) return;
-  ALL_MISSIONS[selectedStudent] = currentMissions.map(m=>({...m}));
+  ALL_MISSIONS[selectedStudent] = currentMissions.map(m => ({...m}));
   const btn = document.querySelector('.save-btn');
   const statusEl = document.getElementById('save-status');
   btn.disabled = true; btn.textContent = '저장 중...';
@@ -772,294 +952,99 @@ async function saveMissions() {
     statusEl.className = 'save-status ok'; statusEl.textContent = '✓ 저장 완료!';
     toast('✅ ' + selectedStudent + ' 미션 저장됨!');
     renderMissionStudentSelector();
+    renderStudentGrid();
   } else {
     statusEl.className = 'save-status err'; statusEl.textContent = '⚠️ 저장 실패';
-    toast('⚠️ 저장 실패');
+    toast('⚠️ 저장에 실패했어요');
   }
-  setTimeout(()=>{ if(statusEl){statusEl.textContent='';statusEl.className='save-status';} },3000);
+  setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'save-status'; }, 3000);
 }
 
-// ── 프리셋 편집 ───────────────────────────────────────────────────────────────
-let _presetEditorOpen = false;
-function togglePresetEditor() {
-  _presetEditorOpen = !_presetEditorOpen;
-  const editor = document.getElementById('preset-editor');
-  const btn = document.getElementById('preset-edit-btn');
-  if (!editor||!btn) return;
-  if (_presetEditorOpen) { editor.classList.add('open'); renderPresetEditList(); btn.textContent='✕ 닫기'; }
-  else { editor.classList.remove('open'); btn.textContent='✏️ 편집'; }
-}
-function renderPresetEditList() {
-  const el = document.getElementById('preset-edit-list');
-  if (!el) return;
-  el.innerHTML = PRESETS.length ? PRESETS.map((p,i) => `
-    <div class="preset-edit-row">
-      <input class="preset-edit-inp" value="${escHtml(p)}"
-             onchange="PRESETS[${i}]=this.value.trim();saveCustomPresets(PRESETS);refreshPresetChips();"
-             onblur="if(!this.value.trim()){PRESETS.splice(${i},1);saveCustomPresets(PRESETS);renderPresetEditList();refreshPresetChips();}"/>
-      <button class="btn btn-red btn-xs" onclick="PRESETS.splice(${i},1);saveCustomPresets(PRESETS);renderPresetEditList();refreshPresetChips();">✕</button>
-    </div>`).join('') : '<div style="color:var(--gray-400);font-size:13px">항목이 없어요</div>';
-}
-function addPresetItem() {
-  const inp = document.getElementById('preset-add-inp');
-  if (!inp) return;
-  const val = inp.value.trim();
-  if (!val) { inp.focus(); return; }
-  PRESETS.push(val); saveCustomPresets(PRESETS);
-  inp.value = ''; renderPresetEditList(); refreshPresetChips(); inp.focus();
-}
-function refreshPresetChips() {
-  const wrap = document.getElementById('preset-chips-wrap');
-  if (!wrap) return;
-  wrap.innerHTML = PRESETS.map(p => `<button class="preset-chip" data-preset="${escHtml(p)}" onclick="addPresetFromChip(this)">${escHtml(p)}</button>`).join('');
-}
-function resetPresets() {
-  const defs = loadDefaultPresets();
-  if (!confirm('기본값('+defs.join(', ')+')으로 되돌릴까요?')) return;
-  PRESETS = [...defs]; saveCustomPresets(PRESETS); renderPresetEditList(); refreshPresetChips();
-  toast('🔄 기본값으로 되돌렸어요');
-}
-function setAsDefault() {
-  if (!PRESETS.length) { toast('⚠️ 항목이 없어요'); return; }
-  saveDefaultPresets([...PRESETS]); toast('📌 현재 목록이 기본값으로 저장됐어요!');
-}
-
-// ── 현황 보기 ─────────────────────────────────────────────────────────────────
-function renderOverviewCatFilter() {
-  const el = document.getElementById('overview-cat-filter');
-  if (!el) return;
-  const all = ['전체', ...CATS];
-  el.innerHTML = all.map(c => `<button class="cat-btn ${c!=='전체'?'cat-'+c:''} ${overviewCatFilter===c?'active':''}"
-    onclick="overviewCatFilter='${c}';renderOverviewCatFilter();loadOverview()">${c}</button>`).join('');
-}
+// ── OVERVIEW ─────────────────────────────────────────────────────────────────
 async function loadOverview() {
   await loadTodayMissions();
-  renderOverviewCatFilter();
   const g = document.getElementById('overview-grid');
-  let list = STUDENTS;
-  if (overviewCatFilter !== '전체') list = STUDENTS.filter(s => getStudentCat(s.name) === overviewCatFilter);
-  if (!list.length) { g.innerHTML = '<div style="color:var(--gray-400)">해당 카테고리 학생 없음</div>'; return; }
-
-  g.innerHTML = list.map(s => {
+  if (!STUDENTS.length) { g.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
+  g.innerHTML = STUDENTS.map(s => {
     const missions = ALL_MISSIONS[s.name] || [];
-    const cat = getStudentCat(s.name);
-    const catIcon = cat ? CAT_ICONS[cat] : '';
-    const ptsHTML = s.points !== null ? `<div class="ov-sub">🏅 ${s.points}P</div>` : '';
-    const missionsHTML = missions.length
-      ? missions.map(m => {
-          const hintHTML = m.hint ? `<div class="ov-hint">${escHtml(m.hint)}</div>` : '';
-          return `<div class="ov-mission-item"><div><span>${escHtml(m.text)}</span>${hintHTML}</div></div>`;
-        }).join('')
-      : '<div class="no-missions-msg">오늘 미션 없음</div>';
-
     return `<div class="overview-card">
       <div class="ov-stu-header">
         <div class="ov-av">${s.name[0]}</div>
         <div>
-          <div class="ov-name">${escHtml(s.name)}</div>
-          <div class="ov-sub">${catIcon} ${cat||''}</div>
-          ${ptsHTML}
+          <div class="ov-name">${s.name}</div>
+          <div class="ov-pts">🏅 ${s.points}P</div>
         </div>
       </div>
-      <div class="ov-missions">${missionsHTML}</div>
+      <div class="ov-missions">
+        ${missions.length ? missions.map(m => `
+          <div class="ov-mission-item">${m.text}
+            ${m.hint ? '<span style="color:var(--gray-400);font-size:10px">(${m.hint})</span>' : ''}
+          </div>`).join('')
+          : '<div class="no-missions-msg">오늘 미션 없음</div>'}
+      </div>
     </div>`;
   }).join('');
 }
 
-// ── 링크 생성 ─────────────────────────────────────────────────────────────────
+// ── LINKS ────────────────────────────────────────────────────────────────────
 function loadLinks() {
   const el = document.getElementById('link-list');
   if (!STUDENTS.length) { el.innerHTML = '<div style="color:var(--gray-400)">학생 없음</div>'; return; }
-
-  // 카테고리별 그룹핑
-  const groups = {};
-  CATS.forEach(cat => { groups[cat] = []; });
-  STUDENTS.forEach(s => {
-    const cat = getStudentCat(s.name) || '미분류';
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(s);
-  });
-
-  el.innerHTML = CATS.map(cat => {
-    const stus = groups[cat] || [];
-    if (!stus.length) return '';
-    return `<div style="margin-bottom:18px">
-      <div style="font-size:12px;font-weight:900;color:var(--gray-400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">${CAT_ICONS[cat]} ${cat}</div>
-      ${stus.map(s => {
-        const url = MOGAKGONG_URL + '?name=' + encodeURIComponent(s.name);
-        const sub = s._kiosk ? '키오스크 연동' : (s._cat||'');
-        return `<div class="link-card">
-          <div><div class="link-stu-name">${escHtml(s.name)}</div><div class="link-stu-sub">${sub}</div></div>
-          <div class="link-url">${url}</div>
-          <button class="link-copy-btn" id="lcb-${escHtml(s.id||s.name)}"
-            onclick="copyLink(${JSON.stringify(String(s.id||s.name))},${JSON.stringify(url)},${JSON.stringify(s.name)})">
-            📋 복사
-          </button>
-        </div>`;
-      }).join('')}
+  el.innerHTML = STUDENTS.map(s => {
+    const url = MOGAKGONG_URL + '?name=' + encodeURIComponent(s.name);
+    return `<div class="link-card">
+      <div class="link-stu-name">🔥 ${s.name}</div>
+      <div class="link-url">${url}</div>
+      <button class="link-copy-btn" id="lcb-${s.id}" onclick="copyLink('${s.id}','${encodeURIComponent(url)}','${encodeURIComponent(s.name)}')">
+        📋 복사
+      </button>
     </div>`;
   }).join('');
 }
 
-function copyLink(id, url, name) {
+function copyLink(id, encodedUrl, encodedName) {
+  const url = decodeURIComponent(encodedUrl);
   navigator.clipboard.writeText(url).then(() => {
     const btn = document.getElementById('lcb-' + id);
-    if (btn) { btn.textContent = '✓ 복사됨!'; btn.classList.add('copied'); setTimeout(()=>{ btn.textContent='📋 복사'; btn.classList.remove('copied'); },2000); }
-    toast('🔗 ' + name + ' 링크 복사됨!');
+    btn.textContent = '✓ 복사됨!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 복사'; btn.classList.remove('copied'); }, 2000);
+    toast('🔗 ' + decodeURIComponent(encodedName) + ' 링크 복사됨!');
   });
 }
 
-// ── TABS ──────────────────────────────────────────────────────────────────────
+// ── TABS ─────────────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
   currentTab = tab;
-  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   ['missions','overview','students','links'].forEach(t => {
-    const el = document.getElementById('tab-'+t);
-    if (el) el.style.display = t===tab ? 'block' : 'none';
+    const el = document.getElementById('tab-' + t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
   });
-  if (tab==='overview') { renderOverviewCatFilter(); loadOverview(); }
-  if (tab==='students') loadStudents();
-  if (tab==='links') loadLinks();
+  if (tab === 'overview') loadOverview();
+  if (tab === 'students') { loadStudents(); }
+  if (tab === 'links') loadLinks();
 }
 
-// ── UTILS ─────────────────────────────────────────────────────────────────────
+// ── UTILS ────────────────────────────────────────────────────────────────────
 function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast'; el.textContent = msg;
   document.body.appendChild(el);
-  setTimeout(()=>el.remove(), 2500);
+  setTimeout(() => el.remove(), 2500);
 }
 
-// ── AUTO LOGIN ────────────────────────────────────────────────────────────────
+// ── AUTO LOGIN (세션 유지) ────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   const saved = sessionStorage.getItem('mogak_admin_pw');
   if (saved) { PW = saved; showApp(); }
 });
 </script>
 
-<!-- 학생 수정 모달 -->
-<div class="edit-modal-overlay" id="edit-student-modal" onclick="if(event.target===this)closeEditStudent()">
-  <div class="edit-modal">
-    <div class="edit-modal-title">✏️ 학생 정보 수정</div>
-    <div class="edit-modal-sub" id="edit-modal-sub"></div>
-
-    <div class="edit-field">
-      <label>이름</label>
-      <input class="inp" id="edit-stu-name" placeholder="학생 이름"/>
-    </div>
-
-    <div class="edit-field">
-      <label>카테고리 (과목)</label>
-      <select class="sel" id="edit-stu-cat" style="width:100%" onchange="updateEditClassOptions()">
-        <option value="초등영어">📘 초등영어</option>
-        <option value="중고등영어">📗 중고등영어</option>
-        <option value="초등수학">📐 초등수학</option>
-        <option value="중고등수학">📏 중고등수학</option>
-      </select>
-    </div>
-
-    <div class="edit-field">
-      <label>클래스 (반)</label>
-      <select class="sel" id="edit-stu-class" style="width:100%">
-        <option value="">클래스 없음</option>
-      </select>
-    </div>
-
-    <div class="edit-modal-btns">
-      <button class="btn btn-gray btn-sm" onclick="closeEditStudent()">취소</button>
-      <button class="btn btn-red btn-sm" onclick="deleteFromEditModal()">🗑️ 삭제</button>
-      <button class="btn btn-blue" onclick="saveEditStudent()">💾 저장</button>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── 학생 수정 모달 ─────────────────────────────────────────────────────────────
-let _editOrigCat = '';
-let _editOrigName = '';
-
-function openEditStudent(cat, name) {
-  _editOrigCat = cat;
-  _editOrigName = name;
-
-  document.getElementById('edit-modal-sub').textContent = name + ' 학생 정보를 수정해요';
-  document.getElementById('edit-stu-name').value = name;
-  document.getElementById('edit-stu-cat').value = cat;
-  updateEditClassOptions(cat);
-
-  // 현재 클래스 찾기
-  const stuObj = (MOGAK_DATA[cat]?.students || []).find(s => s.name === name);
-  if (stuObj) {
-    setTimeout(() => {
-      const sel = document.getElementById('edit-stu-class');
-      if (sel) sel.value = stuObj.class || '';
-    }, 30);
-  }
-
-  document.getElementById('edit-student-modal').classList.add('open');
-}
-
-function updateEditClassOptions(cat) {
-  const selectedCat = cat || document.getElementById('edit-stu-cat').value;
-  const classes = MOGAK_DATA[selectedCat]?.classes || [];
-  const sel = document.getElementById('edit-stu-class');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">클래스 없음</option>' +
-    classes.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
-}
-
-function closeEditStudent() {
-  document.getElementById('edit-student-modal').classList.remove('open');
-}
-
-async function saveEditStudent() {
-  const newName = document.getElementById('edit-stu-name').value.trim();
-  const newCat = document.getElementById('edit-stu-cat').value;
-  const newClass = document.getElementById('edit-stu-class').value;
-
-  if (!newName) { toast('⚠️ 이름을 입력해주세요'); return; }
-
-  // 이름 중복 체크 (자신 제외)
-  if (newName !== _editOrigName) {
-    const allNames = [...KIOSK_STUDENTS.map(s=>s.name)];
-    CATS.forEach(c => (MOGAK_DATA[c]?.students||[]).forEach(s => { if(s.name!==_editOrigName) allNames.push(s.name); }));
-    if (allNames.includes(newName)) { toast('⚠️ 이미 있는 이름이에요'); return; }
-  }
-
-  // 기존 카테고리에서 제거
-  if (MOGAK_DATA[_editOrigCat]) {
-    MOGAK_DATA[_editOrigCat].students = MOGAK_DATA[_editOrigCat].students.filter(s => s.name !== _editOrigName);
-  }
-
-  // 미션 이름 변경
-  if (newName !== _editOrigName && ALL_MISSIONS[_editOrigName]) {
-    ALL_MISSIONS[newName] = ALL_MISSIONS[_editOrigName];
-    delete ALL_MISSIONS[_editOrigName];
-  }
-
-  // 새 카테고리에 추가
-  if (!MOGAK_DATA[newCat]) MOGAK_DATA[newCat] = {classes:[], students:[]};
-  MOGAK_DATA[newCat].students.push({ name: newName, class: newClass });
-
-  await saveMogakData();
-  if (newName !== _editOrigName) await saveTodayMissions();
-
-  if (selectedStudent === _editOrigName) selectedStudent = newName;
-
-  closeEditStudent();
-  await loadStudents();
-  toast('✅ ' + newName + ' 수정됐어요!');
-}
-
-async function deleteFromEditModal() {
-  if (!confirm(_editOrigName + ' 학생을 삭제할까요?')) return;
-  await deleteMogakStudent(_editOrigCat, _editOrigName);
-  closeEditStudent();
-}
-</script>
+<!-- 프리셋 편집: 인라인으로 이동 -->
 </body>
 </html>
