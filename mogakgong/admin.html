@@ -385,7 +385,19 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
     <div class="panel show" id="panel-missions">
       <div class="acard">
         <div class="acard-head">
-          <div class="acard-title">📋 오늘의 미션 입력</div>
+          <div class="acard-title">📋 미션 입력</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span style="font-size:12px;color:var(--muted)">날짜</span>
+            <div style="position:relative;display:inline-flex;align-items:center">
+              <select id="date-sel"
+                style="background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:8px;
+                       padding:6px 28px 6px 10px;font-family:inherit;font-size:13px;font-weight:700;
+                       color:var(--text);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none"
+                onchange="onDateChange(this.value)">
+              </select>
+              <span style="position:absolute;right:8px;pointer-events:none;font-size:10px;color:var(--muted)">▾</span>
+            </div>
+          </div>
         </div>
         <div style="padding:12px 18px 0">
           <div class="stu-grid" id="stu-sel"></div>
@@ -484,6 +496,7 @@ let ALL_MISSIONS={};
 let currentCat='';
 let selKey='', selName='', selCat='';
 let currentMissions=[];
+let missionDate='';  // '' = 오늘, 'YYYY-M-D' = 선택된 날짜
 let _kioskTarget=null;
 let _preOpen=false;
 
@@ -537,8 +550,10 @@ async function showCatSelect(){
 function enterCat(cat){
   currentCat=cat;
   selKey='';selName='';selCat='';currentMissions=[];
+  missionDate=getTodayStr();
   setupAdminForCat(cat);
   go('scr-admin');
+  buildDatePicker();
   loadTodayMissions().then(()=>{renderStuSel();renderEdBody();});
 }
 
@@ -618,12 +633,58 @@ async function saveKioskCatsData(){
 
 function getStudentsByCat(cat){return STUDENTS.filter(s=>s.cat===cat);}
 
-function getTodayKey(){const d=new Date();return'mogakgong_'+d.getFullYear()+'_'+(d.getMonth()+1)+'_'+d.getDate();}
+function getTodayStr(){const d=new Date();return d.getFullYear()+'_'+(d.getMonth()+1)+'_'+d.getDate();}
+function getTodayKey(){return'mogakgong_'+getTodayStr();}
+function getTargetKey(){
+  if(!missionDate||missionDate==='today')return getTodayKey();
+  return'mogakgong_'+missionDate;
+}
+function getTargetDateLabel(){
+  if(!missionDate||missionDate==='today'){
+    const d=new Date();
+    return d.getMonth()+1+'월 '+d.getDate()+'일 (오늘)';
+  }
+  const parts=missionDate.split('_');
+  const d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
+  const days=['일','월','화','수','목','금','토'];
+  const isToday=missionDate===getTodayStr();
+  return d.getMonth()+1+'월 '+d.getDate()+'일 ('+days[d.getDay()]+')'+(isToday?' — 오늘':'');
+}
+
+function buildDatePicker(){
+  const sel=document.getElementById('date-sel');if(!sel)return;
+  const today=new Date();
+  const days=['일','월','화','수','목','금','토'];
+  const opts=[];
+  for(let i=-3;i<=6;i++){
+    const d=new Date(today);d.setDate(today.getDate()+i);
+    const key=d.getFullYear()+'_'+(d.getMonth()+1)+'_'+d.getDate();
+    let label='';
+    if(i===-1)label='어제';
+    else if(i===0)label='오늘';
+    else if(i===1)label='내일';
+    else if(i===2)label='모레';
+    else label=(d.getMonth()+1)+'/'+(d.getDate())+' ('+days[d.getDay()]+')';
+    opts.push({key,label});
+  }
+  sel.innerHTML=opts.map(o=>`<option value="${o.key}"${o.key===getTodayStr()?' selected':''}>${o.label}</option>`).join('');
+  missionDate=getTodayStr();
+}
+
+async function onDateChange(val){
+  missionDate=val;
+  await loadTodayMissions();
+  renderStuSel();
+  if(selKey){
+    currentMissions=(ALL_MISSIONS[selKey]||[]).map(m=>({...m}));
+    renderEdBody();
+  }
+}
 async function loadTodayMissions(){
-  try{await getCFG();ALL_MISSIONS=CFG[getTodayKey()]||{};}catch{ALL_MISSIONS={};}
+  try{await getCFG();ALL_MISSIONS=CFG[getTargetKey()]||{};}catch{ALL_MISSIONS={};}
 }
 async function saveTodayMissions(){
-  try{await getCFG();CFG[getTodayKey()]=ALL_MISSIONS;await setCFG(CFG);return true;}catch{return false;}
+  try{await getCFG();CFG[getTargetKey()]=ALL_MISSIONS;await setCFG(CFG);return true;}catch{return false;}
 }
 
 // ─── 미션 입력 ───────────────────────────────────────────────────────────────
@@ -651,7 +712,7 @@ function renderStuSel(){
 function selectStu(key,name,cat){
   selKey=key;selName=name;selCat=cat;
   currentMissions=(ALL_MISSIONS[key]||[]).map(m=>({...m}));
-  if(!currentMissions.length)currentMissions=[{text:'',hint:''},{text:'',hint:''}];
+  // 기본값 없음 — 빈 상태로 시작
   renderStuSel();renderEdBody();
 }
 
