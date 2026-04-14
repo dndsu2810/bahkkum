@@ -779,8 +779,13 @@ function renderStuSel(){
 }
 
 async function selectStu(key,name,cat){
-  // 이전 학생 미션 자동 저장
-  if(selKey && selKey!==key){
+  // 같은 학생 재클릭 — 에디터 상태 유지, 저장 안 함
+  if(selKey===key){
+    renderEdBody();
+    return;
+  }
+  // 다른 학생으로 이동 — 이전 학생 자동 저장
+  if(selKey){
     await autoSaveBeforeLeave();
   }
   selKey=key;selName=name;selCat=cat;
@@ -791,7 +796,6 @@ async function selectStu(key,name,cat){
   // 날짜 피커 업데이트
   const sel=document.getElementById('date-sel');
   if(sel){
-    // 옵션에 없으면 buildDatePicker로 재생성
     if(![...sel.options].some(o=>o.value===missionDate)) buildDatePicker();
     sel.value=missionDate;
   }
@@ -876,14 +880,24 @@ function delM(i){currentMissions.splice(i,1);refreshML();}
 
 async function saveMissions(){
   if(!selKey)return;
-  ALL_MISSIONS[selKey]=currentMissions.filter(m=>m.text.trim()).map(m=>({...m}));
+  // 빈 항목 제거 후 저장
+  const cleaned=currentMissions.filter(m=>m.text.trim()).map(m=>({...m}));
+  ALL_MISSIONS[selKey]=cleaned;
   const btn=document.querySelector('.save-btn');
   const st=document.getElementById('save-st');
   if(btn){btn.disabled=true;btn.textContent='저장 중...';}
   const ok=await saveTodayMissions();
   if(btn){btn.disabled=false;btn.textContent='저장하기 💾';}
-  if(ok){if(st){st.className='save-st ok';st.textContent='✓ 저장 완료!';}toast('✅ '+selName+' 미션 저장됨!');renderStuSel();}
-  else{if(st){st.className='save-st err';st.textContent='⚠️ 저장 실패';}}
+  if(ok){
+    // 저장된 데이터로 currentMissions 동기화
+    currentMissions=cleaned.map(m=>({...m}));
+    if(st){st.className='save-st ok';st.textContent='✓ 저장 완료!';}
+    toast('✅ '+selName+' 미션 저장됨!');
+    renderStuSel();
+    renderEdBody();  // 에디터 새로고침 (편집 계속 가능)
+  } else {
+    if(st){st.className='save-st err';st.textContent='⚠️ 저장 실패';}
+  }
   setTimeout(()=>{if(st){st.textContent='';st.className='save-st';}},3000);
 }
 
