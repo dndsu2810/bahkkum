@@ -125,6 +125,34 @@ html,body{height:100%;overflow:hidden;background:#0C0806;color:#F5EDE4;font-fami
 .hist-time{font-size:11px;color:rgba(245,237,228,.3);white-space:nowrap}
 .no-hist{text-align:center;padding:16px;color:rgba(245,237,228,.3);font-size:13px}
 
+/* ─── 연장 팝업 ─── */
+.extend-overlay{position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(6px);
+  display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:48px;
+  opacity:0;pointer-events:none;transition:opacity .25s}
+.extend-overlay.show{opacity:1;pointer-events:all}
+.extend-box{background:#1E1410;border:1.5px solid rgba(255,255,255,.12);
+  border-radius:28px;padding:28px 28px 24px;width:min(400px,88vw);
+  text-align:center;
+  transform:translateY(40px);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.extend-overlay.show .extend-box{transform:translateY(0)}
+.extend-title{font-size:19px;font-weight:900;margin-bottom:6px}
+.extend-sub{font-size:14px;color:rgba(245,237,228,.45);margin-bottom:22px;line-height:1.5}
+.extend-countdown{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:22px}
+.extend-ring{position:relative;width:52px;height:52px}
+.extend-ring svg{transform:rotate(-90deg)}
+.extend-ring-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:900;color:#FB923C}
+.extend-btns{display:flex;gap:10px}
+.btn-extend{flex:1;padding:16px;border-radius:16px;border:none;cursor:pointer;
+  font-family:inherit;font-size:16px;font-weight:900;transition:all .15s}
+.btn-extend-yes{background:linear-gradient(135deg,#FB923C,#FDE68A);color:#0C0806;
+  box-shadow:0 8px 24px rgba(251,146,60,.4)}
+.btn-extend-yes:active{transform:scale(.96)}
+.btn-extend-no{background:rgba(255,255,255,.08);color:rgba(245,237,228,.6);border:1px solid rgba(255,255,255,.12)}
+.btn-extend-no:active{transform:scale(.96)}
+
 /* ─── EMPTY / LOADING ─── */
 .loading-scr{position:fixed;inset:0;background:#0C0806;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:16px;z-index:100;transition:opacity .5s}
@@ -172,6 +200,28 @@ html,body{height:100%;overflow:hidden;background:#0C0806;color:#F5EDE4;font-fami
     <div class="timer-txt" id="timer-txt">30초</div>
   </div>
   <div class="detail-scroll" id="detail-scroll"></div>
+
+  <!-- 연장 팝업 -->
+  <div class="extend-overlay" id="extend-overlay">
+    <div class="extend-box">
+      <div class="extend-title">아직 보고 계신가요?</div>
+      <div class="extend-sub">곧 홈 화면으로 돌아가요.<br>더 보고 싶으면 연장하기를 눌러주세요!</div>
+      <div class="extend-countdown">
+        <div class="extend-ring">
+          <svg width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/>
+            <circle cx="26" cy="26" r="22" fill="none" stroke="#FB923C" stroke-width="4"
+              stroke-dasharray="138.2" id="ring-dash" stroke-dashoffset="0" stroke-linecap="round"/>
+          </svg>
+          <div class="extend-ring-num" id="ring-num">5</div>
+        </div>
+      </div>
+      <div class="extend-btns">
+        <button class="btn-extend btn-extend-no" onclick="confirmGoHome()">홈으로 가기</button>
+        <button class="btn-extend btn-extend-yes" onclick="extendTime()">🔥 30초 연장</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -364,29 +414,100 @@ async function openDetail(id) {
 }
 
 // ─── 타이머 ───────────────────────────────────────────────────────────────────
+let _extending = false;   // 연장 팝업 표시 중 여부
+let _extSec = 5;           // 연장 팝업 카운트다운
+let _extInterval = null;
+const RING_LEN = 138.2;    // 원 둘레 (r=22, 2πr)
+
 function startTimer() {
   clearInterval(_timerInterval);
   _timerSec = 30;
+  _extending = false;
+  hideExtendPopup();
   updateTimerUI();
   _timerInterval = setInterval(() => {
+    if (_extending) return;   // 팝업 중엔 메인 타이머 정지
     _timerSec--;
     updateTimerUI();
-    if (_timerSec <= 0) goHome();
+    if (_timerSec === 5) showExtendPopup();
+    if (_timerSec <= 0) confirmGoHome();
   }, 1000);
 }
+
 function updateTimerUI() {
   const fill = document.getElementById('timer-fill');
   const txt = document.getElementById('timer-txt');
   if (fill) fill.style.width = (_timerSec / 30 * 100) + '%';
-  if (txt) txt.textContent = _timerSec + '초';
+  if (txt) {
+    txt.textContent = _timerSec + '초';
+    // 5초 이하면 빨갛게
+    txt.style.color = _timerSec <= 5 ? '#F87171' : 'rgba(245,237,228,.4)';
+  }
 }
-function resetTimer() { _timerSec = 30; }
 
-// 터치하면 타이머 리셋
-document.getElementById('detail').addEventListener('touchstart', resetTimer, {passive:true});
+// ─── 연장 팝업 ────────────────────────────────────────────────────────────────
+function showExtendPopup() {
+  _extending = true;
+  _extSec = 5;
+  const overlay = document.getElementById('extend-overlay');
+  overlay.classList.add('show');
+  updateExtUI();
+  _extInterval = setInterval(() => {
+    _extSec--;
+    updateExtUI();
+    if (_extSec <= 0) confirmGoHome();
+  }, 1000);
+}
+
+function hideExtendPopup() {
+  clearInterval(_extInterval);
+  const overlay = document.getElementById('extend-overlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function updateExtUI() {
+  const num = document.getElementById('ring-num');
+  const dash = document.getElementById('ring-dash');
+  if (num) num.textContent = _extSec;
+  if (dash) {
+    // 5→0 애니메이션: dashoffset 0→138.2
+    const offset = RING_LEN * (1 - _extSec / 5);
+    dash.style.strokeDashoffset = offset;
+    // 남은 시간 적을수록 빨갛게
+    dash.style.stroke = _extSec <= 2 ? '#F87171' : '#FB923C';
+  }
+}
+
+function extendTime() {
+  hideExtendPopup();
+  _extending = false;
+  _timerSec = 30;
+  updateTimerUI();
+  toast('🔥 30초 연장됐어요!');
+}
+
+function confirmGoHome() {
+  clearInterval(_extInterval);
+  hideExtendPopup();
+  goHome();
+}
+
+// 터치하면 팝업 안 뜬 상태에서만 타이머 리셋
+document.getElementById('detail').addEventListener('touchstart', () => {
+  if (!_extending) resetTimer();
+}, {passive:true});
+
+function resetTimer() {
+  if (_extending) return;
+  _timerSec = 30;
+  updateTimerUI();
+}
 
 function goHome() {
   clearInterval(_timerInterval);
+  clearInterval(_extInterval);
+  hideExtendPopup();
+  _extending = false;
   document.getElementById('detail').classList.add('hidden-right');
   document.getElementById('home').classList.remove('hidden-left');
 }
@@ -395,6 +516,14 @@ function goHome() {
 document.addEventListener('keydown', e => { if(e.key === 'Escape') goHome(); });
 
 // ─── UTIL ─────────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#1E1410;border:1px solid rgba(255,255,255,.15);color:#F5EDE4;padding:10px 20px;border-radius:100px;font-size:14px;font-weight:700;z-index:999;pointer-events:none;white-space:nowrap';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
