@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>모각공 🔥</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0C0806;color:#F5EDE4;font-family:'Noto Sans KR',sans-serif;user-select:none;-webkit-user-select:none}
+
+/* ─── SCREENS ─── */
+.scr{position:fixed;inset:0;display:flex;flex-direction:column;transition:transform .4s cubic-bezier(.4,0,.2,1),opacity .4s;will-change:transform}
+.scr.hidden-right{transform:translateX(100%);opacity:0;pointer-events:none}
+.scr.hidden-left{transform:translateX(-100%);opacity:0;pointer-events:none}
+
+/* ─── HOME ─── */
+#home{background:#0C0806}
+.home-hdr{padding:32px 32px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.home-title{font-size:28px;font-weight:900;letter-spacing:-.02em}
+.home-title span{color:#FB923C}
+.home-date{font-size:14px;color:rgba(245,237,228,.4);font-weight:500}
+.home-clock{font-size:22px;font-weight:900;color:rgba(245,237,228,.7);letter-spacing:.02em}
+
+.search-wrap{padding:0 28px 16px;flex-shrink:0}
+.search-box{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;padding:14px 20px}
+.search-icon{font-size:18px;opacity:.5}
+.search-inp{flex:1;background:none;border:none;outline:none;font-family:inherit;font-size:16px;color:#F5EDE4;caret-color:#FB923C}
+.search-inp::placeholder{color:rgba(245,237,228,.3)}
+
+.grid-wrap{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 28px 32px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.grid-wrap::-webkit-scrollbar{display:none}
+.stu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+
+/* ─── STUDENT CARD ─── */
+.stu-card{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.09);border-radius:20px;
+  padding:24px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;
+  cursor:pointer;transition:transform .18s,background .18s,border-color .18s;
+  position:relative;overflow:hidden;min-height:160px;justify-content:center}
+.stu-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(251,146,60,.12),transparent 70%);opacity:0;transition:opacity .2s;border-radius:inherit}
+.stu-card:active{transform:scale(.96);background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.3)}
+.stu-card:active::before{opacity:1}
+
+.sc-av{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:26px;font-weight:900;flex-shrink:0;border:2.5px solid rgba(255,255,255,.1);overflow:hidden}
+.sc-av img{width:100%;height:100%;object-fit:cover}
+.sc-name{font-size:16px;font-weight:900;text-align:center;line-height:1.2;word-break:keep-all}
+.sc-pts{font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px;color:rgba(245,237,228,.55)}
+.sc-pts.has-pts{color:#FB923C}
+.fine-dot{position:absolute;top:14px;right:14px;width:8px;height:8px;border-radius:50%;background:#F87171}
+
+.loading-grid{display:flex;align-items:center;justify-content:center;height:200px;color:rgba(245,237,228,.3);font-size:15px}
+
+/* ─── DETAIL ─── */
+#detail{background:#0C0806}
+
+.detail-hdr{padding:20px 28px 0;display:flex;align-items:center;gap:16px;flex-shrink:0}
+.back-btn{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:22px;transition:all .15s;flex-shrink:0}
+.back-btn:active{transform:scale(.92);background:rgba(255,255,255,.16)}
+.timer-bar{flex:1;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+.timer-fill{height:100%;background:linear-gradient(90deg,#FB923C,#FDE68A);border-radius:2px;transition:width 1s linear}
+.timer-txt{font-size:13px;color:rgba(245,237,228,.4);font-weight:700;flex-shrink:0}
+
+.detail-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;padding:0 28px 40px}
+.detail-scroll::-webkit-scrollbar{display:none}
+
+/* ─── PROFILE HERO ─── */
+.hero{display:flex;flex-direction:column;align-items:center;padding:32px 0 28px;gap:16px}
+.hero-av{width:100px;height:100px;border-radius:50%;border:3px solid rgba(251,146,60,.4);overflow:hidden;
+  display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:900;flex-shrink:0;
+  position:relative}
+.hero-av img{width:100%;height:100%;object-fit:cover}
+.hero-av::after{content:'';position:absolute;inset:-3px;border-radius:50%;
+  background:conic-gradient(from 0deg,#FB923C,#FDE68A,#FB923C);z-index:-1;animation:spin 4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hero-av-inner{position:relative;width:100%;height:100%;border-radius:50%;overflow:hidden;
+  background:#1E1410;z-index:1;display:flex;align-items:center;justify-content:center}
+.hero-name{font-size:28px;font-weight:900;letter-spacing:-.02em}
+.hero-cat{font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;margin-top:-4px}
+
+/* ─── STAT CARDS ─── */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.stat-card{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.09);border-radius:16px;
+  padding:16px 12px;text-align:center;display:flex;flex-direction:column;gap:4px}
+.stat-val{font-size:24px;font-weight:900;line-height:1}
+.stat-lbl{font-size:11px;color:rgba(245,237,228,.45);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.stat-card.pts{border-color:rgba(251,146,60,.3);background:rgba(251,146,60,.08)}
+.stat-card.pts .stat-val{color:#FB923C}
+.stat-card.fine-pt{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)}
+.stat-card.fine-pt .stat-val{color:#F87171}
+.stat-card.fine-t{border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.08)}
+.stat-card.fine-t .stat-val{color:#FBB91C}
+
+/* ─── SECTION ─── */
+.sec-lbl{font-size:12px;font-weight:700;color:rgba(245,237,228,.4);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:10px;margin-top:20px}
+
+/* ─── MISSIONS ─── */
+.mission-list{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+.m-item{display:flex;align-items:center;gap:14px;padding:14px 16px;
+  background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.08);border-radius:14px}
+.m-item.done{background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.2)}
+.m-check{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.2);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px}
+.m-item.done .m-check{background:#22C55E;border-color:#22C55E;color:#fff}
+.m-body{flex:1}
+.m-text{font-size:14px;font-weight:700;line-height:1.3}
+.m-item.done .m-text{text-decoration:line-through;color:rgba(245,237,228,.45)}
+.m-hint{font-size:12px;color:rgba(245,237,228,.4);margin-top:3px}
+.no-mission{text-align:center;padding:20px;color:rgba(245,237,228,.3);font-size:14px;
+  background:rgba(255,255,255,.03);border-radius:14px;border:1px dashed rgba(255,255,255,.1)}
+
+/* ─── HISTORY ─── */
+.hist-list{display:flex;flex-direction:column;gap:6px}
+.hist-item{display:flex;align-items:center;gap:12px;padding:11px 14px;
+  background:rgba(255,255,255,.04);border-radius:12px}
+.hist-delta{font-size:14px;font-weight:900;min-width:48px;text-align:right}
+.hist-delta.pos{color:#34D399}
+.hist-delta.neg{color:#F87171}
+.hist-reason{flex:1;font-size:13px;color:rgba(245,237,228,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-time{font-size:11px;color:rgba(245,237,228,.3);white-space:nowrap}
+.no-hist{text-align:center;padding:16px;color:rgba(245,237,228,.3);font-size:13px}
+
+/* ─── EMPTY / LOADING ─── */
+.loading-scr{position:fixed;inset:0;background:#0C0806;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;z-index:100;transition:opacity .5s}
+.loading-scr.out{opacity:0;pointer-events:none}
+.loading-fire{font-size:56px;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.loading-txt{font-size:16px;color:rgba(245,237,228,.4);font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- 로딩 -->
+<div class="loading-scr" id="loading">
+  <div class="loading-fire">🔥</div>
+  <div class="loading-txt">불러오는 중...</div>
+</div>
+
+<!-- 홈 -->
+<div class="scr" id="home">
+  <div class="home-hdr">
+    <div>
+      <div class="home-title">모각공 <span>🔥</span></div>
+      <div class="home-date" id="home-date"></div>
+    </div>
+    <div class="home-clock" id="home-clock"></div>
+  </div>
+  <div class="search-wrap">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input class="search-inp" id="search-inp" placeholder="이름 검색..." oninput="filterStudents(this.value)" autocomplete="off" autocorrect="off"/>
+    </div>
+  </div>
+  <div class="grid-wrap">
+    <div class="stu-grid" id="stu-grid">
+      <div class="loading-grid">불러오는 중...</div>
+    </div>
+  </div>
+</div>
+
+<!-- 학생 상세 -->
+<div class="scr hidden-right" id="detail">
+  <div class="detail-hdr">
+    <div class="back-btn" onclick="goHome()">←</div>
+    <div class="timer-bar"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+    <div class="timer-txt" id="timer-txt">30초</div>
+  </div>
+  <div class="detail-scroll" id="detail-scroll"></div>
+</div>
+
+<script>
+const KIOSK = 'https://bakuum-kiosk.pages.dev';
+let STUDENTS = [];
+let CFG = {};
+let _timer = null;
+let _timerSec = 30;
+let _timerInterval = null;
+
+// ─── 초기화 ───────────────────────────────────────────────────────────────────
+async function init() {
+  startClock();
+  try {
+    const [stuRes, cfgRes] = await Promise.all([
+      fetch(KIOSK + '/api/students'),
+      fetch(KIOSK + '/api/config')
+    ]);
+    const stuData = await stuRes.json();
+    CFG = await cfgRes.json();
+    if (stuData.success) STUDENTS = stuData.students;
+  } catch(e) { console.error(e); }
+
+  // 키오스크 카테고리 배정된 학생만 필터
+  const KIOSK_CATS = CFG.kiosk_cats || {};
+  STUDENTS = STUDENTS.filter(s => KIOSK_CATS[s.name]);
+
+  renderGrid(STUDENTS);
+  setTimeout(() => {
+    document.getElementById('loading').classList.add('out');
+  }, 400);
+}
+
+// ─── 날짜/시계 ───────────────────────────────────────────────────────────────
+function startClock() {
+  const dateEl = document.getElementById('home-date');
+  const clockEl = document.getElementById('home-clock');
+  function tick() {
+    const d = new Date();
+    const days = ['일','월','화','수','목','금','토'];
+    dateEl.textContent = d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + days[d.getDay()] + ')';
+    const h = String(d.getHours()).padStart(2,'0');
+    const m = String(d.getMinutes()).padStart(2,'0');
+    clockEl.textContent = h + ':' + m;
+  }
+  tick(); setInterval(tick, 10000);
+}
+
+// ─── 카테고리 색상 ────────────────────────────────────────────────────────────
+const CAT_COLOR = {'초등수학':'#34D399','중고등수학':'#FB923C'};
+const CAT_BG = {'초등수학':'rgba(52,211,153,.15)','중고등수학':'rgba(251,146,60,.15)'};
+const CAT_ICON = {'초등수학':'📐','중고등수학':'📏'};
+
+// ─── 학생 그리드 ──────────────────────────────────────────────────────────────
+function renderGrid(list) {
+  const el = document.getElementById('stu-grid');
+  const KIOSK_CATS = CFG.kiosk_cats || {};
+  if (!list.length) {
+    el.innerHTML = '<div class="loading-grid">등록된 학생이 없어요</div>';
+    return;
+  }
+  el.innerHTML = list.map(s => {
+    const cat = KIOSK_CATS[s.name] || '';
+    const color = CAT_COLOR[cat] || '#FB923C';
+    const avStyle = s.photo_url ? '' : `background:linear-gradient(135deg,${color}22,${color}44);color:${color}`;
+    const avContent = s.photo_url
+      ? `<img src="${esc(s.photo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+      : esc(s.name[0]);
+    const fineHTML = s.fine_count > 0 ? '<div class="fine-dot"></div>' : '';
+    const ptsClass = s.points > 0 ? 'has-pts' : '';
+    return `<div class="stu-card" onclick="openDetail(${s.id})">
+      ${fineHTML}
+      <div class="sc-av" style="${avStyle}">${avContent}</div>
+      <div class="sc-name">${esc(s.name)}</div>
+      <div class="sc-pts ${ptsClass}">🏅 ${s.points}P</div>
+    </div>`;
+  }).join('');
+}
+
+function filterStudents(q) {
+  const kw = q.trim();
+  document.querySelectorAll('.stu-card').forEach(c => {
+    const name = c.querySelector('.sc-name').textContent;
+    c.style.display = kw && !name.includes(kw) ? 'none' : '';
+  });
+}
+
+// ─── 학생 상세 ───────────────────────────────────────────────────────────────
+async function openDetail(id) {
+  const s = STUDENTS.find(x => x.id === id);
+  if (!s) return;
+
+  // 화면 전환
+  document.getElementById('home').classList.add('hidden-left');
+  const detail = document.getElementById('detail');
+  detail.classList.remove('hidden-right');
+  document.getElementById('detail-scroll').scrollTop = 0;
+  document.getElementById('search-inp').value = '';
+  filterStudents('');
+
+  // 상세 데이터 로드
+  const KIOSK_CATS = CFG.kiosk_cats || {};
+  const cat = KIOSK_CATS[s.name] || '';
+  const color = CAT_COLOR[cat] || '#FB923C';
+  const bg = CAT_BG[cat] || 'rgba(251,146,60,.15)';
+
+  // 오늘 미션 불러오기
+  const d = new Date();
+  const todayKey = 'mogakgong_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+  const missionKey = s.name + '_' + cat;
+  const missions = CFG[todayKey]?.[missionKey] || [];
+
+  // 히스토리 로드
+  let history = [], fineStats = {fine_point:0, fine_time:0, fine_sheet:0};
+  try {
+    const r = await fetch(KIOSK + '/api/students/' + id);
+    const data = await r.json();
+    if (data.success) { history = data.history || []; fineStats = data.fineStats || fineStats; }
+  } catch(e) {}
+
+  // 렌더
+  const avContent = s.photo_url
+    ? `<div class="hero-av-inner"><img src="${esc(s.photo_url)}" style="width:100%;height:100%;object-fit:cover"/></div>`
+    : `<div class="hero-av-inner" style="font-size:38px;font-weight:900;color:${color}">${esc(s.name[0])}</div>`;
+
+  // 미션 완료 여부 체크 (localStorage에서)
+  const doneKey = 'modak_done_' + missionKey + '_' + todayKey;
+  let doneMask = [];
+  try { doneMask = JSON.parse(localStorage.getItem(doneKey) || '[]'); } catch {}
+
+  const missionsHTML = missions.length
+    ? missions.map((m, i) => {
+        const done = doneMask.includes(i);
+        return `<div class="m-item ${done?'done':''}">
+          <div class="m-check">${done ? '✓' : ''}</div>
+          <div class="m-body">
+            <div class="m-text">${esc(m.text)}</div>
+            ${m.hint ? `<div class="m-hint">${esc(m.hint)}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="no-mission">오늘 미션이 아직 없어요</div>';
+
+  // 포인트 히스토리
+  const histHTML = history.length
+    ? history.slice(0, 12).map(h => {
+        const t = (h.created_at || '').slice(5, 16).replace('T', ' ');
+        return `<div class="hist-item">
+          <div class="hist-delta ${h.delta >= 0 ? 'pos' : 'neg'}">${h.delta >= 0 ? '+' : ''}${h.delta}P</div>
+          <div class="hist-reason">${esc(h.reason || '-')}</div>
+          <div class="hist-time">${t}</div>
+        </div>`;
+      }).join('')
+    : '<div class="no-hist">포인트 내역이 없어요</div>';
+
+  // 벌금 카드들
+  const fineCards = [
+    fineStats.fine_point > 0 ? `<div class="stat-card fine-pt"><div class="stat-val">${fineStats.fine_point}</div><div class="stat-lbl">💸 벌금P</div></div>` : '',
+    fineStats.fine_time > 0 ? `<div class="stat-card fine-t"><div class="stat-val">${fineStats.fine_time}</div><div class="stat-lbl">⏰ 벌금분</div></div>` : '',
+  ].filter(Boolean).join('');
+
+  // 총 3칸 맞추기
+  const statCount = 1 + (fineStats.fine_point > 0 ? 1 : 0) + (fineStats.fine_time > 0 ? 1 : 0);
+  const statStyle = statCount === 1 ? 'grid-template-columns:1fr 1fr 1fr' : '';
+
+  document.getElementById('detail-scroll').innerHTML = `
+    <div class="hero">
+      <div class="hero-av">${avContent}</div>
+      <div class="hero-name">${esc(s.name)}</div>
+      ${cat ? `<div class="hero-cat" style="background:${bg};color:${color}">${CAT_ICON[cat]||''} ${esc(cat)}</div>` : ''}
+    </div>
+
+    <div class="stat-row" style="${statStyle}">
+      <div class="stat-card pts">
+        <div class="stat-val">${s.points}</div>
+        <div class="stat-lbl">🏅 포인트</div>
+      </div>
+      ${fineCards}
+      ${statCount < 3 ? `<div class="stat-card"><div class="stat-val" style="font-size:18px;color:rgba(245,237,228,.3)">${history.length}</div><div class="stat-lbl">📋 내역</div></div>` : ''}
+    </div>
+
+    <div class="sec-lbl">오늘의 미션</div>
+    <div class="mission-list">${missionsHTML}</div>
+
+    <div class="sec-lbl">포인트 내역</div>
+    <div class="hist-list">${histHTML}</div>
+  `;
+
+  startTimer();
+}
+
+// ─── 타이머 ───────────────────────────────────────────────────────────────────
+function startTimer() {
+  clearInterval(_timerInterval);
+  _timerSec = 30;
+  updateTimerUI();
+  _timerInterval = setInterval(() => {
+    _timerSec--;
+    updateTimerUI();
+    if (_timerSec <= 0) goHome();
+  }, 1000);
+}
+function updateTimerUI() {
+  const fill = document.getElementById('timer-fill');
+  const txt = document.getElementById('timer-txt');
+  if (fill) fill.style.width = (_timerSec / 30 * 100) + '%';
+  if (txt) txt.textContent = _timerSec + '초';
+}
+function resetTimer() { _timerSec = 30; }
+
+// 터치하면 타이머 리셋
+document.getElementById('detail').addEventListener('touchstart', resetTimer, {passive:true});
+
+function goHome() {
+  clearInterval(_timerInterval);
+  document.getElementById('detail').classList.add('hidden-right');
+  document.getElementById('home').classList.remove('hidden-left');
+}
+
+// ─── ESC ─────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => { if(e.key === 'Escape') goHome(); });
+
+// ─── UTIL ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── START ────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
