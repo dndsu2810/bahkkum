@@ -496,7 +496,8 @@ let ALL_MISSIONS={};
 let currentCat='';
 let selKey='', selName='', selCat='';
 let currentMissions=[];
-let missionDate='';  // '' = 오늘, 'YYYY-M-D' = 선택된 날짜
+let missionDate='';      // 현재 선택된 학생의 날짜
+let stuDates={};         // {studentKey: 'YYYY_M_D'} 학생별 날짜 설정
 let _kioskTarget=null;
 let _preOpen=false;
 
@@ -551,6 +552,7 @@ function enterCat(cat){
   currentCat=cat;
   selKey='';selName='';selCat='';currentMissions=[];
   missionDate=getTodayStr();
+  stuDates={};
   setupAdminForCat(cat);
   go('scr-admin');
   buildDatePicker();
@@ -672,18 +674,19 @@ function buildDatePicker(){
 }
 
 async function onDateChange(val){
-  // 현재 입력 중인 미션이 있으면 먼저 저장
+  // 현재 학생의 기존 미션 자동 저장
   const dirty = selKey && currentMissions.filter(m=>m.text.trim()).length > 0;
   if(dirty){
     const saved = await autoSaveBeforeLeave();
     if(!saved){
-      // 저장 실패 시 날짜 드롭다운 원래 값으로 복구
       const sel=document.getElementById('date-sel');
       if(sel) sel.value=missionDate;
       return;
     }
   }
   missionDate=val;
+  // 이 학생의 날짜를 따로 기억
+  if(selKey) stuDates[selKey]=val;
   await loadTodayMissions();
   renderStuSel();
   if(selKey){
@@ -731,10 +734,27 @@ function renderStuSel(){
   }).join('');
 }
 
-function selectStu(key,name,cat){
+async function selectStu(key,name,cat){
+  // 이전 학생 미션 자동 저장
+  if(selKey && selKey!==key){
+    await autoSaveBeforeLeave();
+  }
   selKey=key;selName=name;selCat=cat;
+
+  // 이 학생의 날짜 불러오기 (없으면 오늘)
+  missionDate = stuDates[key] || getTodayStr();
+
+  // 날짜 피커 업데이트
+  const sel=document.getElementById('date-sel');
+  if(sel){
+    // 옵션에 없으면 buildDatePicker로 재생성
+    if(![...sel.options].some(o=>o.value===missionDate)) buildDatePicker();
+    sel.value=missionDate;
+  }
+
+  // 해당 날짜 미션 로드
+  await loadTodayMissions();
   currentMissions=(ALL_MISSIONS[key]||[]).map(m=>({...m}));
-  // 기본값 없음 — 빈 상태로 시작
   renderStuSel();renderEdBody();
 }
 
@@ -747,6 +767,7 @@ function renderEdBody(){
     <div class="sel-stu-name">
       ${esc(selName)}
       <span style="font-size:11px;font-weight:700;background:${soft};color:${color};border-radius:20px;padding:3px 10px">${CAT_ICON[selCat]} ${esc(selCat)}</span>
+      <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.08);color:var(--muted);border-radius:20px;padding:3px 10px;border:1px solid var(--border)">${getTargetDateLabel()}</span>
       <span style="font-size:12px;color:var(--muted);font-weight:400" id="m-cnt">총 ${currentMissions.filter(m=>m.text.trim()).length}개</span>
     </div>
     ${recs.length?`<div style="margin-bottom:12px">
