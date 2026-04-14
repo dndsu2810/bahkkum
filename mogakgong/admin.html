@@ -672,6 +672,17 @@ function buildDatePicker(){
 }
 
 async function onDateChange(val){
+  // 현재 입력 중인 미션이 있으면 먼저 저장
+  const dirty = selKey && currentMissions.filter(m=>m.text.trim()).length > 0;
+  if(dirty){
+    const saved = await autoSaveBeforeLeave();
+    if(!saved){
+      // 저장 실패 시 날짜 드롭다운 원래 값으로 복구
+      const sel=document.getElementById('date-sel');
+      if(sel) sel.value=missionDate;
+      return;
+    }
+  }
   missionDate=val;
   await loadTodayMissions();
   renderStuSel();
@@ -679,6 +690,17 @@ async function onDateChange(val){
     currentMissions=(ALL_MISSIONS[selKey]||[]).map(m=>({...m}));
     renderEdBody();
   }
+}
+
+async function autoSaveBeforeLeave(){
+  if(!selKey) return true;
+  const missions = currentMissions.filter(m=>m.text.trim()).map(m=>({...m}));
+  if(!missions.length) return true;
+  ALL_MISSIONS[selKey] = missions;
+  const ok = await saveTodayMissions();
+  if(ok) toast('💾 ' + selName + ' 미션 자동 저장됨!');
+  else toast('⚠️ 자동 저장 실패 — 날짜 변경 취소됨');
+  return ok;
 }
 async function loadTodayMissions(){
   try{await getCFG();ALL_MISSIONS=CFG[getTargetKey()]||{};}catch{ALL_MISSIONS={};}
