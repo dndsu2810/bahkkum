@@ -31,6 +31,15 @@ body{
   background:var(--surface);border-radius:20px;
   padding:6px 12px;border:1px solid rgba(255,255,255,0.06);
 }
+.sync-badge{
+  font-size:10px;font-weight:700;
+  background:rgba(34,197,94,.15);color:#22C55E;
+  border:1px solid rgba(34,197,94,.3);border-radius:20px;
+  padding:4px 10px;display:none;
+  animation:sync-in .4s ease;
+}
+@keyframes sync-in{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+.sync-badge.show{display:inline-block}
 .stage{
   width:100%;max-width:440px;
   padding:20px 20px 0;
@@ -461,7 +470,10 @@ body{
     <div style="font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:3px">오늘의 미션</div>
     <div class="student-name"><span id="header-name">--</span> <span>학생</span> 🔥 <span id="class-badge" style="display:none;font-size:12px;font-weight:700;background:rgba(59,130,246,.15);color:#3B82F6;border-radius:20px;padding:2px 10px;vertical-align:middle;margin-left:4px"></span></div>
   </div>
-  <div class="date-badge" id="today-date"></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="date-badge" id="today-date"></div>
+    <div class="sync-badge" id="sync-badge">✦ 업데이트됨</div>
+  </div>
 </div>
 
 <div class="stage">
@@ -597,27 +609,66 @@ function getMissionKey() {
   return STUDENT_KEY;
 }
 
-const DEFAULT_MISSIONS = [
-  {text:'개념 복습',hint:'교재 읽기'},
-  {text:'유형 연습문제',hint:'풀기'},
-  {text:'틀린 문제 다시 풀기',hint:'오답 노트'},
-  {text:'심화 문제',hint:'도전 문제'},
-  {text:'선생님께 질문 정리',hint:'메모해두기'},
-];
+// 미션은 서버에서만 로드
 
-async function loadMissions() {
+let _lastMissionHash = '';
+
+function missionHash(ms) {
+  return JSON.stringify(ms);
+}
+
+async function loadMissions(silent) {
   try {
     const res = await fetch(KIOSK_API + '/api/config');
     const cfg = await res.json();
     const todayKey = getTodayKey();
     const loaded = cfg[todayKey]?.[getMissionKey()];
-    missions = (loaded && loaded.length > 0) ? loaded : DEFAULT_MISSIONS;
+    const newMs = (loaded && loaded.length > 0) ? loaded : [];
+
+    if (silent) {
+      // 폴링 모드 — 변경 있을 때만 업데이트
+      const newHash = missionHash(newMs);
+      if (newHash === _lastMissionHash) return; // 변화 없음
+      _lastMissionHash = newHash;
+      // 완료 상태 유지하면서 미션 텍스트만 갱신
+      const prevDone = [...done];
+      missions = newMs;
+      done = missions.map((_,i) => prevDone[i] || false);
+      document.getElementById('total-count').textContent = missions.length;
+      buildMissionList();
+      // 완료 상태 복원
+      done.forEach((d,i) => { if(d) applyDone(i); });
+      updateFireState();
+      showSyncBadge();
+      return;
+    }
+
+    missions = newMs;
+    _lastMissionHash = missionHash(missions);
   } catch(e) {
-    missions = DEFAULT_MISSIONS;
+    if (!silent) missions = [];
   }
-  done = new Array(missions.length).fill(false);
-  document.getElementById('total-count').textContent = missions.length;
-  buildMissionList();
+  if (!silent) {
+    done = new Array(missions.length).fill(false);
+    document.getElementById('total-count').textContent = missions.length;
+    buildMissionList();
+  }
+}
+
+function showSyncBadge() {
+  const el = document.getElementById('sync-badge');
+  if (!el) return;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// 30초마다 실시간 업데이트 폴링
+function startPolling() {
+  setInterval(() => {
+    if (document.visibilityState !== 'hidden') {
+      loadMissions(true);
+    }
+  }, 30000);
 }
 
 const d=new Date();
@@ -916,7 +967,8 @@ document.getElementById('greet-overlay').addEventListener('click', ()=>{
 window.addEventListener('load', async ()=>{
   document.getElementById('greet-overlay').classList.add('show');
   typeGreeting();
-  await loadMissions();
+  await loadMissions(false);
+  startPolling();
   loadKioskStudent();
 });
 </script>
