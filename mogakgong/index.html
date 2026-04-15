@@ -716,6 +716,17 @@ async function loadMissions(silent) {
     const res = await fetch(KIOSK_API + '/api/config');
     cfg = await res.json();
 
+    // pending 상태 확인 — 이미 다른 기기에서 알림 보냈으면 로컬에도 기록
+    const pendingData = cfg['mogakgong_pending']?.[STUDENT_KEY];
+    if (pendingData && pendingData.status === 'pending') {
+      const d0 = new Date();
+      const todayMissionKey = 'mogakgong_' + d0.getFullYear() + '_' + (d0.getMonth()+1) + '_' + d0.getDate();
+      const submitKey = 'mogak_submitted_' + STUDENT_KEY + '_' + todayMissionKey;
+      if (!localStorage.getItem(submitKey)) {
+        localStorage.setItem(submitKey, '1'); // 다른 기기 제출 → 로컬에도 기록
+      }
+    }
+
     // 별명 로드 (첫 번째 로드 시에만)
     if (!STUDENT_NICKNAME) {
       const nicknames = cfg.mogak_nicknames || {};

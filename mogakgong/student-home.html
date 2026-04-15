@@ -324,7 +324,13 @@ async function openDetail(id) {
   const allDone    = missions.length > 0 && doneCnt === missions.length;
 
   const submitKey = 'mogak_submitted_' + missionKey + '_' + todayKey;
-  const alreadySent = localStorage.getItem(submitKey) === '1';
+  // 서버 pending 상태로 다른 기기 제출 여부 확인
+  const serverPending = cfg['mogakgong_pending']?.[missionKey];
+  const serverAlreadySent = serverPending && serverPending.status === 'pending';
+  if (serverAlreadySent && !localStorage.getItem(submitKey)) {
+    localStorage.setItem(submitKey, '1'); // 동기화
+  }
+  const alreadySent = localStorage.getItem(submitKey) === '1' || serverAlreadySent;
 
   const avContent = s.photo_url
     ? `<div class="hero-av-inner"><img src="${esc(s.photo_url)}" style="width:100%;height:100%;object-fit:cover"/></div>`

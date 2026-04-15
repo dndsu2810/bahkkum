@@ -742,9 +742,9 @@ app.post('/api/submit', async (c) => {
 
       await c.env.DB.prepare(
 
-        'INSERT INTO point_history (student_id, delta, reason, category) VALUES (?,?,?,?)'
+        'INSERT INTO point_history (student_id, delta, reason, category, created_at) VALUES (?,?,?,?,?)'
 
-      ).bind(stu.id, delta, reason, category).run()
+      ).bind(stu.id, delta, reason, category, getKSTTimestamp()).run()
 
       if (category === 'fine') {
 
@@ -897,6 +897,15 @@ function getKSTDate() {
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
 
   return kst.toISOString().slice(0, 10)
+
+}
+
+// KST 현재 시각 (YYYY-MM-DD HH:MM:SS) — D1 저장용
+function getKSTTimestamp() {
+
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+
+  return kst.toISOString().slice(0, 19).replace('T', ' ')
 
 }
 
@@ -1316,9 +1325,9 @@ app.post('/api/admin/students/:id/points', async (c) => {
 
   await c.env.DB.prepare(
 
-    'INSERT INTO point_history (student_id, delta, reason, category) VALUES (?,?,?,?)'
+    'INSERT INTO point_history (student_id, delta, reason, category, created_at) VALUES (?,?,?,?,?)'
 
-  ).bind(id, delta, reason || '관리자 조정', 'admin').run()
+  ).bind(id, delta, reason || '관리자 조정', 'admin', getKSTTimestamp()).run()
 
   return c.json({ success: true })
 
