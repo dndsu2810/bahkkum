@@ -1161,11 +1161,31 @@ function renderLinks(){
 }
 
 function copyLink(id,url,name){
-  navigator.clipboard.writeText(url).then(()=>{
+  const markCopied=()=>{
     const btn=document.getElementById(id);
     if(btn){btn.textContent='✓ 복사됨!';btn.classList.add('copied');setTimeout(()=>{btn.textContent='📋 복사';btn.classList.remove('copied');},2000);}
     toast('🔗 '+name+' 링크 복사됨!');
-  });
+  };
+  const fallback=()=>{
+    // clipboard API 안 될 때 textarea 방식으로 복사
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=url;ta.style.cssText='position:fixed;left:-9999px;top:-9999px;opacity:0';
+      document.body.appendChild(ta);ta.focus();ta.select();
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(ok)markCopied();
+      else{
+        // 마지막 수단: 입력창으로 보여주기
+        prompt('아래 링크를 복사하세요 (Ctrl+C / Cmd+C)',url);
+      }
+    }catch(e){ prompt('아래 링크를 복사하세요 (Ctrl+C / Cmd+C)',url); }
+  };
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(url).then(markCopied).catch(fallback);
+  } else {
+    fallback();
+  }
 }
 
 // ─── 포인트 내역 ─────────────────────────────────────────────────────────────
