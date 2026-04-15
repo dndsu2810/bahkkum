@@ -1527,49 +1527,31 @@ async function sendSlackQueue(env: Bindings, d: any) {
 
 async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
 
-  if (!env.SLACK_WEBHOOK_URL) {
-    console.log('SLACK_WEBHOOK_URL 없음 - 슬랙 알림 건너뜀')
-    return
-  }
+  if (!env.SLACK_WEBHOOK_URL) return
 
   const now = new Date(Date.now() + 9 * 3600 * 1000)
-  const timeStr = String(now.getUTCHours()).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0')
+  const h = String(now.getUTCHours()).padStart(2, '0')
+  const m = String(now.getUTCMinutes()).padStart(2, '0')
+  const timeStr = h + ':' + m
 
-  const missionLines = d.missions.length > 0
-    ? d.missions.map((m: any) => `• ${m.text || m}`).join('
-')
+  const missionList = d.missions.length > 0
+    ? d.missions.map(function(m: any) { return '• ' + (m.text || String(m)) }).join('\n')
     : '없음'
 
-  const payload = {
-    text: `🔥 모각공 완료 확인 요청: ${d.name} (${d.cat})`,
-    blocks: [
-      { type: 'header', text: { type: 'plain_text', text: '🔥 모각공 미션 완료 확인 요청', emoji: true } },
-      { type: 'section', fields: [
-        { type: 'mrkdwn', text: `*학생:*
-${d.name}` },
-        { type: 'mrkdwn', text: `*수업:*
-${d.cat}` },
-      ]},
-      { type: 'section', text: { type: 'mrkdwn', text: `*완료한 미션:*
-${missionLines}` } },
-      { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${timeStr}  |  어드민 → 현황보기에서 확인 후 포인트 적립` }] },
-      { type: 'divider' },
-    ]
-  }
+  const text = '🔥 모각공 완료 확인 요청\n학생: ' + d.name + ' (' + d.cat + ')\n미션: ' + missionList + '\n⏰ ' + timeStr
 
   const res = await fetch(env.SLACK_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ text: text })
   })
 
   if (!res.ok) {
     const errText = await res.text()
-    throw new Error(`Slack HTTP ${res.status}: ${errText}`)
+    throw new Error('Slack ' + res.status + ': ' + errText)
   }
 
 }
-
 
 async function sendSlack(env: Bindings, d: any) {
 
