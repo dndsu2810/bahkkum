@@ -212,9 +212,15 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
 .ov-name{font-size:13px;font-weight:900}
 .ov-pts{font-size:11px;color:var(--muted);margin-top:2px}
 .ov-ms{display:flex;flex-direction:column;gap:4px}
-.ov-m{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:rgba(255,255,255,.6)}
-.ov-m::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.2);flex-shrink:0;margin-top:5px}
+.ov-m{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:rgba(255,255,255,.6)}
+.ov-m-check{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);
+  flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:9px}
+.ov-m.checked .ov-m-check{background:#34D399;border-color:#34D399;color:#fff}
+.ov-m.checked .ov-m-text{text-decoration:line-through;opacity:.45}
 .ov-mhint{font-size:11px;color:var(--muted)}
+.ov-progress{height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:8px;overflow:hidden}
+.ov-progress-fill{height:100%;border-radius:2px;background:#34D399;transition:width .4s}
+.ov-done-badge{font-size:10px;font-weight:700;margin-top:4px}
 .ov-empty{font-size:12px;color:var(--muted);text-align:center;padding:10px 0}
 
 /* ─── LINKS ───────────────────────────────────────────────────────────────── */
@@ -895,27 +901,54 @@ function refreshPreChips(){
 // ─── 현황 보기 ───────────────────────────────────────────────────────────────
 async function loadOverview(){
   await loadTodayMissions();
+
+  // done 상태 로드
+  const d=new Date();
+  const doneKey='mogakgong_done_'+d.getFullYear()+'_'+(d.getMonth()+1)+'_'+d.getDate();
+  const ALL_DONE = CFG[doneKey] || {};
+
   const el=document.getElementById('ov-grid');if(!el)return;
   const list=getStudentsByCat(currentCat);
   if(!list.length){el.innerHTML='<div class="empty">원생을 먼저 추가해주세요</div>';return;}
   const color=CAT_COLOR[currentCat];const soft=CAT_SOFT[currentCat];
   const isEng=IS_ENGLISH[currentCat];
+
   el.innerHTML=list.map(s=>{
     const key=s.name+'_'+currentCat;
     const ms=ALL_MISSIONS[key]||[];
+    const doneArr=ALL_DONE[key]||[];
+    const doneCnt=doneArr.filter(Boolean).length;
+    const total=ms.length;
+    const allDone=total>0&&doneCnt===total;
+    const pct=total>0?Math.round(doneCnt/total*100):0;
     const ptsHTML=!isEng&&s.points!=null?`<div class="ov-pts">🏅 ${s.points}P</div>`:'';
-    return `<div class="ov-card">
+
+    // 완료율 배지
+    const progressHTML=total>0?`
+      <div class="ov-progress"><div class="ov-progress-fill" style="width:${pct}%"></div></div>
+      <div class="ov-done-badge" style="color:${allDone?'#34D399':'var(--muted)'}">
+        ${allDone?'🔥 전체 완료!':doneCnt+'/'+total+' 완료'}
+      </div>`:'';
+
+    return `<div class="ov-card" style="${allDone?'border-color:rgba(52,211,153,.3)':''}">
       <div class="ov-head">
-        <div class="ov-av" style="background:${soft};color:${color}">${s.name[0]}</div>
+        <div class="ov-av" style="background:${allDone?'rgba(52,211,153,.2)':soft};color:${allDone?'#34D399':color}">${s.name[0]}</div>
         <div>
           <div class="ov-name">${esc(s.name)}</div>
           ${ptsHTML}
         </div>
       </div>
       <div class="ov-ms">${ms.length
-        ?ms.map(m=>`<div class="ov-m"><div><div>${esc(m.text)}</div>${m.hint?`<div class="ov-mhint">${esc(m.hint)}</div>`:''}</div></div>`).join('')
+        ?ms.map((m,i)=>{
+          const isDone=doneArr[i]||false;
+          return `<div class="ov-m ${isDone?'checked':''}">
+            <div class="ov-m-check">${isDone?'✓':''}</div>
+            <div><div class="ov-m-text">${esc(m.text)}</div>${m.hint?`<div class="ov-mhint">${esc(m.hint)}</div>`:''}</div>
+          </div>`;
+        }).join('')
         :'<div class="ov-empty">미션 없음</div>'
       }</div>
+      ${progressHTML}
     </div>`;
   }).join('');
 }
