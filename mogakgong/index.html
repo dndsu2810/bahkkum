@@ -632,9 +632,19 @@ function getMissionKey() {
   return STUDENT_KEY;
 }
 function getDoneStoreKey() {
-  // 체크 상태 저장 키: mogakgong_done_YYYY_M_D
   const d = new Date();
   return 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+}
+function getSubmitKey() {
+  // 오늘 제출 완료 여부 저장 키
+  const d = new Date();
+  return 'mogak_submitted_' + STUDENT_KEY + '_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+}
+function isSubmittedToday() {
+  return localStorage.getItem(getSubmitKey()) === '1';
+}
+function markSubmittedToday() {
+  localStorage.setItem(getSubmitKey(), '1');
 }
 
 // ── done 상태: localStorage(즉시) + 서버(공유) 이중 저장 ─────────────────────
@@ -914,25 +924,32 @@ function updateState(){
     document.getElementById('complete-banner')?.classList.remove('show');
   }
   if(cnt===total){
-    btn.disabled=false;btn.textContent='선생님께 완료 알림 보내기 🔥';
-    btn.onclick=async()=>{
+    if(isSubmittedToday()){
+      // 이미 제출 완료 — 재제출 불가
       btn.disabled=true;
-      btn.textContent='포인트 지급 중... ⏳';
-      const completed = missions.filter((_,i)=>done[i]);
-      const result = await submitToKiosk(completed);
-      btn.disabled=false;
-      btn.textContent='선생님께 완료 알림 보내기 🔥';
-      spawnConfetti();
-      // 오버레이 포인트 정보 업데이트
-      const earnedPts = completed.length * PT_PER_MISSION + PT_BONUS_ALL;
-      document.getElementById('overlay-points').textContent =
-        result.noKiosk
-          ? '✅ 선생님께 완료 알림이 전송됐어요!'
-          : result.success
-          ? '+' + earnedPts + ' 포인트 지급 완료! 🏅'
-          : '⚠️ 포인트 연동 실패 (선생님께 말해주세요)';
-      setTimeout(()=>document.getElementById('overlay').classList.add('show'),400);
-    };
+      btn.textContent='✅ 오늘 이미 완료 알림을 보냈어요!';
+      btn.onclick=null;
+    } else {
+      btn.disabled=false;btn.textContent='선생님께 완료 알림 보내기 🔥';
+      btn.onclick=async()=>{
+        if(isSubmittedToday()) return; // 이중 클릭 방지
+        btn.disabled=true;
+        btn.textContent='포인트 지급 중... ⏳';
+        const completed = missions.filter((_,i)=>done[i]);
+        const result = await submitToKiosk(completed);
+        markSubmittedToday(); // 오늘 제출 완료 기록
+        btn.textContent='✅ 오늘 이미 완료 알림을 보냈어요!';
+        spawnConfetti();
+        const earnedPts = completed.length * PT_PER_MISSION + PT_BONUS_ALL;
+        document.getElementById('overlay-points').textContent =
+          result.noKiosk
+            ? '✅ 선생님께 완료 알림이 전송됐어요!'
+            : result.success
+            ? '+' + earnedPts + ' 포인트 지급 완료! 🏅'
+            : '⚠️ 포인트 연동 실패 (선생님께 말해주세요)';
+        setTimeout(()=>document.getElementById('overlay').classList.add('show'),400);
+      };
+    }
   } else {
     btn.disabled=true;btn.textContent=`미션이 ${total-cnt}개 남았어요 🪵`;btn.onclick=null;
   }
