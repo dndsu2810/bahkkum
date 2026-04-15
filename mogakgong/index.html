@@ -1082,13 +1082,18 @@ function typeGreeting(){
   const el  = document.getElementById('bubble-typed');
   const cur = document.getElementById('bcursor');
   const btn = document.getElementById('greet-btn');
+  // 엘리먼트 없으면 즉시 버튼 표시
+  if(!el || !btn){
+    if(btn) btn.classList.add('visible');
+    return;
+  }
   const GREET_LINES = getGreetLines();
   let lineIdx = 0, charIdx = 0;
   let rendered = [];
 
   function tick(){
     if(lineIdx >= GREET_LINES.length){
-      cur.style.display = 'none';
+      if(cur) cur.style.display = 'none';
       btn.classList.add('visible');
       return;
     }
@@ -1108,23 +1113,26 @@ function typeGreeting(){
 }
 
 function closeGreet(){
-  // 오늘 방문 기록 저장
   localStorage.setItem(todayKey, '1');
   const ov = document.getElementById('greet-overlay');
+  if(!ov) return;
   ov.style.opacity = '0';
   ov.style.pointerEvents = 'none';
   setTimeout(()=>{ ov.style.display = 'none'; }, 420);
 }
 
+// 오버레이 어디든 탭해도 닫히게 (버튼 표시 여부 무관)
 document.getElementById('greet-overlay').addEventListener('click', ()=>{
-  if(document.getElementById('greet-btn').classList.contains('visible')) closeGreet();
+  const btn = document.getElementById('greet-btn');
+  if(btn && btn.classList.contains('visible')) closeGreet();
 });
 
 window.addEventListener('load', async ()=>{
   document.getElementById('greet-overlay').classList.add('show');
-  // 별명 먼저 로드 후 인사말 시작
-  await loadMissions(false);
-  typeGreeting();
+  // 인사말 & 미션 로드 병렬 시작 (인사말이 미션 로드를 기다리지 않음)
+  const missionLoad = loadMissions(false);
+  typeGreeting();                      // 즉시 시작
+  await missionLoad;                   // 미션은 백그라운드에서 로드
   startPolling();
   loadKioskStudent();
 });
