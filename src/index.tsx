@@ -30,7 +30,11 @@ const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('/static/*', serveStatic({ root: './' }))
 
-app.use('/api/*', cors())
+app.use('/api/*', cors({
+  origin: ['https://mogakgong.pages.dev', 'https://bakuum-kiosk.pages.dev'],
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'X-Admin-Password'],
+}))
 
 
 

@@ -442,13 +442,15 @@ async function toggleMission(el, studentId) {
   try {
     const d = new Date();
     const dateKey = 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+    const payload = { dateKey, studentKey: key, done: doneArr };
     const res = await fetch(KIOSK + '/api/mogak/done', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ dateKey, studentKey: key, done: doneArr })
+      body: JSON.stringify(payload)
     });
-    if (!res.ok) console.error('done 저장 실패', res.status);
-  } catch(e) { console.error('done 저장 오류', e); }
+    if (!res.ok) console.error('done 저장 실패 (tablet)', res.status, await res.text());
+    else console.log('done 저장 성공 (tablet):', key, doneArr);
+  } catch(e) { console.error('done 저장 오류 (tablet)', e); }
 }
 
 // ─── 타이머 ───────────────────────────────────────────────────────────────────

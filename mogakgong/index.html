@@ -614,18 +614,38 @@ function getDoneStoreKey() {
 }
 
 async function saveDoneState() {
+  const body = {
+    dateKey: getDoneStoreKey(),
+    studentKey: STUDENT_KEY,
+    done: done.map(Boolean)
+  };
   try {
-    // 전용 엔드포인트로 체크 상태 저장 (PW 불필요)
-    await fetch(KIOSK_API + '/api/mogak/done', {
+    // 1차 시도: 전용 엔드포인트
+    const res = await fetch(KIOSK_API + '/api/mogak/done', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        dateKey: getDoneStoreKey(),
-        studentKey: STUDENT_KEY,
-        done: done.map(Boolean)
-      })
+      body: JSON.stringify(body)
     });
-  } catch(e) {}
+    if (res.ok) return;
+    // 2차 시도: 직접 config 업데이트
+    await saveDoneViaConfig(body);
+  } catch(e) {
+    try { await saveDoneViaConfig(body); } catch(_) {}
+  }
+}
+
+async function saveDoneViaConfig({ dateKey, studentKey, done: doneArr }) {
+  // config 읽고 → done 업데이트 → 저장
+  const r = await fetch(KIOSK_API + '/api/config');
+  const cfg = await r.json();
+  if (!cfg[dateKey]) cfg[dateKey] = {};
+  cfg[dateKey][studentKey] = doneArr;
+  // 저장은 /api/mogak/done-direct (PW 없이)
+  await fetch(KIOSK_API + '/api/mogak/done', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ dateKey, studentKey, done: doneArr })
+  });
 }
 
 async function loadDoneState() {
