@@ -948,26 +948,37 @@ async function confirmStudent(stuKey, stuName){
   const entry=pending[stuKey];
   if(!entry){toast('⚠️ 대기 정보 없음');return;}
 
-  // 1. 포인트 적립 (키오스크 연동 학생만)
+  // 1. 포인트 적립 (수학반 키오스크 연동 학생만)
   const isMath=!IS_ENGLISH[currentCat];
   if(isMath){
-    const stu=KIOSK_STUDENTS.find(s=>s.name===(stuName||stuKey.split('_')[0]));
+    const stuName2=stuName||stuKey.split('_')[0];
+    const stu=KIOSK_STUDENTS.find(s=>s.name===stuName2);
     if(stu){
       try{
-        await api('/api/submit','POST',{
-          name:stu.name,
-          completedMissions:entry.missions||[],
-          studentId:stu.id
+        const missions=entry.missions||[];
+        const PT_PER=2, PT_BONUS=10;
+        const pts=missions.length*PT_PER+PT_BONUS;
+        // 올바른 포인트 적립 API 사용
+        await api('/api/admin/students/'+stu.id+'/points','POST',{
+          delta: pts,
+          reason: '모각공 미션 완료 ('+missions.map(m=>m.text).join(', ')+')'
         });
-      }catch(e){console.error(e);}
+        toast('✅ '+stuName2+' +'+pts+'P 적립됨!');
+      }catch(e){
+        console.error(e);
+        toast('⚠️ 포인트 적립 오류: '+e.message);
+      }
+    } else {
+      toast('✅ '+(stuName||stuKey)+' 확인 완료! (영어반 or 키오스크 미연동)');
     }
+  } else {
+    toast('✅ '+(stuName||stuKey)+' 미션 확인 완료!');
   }
 
   // 2. pending 상태 → confirmed 로 변경
   pending[stuKey]={...entry,status:'confirmed',confirmedAt:Date.now()};
   CFG['mogakgong_pending']=pending;
   await setCFG(CFG);
-  toast('✅ '+(stuName||stuKey)+' 포인트 적립 완료!');
   loadOverview();
 }
 

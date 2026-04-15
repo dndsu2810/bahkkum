@@ -127,6 +127,17 @@ html,body{height:100%;overflow:hidden;background:#0C0806;color:#F5EDE4;font-fami
 .hist-reason{flex:1;font-size:13px;color:rgba(245,237,228,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hist-time{font-size:11px;color:rgba(245,237,228,.3);white-space:nowrap}
 .no-hist{text-align:center;padding:16px;color:rgba(245,237,228,.3);font-size:13px}
+.notify-btn{width:100%;padding:18px;border-radius:18px;border:none;cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:900;
+  background:linear-gradient(135deg,#FB923C,#FDE68A);color:#0C0806;
+  box-shadow:0 8px 28px rgba(251,146,60,.45);transition:transform .15s,opacity .15s;
+  margin-top:8px}
+.notify-btn:active{transform:scale(.97)}
+.notify-btn:disabled{background:rgba(255,255,255,.1);color:rgba(245,237,228,.4);
+  box-shadow:none;cursor:not-allowed}
+.notify-done{width:100%;padding:16px;border-radius:18px;
+  background:rgba(52,211,153,.12);border:1.5px solid rgba(52,211,153,.3);
+  color:#34D399;font-size:14px;font-weight:900;text-align:center;margin-top:8px}
 
 /* ─── 연장 팝업 ─── */
 .extend-overlay{position:fixed;inset:0;z-index:200;
@@ -394,6 +405,22 @@ async function openDetail(id) {
   const statCount = 1 + (fineStats.fine_point > 0 ? 1 : 0) + (fineStats.fine_time > 0 ? 1 : 0);
   const statStyle = statCount === 1 ? 'grid-template-columns:1fr 1fr 1fr' : '';
 
+  // 이미 선생님께 알렸는지 확인
+  const submitKey = 'mogak_submitted_' + missionKey + '_' + todayKey;
+  const alreadySubmitted = localStorage.getItem(submitKey) === '1';
+  const allDone = missions.length > 0 && doneMaskServer.filter(Boolean).length === missions.length;
+
+  let notifyHTML = '';
+  if (missions.length > 0) {
+    if (alreadySubmitted) {
+      notifyHTML = '<div class="notify-done">✅ 선생님께 완료 알림을 보냈어요!</div>';
+    } else if (allDone) {
+      notifyHTML = `<button class="notify-btn" id="notify-btn" onclick="notifyTeacher(${id},'${esc(missionKey)}','${esc(s.name)}')">🔥 선생님께 완료 알리기</button>`;
+    } else {
+      notifyHTML = '<button class="notify-btn" disabled>미션을 모두 완료해야 알릴 수 있어요</button>';
+    }
+  }
+
   document.getElementById('detail-scroll').innerHTML = `
     <div class="hero">
       <div class="hero-av">${avContent}</div>
@@ -412,12 +439,68 @@ async function openDetail(id) {
 
     <div class="sec-lbl">오늘의 미션</div>
     <div class="mission-list">${missionsHTML}</div>
+    ${notifyHTML}
 
-    <div class="sec-lbl">포인트 내역</div>
+    <div class="sec-lbl" style="margin-top:20px">포인트 내역</div>
     <div class="hist-list">${histHTML}</div>
   `;
 
   startTimer();
+}
+
+// ─── 선생님께 알리기 ─────────────────────────────────────────────────────────────
+async function notifyTeacher(studentId, missionKey, studentName) {
+  const btn = document.getElementById('notify-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '전송 중... ⏳'; }
+  resetTimer();
+
+  try {
+    const d = new Date();
+    const todayKey = 'mogakgong_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+    const doneKey = 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+
+    // 현재 미션 목록 가져오기
+    const cfgRes = await fetch(KIOSK + '/api/config');
+    const cfg = await cfgRes.json();
+    const missions = cfg[todayKey]?.[missionKey] || [];
+    const doneArr = cfg[doneKey]?.[missionKey] || [];
+    const completed = missions.filter((_, i) => doneArr[i]);
+
+    // pending 상태로 저장
+    const res = await fetch(KIOSK + '/api/mogak/done', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dateKey: 'mogakgong_pending',
+        studentKey: missionKey,
+        done: {
+          name: studentName,
+          cat: missionKey.split('_').slice(1).join('_'),
+          missions: completed,
+          timestamp: Date.now(),
+          status: 'pending',
+          studentId: studentId
+        }
+      })
+    });
+
+    if (res.ok) {
+      // 로컬에 제출 기록
+      const submitKey = 'mogak_submitted_' + missionKey + '_' + todayKey;
+      localStorage.setItem(submitKey, '1');
+      if (btn) {
+        btn.className = 'notify-done';
+        btn.textContent = '✅ 선생님께 완료 알림을 보냈어요!';
+        btn.onclick = null;
+      }
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = '🔥 선생님께 완료 알리기'; }
+      alert('전송에 실패했어요. 다시 눌러주세요.');
+    }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔥 선생님께 완료 알리기'; }
+    console.error(e);
+  }
 }
 
 // ─── 미션 체크 토글 ─────────────────────────────────────────────────────────────
@@ -448,9 +531,25 @@ async function toggleMission(el, studentId) {
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
-    if (!res.ok) console.error('done 저장 실패 (tablet)', res.status, await res.text());
-    else console.log('done 저장 성공 (tablet):', key, doneArr);
+    if (!res.ok) console.error('done 저장 실패 (tablet)', res.status);
   } catch(e) { console.error('done 저장 오류 (tablet)', e); }
+
+  // 버튼 상태 갱신
+  updateNotifyBtn(key);
+}
+
+function updateNotifyBtn(key) {
+  const btn = document.getElementById('notify-btn');
+  if (!btn) return;
+  const allItems = document.querySelectorAll('.m-item');
+  const allDone = allItems.length > 0 && Array.from(allItems).every(i => i.classList.contains('done'));
+  if (allDone) {
+    btn.disabled = false;
+    btn.textContent = '🔥 선생님께 완료 알리기';
+  } else {
+    btn.disabled = true;
+    btn.textContent = '미션을 모두 완료해야 알릴 수 있어요';
+  }
 }
 
 // ─── 타이머 ───────────────────────────────────────────────────────────────────
