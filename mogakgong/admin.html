@@ -471,76 +471,6 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
   </div>
 </div>
 
-<!-- 별명 설정 모달 -->
-<div class="modal-ov" id="nick-modal" onclick="if(event.target===this)closeNickModal()">
-  <div class="mbox">
-    <div class="mbox-title">✏️ 별명 설정</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px" id="nick-modal-desc"></div>
-    <div class="mfield">
-      <label>별명 (비워두면 자동으로 성 제외 이름 사용)</label>
-      <input class="minp" id="nick-inp" placeholder="예: 서준, 하린, 민지..."
-             onkeydown="if(event.key==='Enter')saveNick()" oninput="updateNickPreview()"/>
-      <div style="font-size:12px;color:var(--muted);margin-top:6px" id="nick-preview"></div>
-    </div>
-    <div class="mbtns">
-      <button class="btn btn-ghost btn-sm" onclick="clearNick()">기본값으로</button>
-      <button class="btn btn-ghost btn-sm" onclick="closeNickModal()">취소</button>
-      <button class="btn btn-primary btn-sm" id="nick-save-btn" onclick="saveNick()">저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- 키오스크 학생 카테고리 배정 모달 -->
-<div class="modal-ov" id="kiosk-modal" onclick="if(event.target===this)closeKioskModal()">
-  <div class="mbox">
-    <div class="mbox-title">🖥️ 카테고리 배정</div>
-    <div class="mfield">
-      <label>학생</label>
-      <div id="kiosk-modal-name" style="font-size:15px;font-weight:900;padding:8px 0;color:var(--text)"></div>
-    </div>
-    <div class="mfield">
-      <label>카테고리</label>
-      <select class="msel" id="kiosk-modal-cat">
-        <option value="">배정 없음</option>
-        <option value="초등수학">📐 초등수학</option>
-        <option value="중고등수학">📏 중고등수학</option>
-      </select>
-    </div>
-    <div class="mbtns">
-      <button class="btn btn-ghost btn-sm" onclick="closeKioskModal()">취소</button>
-      <button class="btn btn-primary btn-sm" id="kiosk-modal-save" onclick="saveKioskCat()">저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- 미루기 모달 -->
-<div class="modal-ov" id="postpone-modal" onclick="if(event.target===this)closePostpone()">
-  <div class="mbox">
-    <div class="mbox-title">📅 미션 미루기</div>
-    <div class="mfield">
-      <label>어느 날짜로 미룰까요?</label>
-      <div class="date-grid" id="postpone-date-grid"></div>
-    </div>
-    <div class="mfield">
-      <label>현재 날짜 처리</label>
-      <div class="postpone-opt">
-        <label class="popt">
-          <input type="radio" name="postpone-keep" value="keep" checked/>
-          <div><div class="popt-label">현재 날짜 미션 유지</div><div class="popt-sub">오늘 + 선택한 날짜 둘 다 있음</div></div>
-        </label>
-        <label class="popt">
-          <input type="radio" name="postpone-keep" value="remove"/>
-          <div><div class="popt-label">현재 날짜에서 삭제</div><div class="popt-sub">선택한 날짜로 완전히 이동</div></div>
-        </label>
-      </div>
-    </div>
-    <div class="mbtns">
-      <button class="btn btn-ghost btn-sm" onclick="closePostpone()">취소</button>
-      <button class="btn btn-primary btn-sm" id="postpone-confirm" onclick="confirmPostpone()"
-        style="background:var(--hs-c)">📅 미루기 확인</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ─── 상수 ───────────────────────────────────────────────────────────────────
@@ -1319,5 +1249,77 @@ window.addEventListener('load',async()=>{
   if(saved){PW=saved;await showCatSelect();}
 });
 </script>
+
+<!-- 별명 설정 모달 -->
+<div class="modal-ov" id="nick-modal" onclick="if(event.target===this)closeNickModal()">
+  <div class="mbox">
+    <div class="mbox-title">✏️ 별명 설정</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px" id="nick-modal-desc"></div>
+    <div class="mfield">
+      <label>별명 (비워두면 자동으로 성 제외 이름 사용)</label>
+      <input class="minp" id="nick-inp" placeholder="예: 서준, 하린, 민지..."
+             onkeydown="if(event.key==='Enter')saveNick()" oninput="updateNickPreview()"/>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px" id="nick-preview"></div>
+    </div>
+    <div class="mbtns">
+      <button class="btn btn-ghost btn-sm" onclick="clearNick()">기본값으로</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeNickModal()">취소</button>
+      <button class="btn btn-primary btn-sm" id="nick-save-btn" onclick="saveNick()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 키오스크 학생 카테고리 배정 모달 -->
+<div class="modal-ov" id="kiosk-modal" onclick="if(event.target===this)closeKioskModal()">
+  <div class="mbox">
+    <div class="mbox-title">🖥️ 카테고리 배정</div>
+    <div class="mfield">
+      <label>학생</label>
+      <div id="kiosk-modal-name" style="font-size:15px;font-weight:900;padding:8px 0;color:var(--text)"></div>
+    </div>
+    <div class="mfield">
+      <label>카테고리</label>
+      <select class="msel" id="kiosk-modal-cat">
+        <option value="">배정 없음</option>
+        <option value="초등수학">📐 초등수학</option>
+        <option value="중고등수학">📏 중고등수학</option>
+      </select>
+    </div>
+    <div class="mbtns">
+      <button class="btn btn-ghost btn-sm" onclick="closeKioskModal()">취소</button>
+      <button class="btn btn-primary btn-sm" id="kiosk-modal-save" onclick="saveKioskCat()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 미루기 모달 -->
+<div class="modal-ov" id="postpone-modal" onclick="if(event.target===this)closePostpone()">
+  <div class="mbox">
+    <div class="mbox-title">📅 미션 미루기</div>
+    <div class="mfield">
+      <label>어느 날짜로 미룰까요?</label>
+      <div class="date-grid" id="postpone-date-grid"></div>
+    </div>
+    <div class="mfield">
+      <label>현재 날짜 처리</label>
+      <div class="postpone-opt">
+        <label class="popt">
+          <input type="radio" name="postpone-keep" value="keep" checked/>
+          <div><div class="popt-label">현재 날짜 미션 유지</div><div class="popt-sub">오늘 + 선택한 날짜 둘 다 있음</div></div>
+        </label>
+        <label class="popt">
+          <input type="radio" name="postpone-keep" value="remove"/>
+          <div><div class="popt-label">현재 날짜에서 삭제</div><div class="popt-sub">선택한 날짜로 완전히 이동</div></div>
+        </label>
+      </div>
+    </div>
+    <div class="mbtns">
+      <button class="btn btn-ghost btn-sm" onclick="closePostpone()">취소</button>
+      <button class="btn btn-primary btn-sm" id="postpone-confirm" onclick="confirmPostpone()"
+        style="background:var(--hs-c)">📅 미루기 확인</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
