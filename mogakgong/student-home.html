@@ -422,7 +422,7 @@ async function openDetail(id) {
 
 // ─── 미션 체크 토글 ─────────────────────────────────────────────────────────────
 async function toggleMission(el, studentId) {
-  resetTimer(); // 터치 시 타이머 리셋
+  resetTimer();
   const idx = parseInt(el.getAttribute('data-idx'));
   const key = el.getAttribute('data-key');
   const isDone = el.classList.contains('done');
@@ -433,20 +433,22 @@ async function toggleMission(el, studentId) {
   const chk = el.querySelector('.m-check');
   if (chk) chk.textContent = newDone ? '✓' : '';
 
-  // 현재 done 배열 재구성
-  const allItems = document.querySelectorAll('.m-item[data-key="' + key + '"]');
+  // 부모 컨테이너에서 같은 key 가진 항목들 찾기 (CSS 선택자 인코딩 문제 우회)
+  const container = el.closest('.mission-list') || el.parentElement;
+  const allItems = container ? container.querySelectorAll('.m-item') : [el];
   const doneArr = Array.from(allItems).map(item => item.classList.contains('done'));
 
   // 서버에 저장
   try {
     const d = new Date();
     const dateKey = 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
-    await fetch(KIOSK + '/api/mogak/done', {
+    const res = await fetch(KIOSK + '/api/mogak/done', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ dateKey, studentKey: key, done: doneArr })
     });
-  } catch(e) {}
+    if (!res.ok) console.error('done 저장 실패', res.status);
+  } catch(e) { console.error('done 저장 오류', e); }
 }
 
 // ─── 타이머 ───────────────────────────────────────────────────────────────────
