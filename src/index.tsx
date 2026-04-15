@@ -168,25 +168,12 @@ app.post('/api/mogak/notify', async (c) => {
       "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
     ).bind(JSON.stringify(cfg)).run()
 
-    // 4. 슬랙 알림 발송
-    if (c.env.SLACK_WEBHOOK_URL) {
-      try {
-        const now = new Date(Date.now() + 9 * 3600 * 1000)
-        const timeStr = String(now.getUTCHours()).padStart(2,'0') + ':' + String(now.getUTCMinutes()).padStart(2,'0')
-        const missionList = (missions || []).map((m: any) => `• ${m.text}`).join('\n')
-        await fetch(c.env.SLACK_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            blocks: [
-              { type: 'header', text: { type: 'plain_text', text: '🔥 모각공 미션 완료 확인 요청', emoji: true } },
-              { type: 'section', text: { type: 'mrkdwn', text: `*👤 학생:* ${name}　*📚 수업:* ${cat || '-'}\n\n*✅ 완료한 미션:*\n${missionList || '없음'}` } },
-              { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${timeStr}　|　어드민 → 현황보기에서 확인 후 포인트 적립` }] },
-              { type: 'divider' },
-            ]
-          })
-        })
-      } catch (_) {}
+    // 4. 슬랙 알림 발송 (기존 sendSlack 방식과 동일하게 env 직접 전달)
+    try {
+      await sendMogakSlack(c.env, { name, cat: cat || '-', missions: missions || [] })
+    } catch (slackErr: any) {
+      console.error('모각공 슬랙 오류:', slackErr?.message)
+      // 슬랙 실패해도 저장은 성공으로 처리
     }
 
     return c.json({ success: true })
@@ -1528,6 +1515,52 @@ async function sendSlackQueue(env: Bindings, d: any) {
 
 
 // ── Slack ──────────────────────────────────────────────────────────────────────
+
+async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
+
+  if (!env.SLACK_WEBHOOK_URL) {
+    console.log('SLACK_WEBHOOK_URL 없음 - 슬랙 알림 건너뜀')
+    return
+  }
+
+  const now = new Date(Date.now() + 9 * 3600 * 1000)
+  const timeStr = String(now.getUTCHours()).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0')
+
+  const missionLines = d.missions.length > 0
+    ? d.missions.map((m: any) => `• ${m.text || m}`).join('
+')
+    : '없음'
+
+  const payload = {
+    text: `🔥 모각공 완료 확인 요청: ${d.name} (${d.cat})`,
+    blocks: [
+      { type: 'header', text: { type: 'plain_text', text: '🔥 모각공 미션 완료 확인 요청', emoji: true } },
+      { type: 'section', fields: [
+        { type: 'mrkdwn', text: `*학생:*
+${d.name}` },
+        { type: 'mrkdwn', text: `*수업:*
+${d.cat}` },
+      ]},
+      { type: 'section', text: { type: 'mrkdwn', text: `*완료한 미션:*
+${missionLines}` } },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${timeStr}  |  어드민 → 현황보기에서 확인 후 포인트 적립` }] },
+      { type: 'divider' },
+    ]
+  }
+
+  const res = await fetch(env.SLACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Slack HTTP ${res.status}: ${errText}`)
+  }
+
+}
+
 
 async function sendSlack(env: Bindings, d: any) {
 
