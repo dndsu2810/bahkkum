@@ -900,8 +900,7 @@ function refreshPreChips(){
 
 // ─── 현황 보기 ───────────────────────────────────────────────────────────────
 async function resetStudentDone(key, name) {
-  if (!confirm(name + ' 학생의 오늘 체크 상태를 초기화할까요?
-(학생이 다시 체크할 수 있어요)')) return;
+  if (!confirm(name + ' 학생의 오늘 체크 상태를 초기화할까요? (학생이 다시 체크할 수 있어요)')) return;
 
   // 서버 done 상태 삭제
   try {
