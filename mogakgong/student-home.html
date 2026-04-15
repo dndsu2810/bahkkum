@@ -493,22 +493,15 @@ async function notifyTeacher(studentId, missionKey, studentName) {
     const name = studentName || missionKey.split('_')[0];
     const cat  = missionKey.split('_').slice(1).join('_');
 
-    const res = await fetch(KIOSK + '/api/mogak/done', {
+    // 전용 알림 엔드포인트 사용 (객체/배열 혼용 문제 방지)
+    const res = await fetch(KIOSK + '/api/mogak/notify', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        dateKey: 'mogakgong_pending',
-        studentKey: missionKey,
-        done: {
-          name, cat, missions: completed,
-          timestamp: Date.now(),
-          status: 'pending',
-          studentId
-        }
-      })
+      body: JSON.stringify({ studentKey: missionKey, name, cat, missions: completed, studentId })
     });
 
-    const result = await res.json();
+    let result = { success: false, error: '응답 없음' };
+    try { result = await res.json(); } catch(e) { result = { success: false, error: '응답 파싱 실패' }; }
     if (result.success) {
       localStorage.setItem(submitKey, '1');
       const notifyWrap = document.querySelector('.notify-wrap');

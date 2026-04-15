@@ -126,6 +126,50 @@ app.post('/api/mogak/done', async (c) => {
 })
 
 
+// ── 모각공 선생님 완료 알림 저장 (PW 없이) ─────────────────────────────────────
+app.post('/api/mogak/notify', async (c) => {
+
+  try {
+
+    const body = await c.req.json()
+    const { studentKey, name, cat, missions, studentId } = body
+
+    if (!studentKey || !name) {
+      return c.json({ success: false, error: '파라미터 오류' }, 400)
+    }
+
+    const row = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='kiosk_config'"
+    ).first() as any
+
+    const cfg = row?.value ? JSON.parse(row.value) : {}
+
+    if (!cfg['mogakgong_pending']) cfg['mogakgong_pending'] = {}
+
+    cfg['mogakgong_pending'][studentKey] = {
+      name,
+      cat: cat || '',
+      missions: missions || [],
+      timestamp: Date.now(),
+      status: 'pending',
+      studentId: studentId || null
+    }
+
+    await c.env.DB.prepare(
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
+    ).bind(JSON.stringify(cfg)).run()
+
+    return c.json({ success: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
 // 관리자 설정 저장 (DB에 저장 → 모든 기기에서 즉시 반영)
 app.post('/api/admin/config', async (c) => {
 
