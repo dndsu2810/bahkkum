@@ -248,6 +248,23 @@ body{
   50%{box-shadow:0 6px 40px rgba(254,95,60,.7)}
 }
 .action-btn:not(:disabled):active{transform:scale(.97)}
+/* 완료 알림 배너 */
+.complete-banner{
+  display:none;
+  position:fixed;top:0;left:0;right:0;z-index:250;
+  background:linear-gradient(135deg,#22C55E,#16A34A);
+  color:#fff;font-family:'Noto Sans KR',sans-serif;
+  padding:14px 20px 16px;
+  animation:banner-in .5s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 4px 24px rgba(34,197,94,.5);
+}
+.complete-banner.show{display:block}
+@keyframes banner-in{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+.banner-title{font-size:16px;font-weight:900;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.banner-list{display:flex;flex-direction:column;gap:3px}
+.banner-item{font-size:13px;display:flex;align-items:center;gap:6px;opacity:.9}
+.banner-item::before{content:'✓';font-weight:900;font-size:12px}
+.banner-close{position:absolute;top:12px;right:16px;font-size:20px;cursor:pointer;opacity:.8;background:none;border:none;color:#fff}
 .overlay{
   position:fixed;inset:0;
   background:rgba(14,10,8,.97);
@@ -543,6 +560,13 @@ body{
   <button class="action-btn" id="action-btn" disabled>미션을 모두 완료해야 해요</button>
 </div>
 
+<!-- 완료 알림 배너 -->
+<div class="complete-banner" id="complete-banner">
+  <button class="banner-close" onclick="document.getElementById('complete-banner').classList.remove('show')">✕</button>
+  <div class="banner-title">🔥 모든 목표 완료!</div>
+  <div class="banner-list" id="banner-list"></div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="overlay-icon">🔥</div>
   <div class="overlay-title">모닥불 완성! 🎉</div>
@@ -613,51 +637,57 @@ function getDoneStoreKey() {
   return 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
 }
 
+// ── done 상태: localStorage(즉시) + 서버(공유) 이중 저장 ─────────────────────
+function getLocalDoneKey() {
+  return 'mogak_done_' + STUDENT_KEY + '_' + getDoneStoreKey();
+}
+
 async function saveDoneState() {
-  const body = {
-    dateKey: getDoneStoreKey(),
-    studentKey: STUDENT_KEY,
-    done: done.map(Boolean)
-  };
+  const doneArr = done.map(Boolean);
+
+  // localStorage 즉시 저장 (새로고침 대비)
+  try { localStorage.setItem(getLocalDoneKey(), JSON.stringify(doneArr)); } catch(_) {}
+
+  // 서버 저장 (기기 간 공유)
   try {
-    // 1차 시도: 전용 엔드포인트
-    const res = await fetch(KIOSK_API + '/api/mogak/done', {
+    await fetch(KIOSK_API + '/api/mogak/done', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        dateKey: getDoneStoreKey(),
+        studentKey: STUDENT_KEY,
+        done: doneArr
+      })
     });
-    if (res.ok) return;
-    // 2차 시도: 직접 config 업데이트
-    await saveDoneViaConfig(body);
-  } catch(e) {
-    try { await saveDoneViaConfig(body); } catch(_) {}
-  }
+  } catch(e) {}
 }
 
-async function saveDoneViaConfig({ dateKey, studentKey, done: doneArr }) {
-  // config 읽고 → done 업데이트 → 저장
-  const r = await fetch(KIOSK_API + '/api/config');
-  const cfg = await r.json();
-  if (!cfg[dateKey]) cfg[dateKey] = {};
-  cfg[dateKey][studentKey] = doneArr;
-  // 저장은 /api/mogak/done-direct (PW 없이)
-  await fetch(KIOSK_API + '/api/mogak/done', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ dateKey, studentKey, done: doneArr })
-  });
-}
-
-async function loadDoneState() {
+async function loadDoneState(cfg) {
+  // 1순위: 서버 데이터 (공유 상태)
   try {
-    const res = await fetch(KIOSK_API + '/api/config');
-    const cfg = await res.json();
-    const saved = cfg[getDoneStoreKey()]?.[STUDENT_KEY];
-    if (saved && Array.isArray(saved)) {
-      done = missions.map((_, i) => saved[i] || false);
-      return true;
+    if (cfg) {
+      const saved = cfg[getDoneStoreKey()]?.[STUDENT_KEY];
+      if (saved && Array.isArray(saved) && saved.some(Boolean)) {
+        done = missions.map((_, i) => saved[i] || false);
+        try { localStorage.setItem(getLocalDoneKey(), JSON.stringify(done)); } catch(_) {}
+        return true;
+      }
     }
   } catch(e) {}
+
+  // 2순위: localStorage (서버에 없을 때)
+  try {
+    const local = localStorage.getItem(getLocalDoneKey());
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed) && parsed.some(Boolean)) {
+        done = missions.map((_, i) => parsed[i] || false);
+        saveDoneState(); // 로컬 → 서버 업로드
+        return true;
+      }
+    }
+  } catch(_) {}
+
   return false;
 }
 
@@ -714,13 +744,25 @@ async function loadMissions(silent) {
   }
   if (!silent) {
     document.getElementById('total-count').textContent = missions.length;
-    // done 상태 서버에서 로드
-    const hasSaved = await loadDoneState();
+    // done 상태 로드 (cfg 재사용 — 추가 fetch 불필요)
+    const hasSaved = await loadDoneState(cfg);
     if (!hasSaved) done = new Array(missions.length).fill(false);
     buildMissionList();
     done.forEach((d,i) => { if(d) applyDone(i); });
     updateState();
   }
+}
+
+function showCompleteBanner() {
+  const banner = document.getElementById('complete-banner');
+  const list = document.getElementById('banner-list');
+  if (!banner || !list) return;
+  // 완료된 미션 목록
+  const completed = missions.filter((_, i) => done[i]);
+  list.innerHTML = completed.map(m =>
+    `<div class="banner-item">${m.text}</div>`
+  ).join('');
+  banner.classList.add('show');
 }
 
 function showSyncBadge() {
@@ -866,6 +908,11 @@ function updateState(){
   const la=document.getElementById('log-a'),lb=document.getElementById('log-b'),lc=document.getElementById('log-c');
   la.classList.toggle('show',cnt>=1);lb.classList.toggle('show',cnt>=3);lc.classList.toggle('show',cnt>=5);
   const btn=document.getElementById('action-btn');
+  if(cnt===total && total>0){
+    showCompleteBanner();
+  } else {
+    document.getElementById('complete-banner')?.classList.remove('show');
+  }
   if(cnt===total){
     btn.disabled=false;btn.textContent='선생님께 완료 알림 보내기 🔥';
     btn.onclick=async()=>{
