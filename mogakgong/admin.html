@@ -1001,7 +1001,8 @@ async function resetStudentDone(key, name) {
 }
 
 async function loadOverview(){
-  await loadTodayMissions();
+  await loadStudents();      // 키오스크 포인트 최신화
+  await loadTodayMissions(); // 미션 + done 상태 최신화
 
   // 확인 대기 목록 렌더
   renderPendingList();

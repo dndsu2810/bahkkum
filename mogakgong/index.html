@@ -719,7 +719,17 @@ async function loadMissions(silent) {
     // 별명 로드 (첫 번째 로드 시에만)
     if (!STUDENT_NICKNAME) {
       const nicknames = cfg.mogak_nicknames || {};
+      // STUDENT_KEY(이름_카테고리)로 먼저 찾고, 없으면 이름만으로 폴백
       STUDENT_NICKNAME = nicknames[STUDENT_KEY] || '';
+      if (!STUDENT_NICKNAME && STUDENT_CLASS) {
+        // 카테고리 있는데 못 찾은 경우 — 이름만으로도 시도
+        STUDENT_NICKNAME = nicknames[STUDENT_NAME] || '';
+      }
+      if (!STUDENT_NICKNAME && !STUDENT_CLASS) {
+        // 카테고리 없는 링크: 이름_카테고리 형태로 저장된 것 중 이름 일치하는 것 찾기
+        const found = Object.keys(nicknames).find(k => k.startsWith(STUDENT_NAME + '_'));
+        if (found) STUDENT_NICKNAME = nicknames[found];
+      }
     }
 
     const todayKey = getTodayKey();
@@ -732,6 +742,10 @@ async function loadMissions(silent) {
       const doneFromServer = cfg[getDoneStoreKey()]?.[STUDENT_KEY];
       const newDoneHash = JSON.stringify(doneFromServer || []);
       const prevDoneHash = JSON.stringify(done);
+
+      // 별명 변경 감지
+      const newNick = (cfg.mogak_nicknames||{})[STUDENT_KEY] || (cfg.mogak_nicknames||{})[STUDENT_NAME] || '';
+      if (newNick && newNick !== STUDENT_NICKNAME) STUDENT_NICKNAME = newNick;
 
       if (newHash === _lastMissionHash && newDoneHash === prevDoneHash) return;
 

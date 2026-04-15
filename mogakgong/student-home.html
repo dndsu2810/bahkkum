@@ -432,9 +432,8 @@ async function toggleMission(el, studentId, missionKey) {
 
   // 알림 버튼 업데이트
   const notifyWrap = document.querySelector('.notify-wrap');
-  const submitKey = 'mogak_submitted_' + missionKey + '_mogakgong_' + (() => {
-    const d = new Date(); return d.getFullYear()+'_'+(d.getMonth()+1)+'_'+d.getDate();
-  })();
+  const d2 = new Date();
+  const submitKey = 'mogak_submitted_' + missionKey + '_mogakgong_' + d2.getFullYear() + '_' + (d2.getMonth()+1) + '_' + d2.getDate();
   const alreadySent = localStorage.getItem(submitKey) === '1';
   if (notifyWrap && !alreadySent) {
     if (allDone) {
@@ -489,9 +488,10 @@ async function notifyTeacher(studentId, missionKey, studentName) {
       return;
     }
 
-    // 학생 이름 추출
-    const name = studentName || missionKey.split('_')[0];
-    const cat  = missionKey.split('_').slice(1).join('_');
+    // 학생 이름 추출 (missionKey = '이름_카테고리')
+    const parts = missionKey.split('_');
+    const name = studentName || parts[0] || STUDENTS.find(s=>s.id===studentId)?.name || '학생';
+    const cat  = parts.slice(1).join('_');
 
     // 전용 알림 엔드포인트 사용 (객체/배열 혼용 문제 방지)
     const res = await fetch(KIOSK + '/api/mogak/notify', {
