@@ -126,7 +126,7 @@ app.post('/api/mogak/done', async (c) => {
 })
 
 
-// ── 모각공 선생님 완료 알림 저장 (PW 없이) ─────────────────────────────────────
+// ── 모각공 선생님 완료 알림 (슬랙 알림 + pending 저장) ──────────────────────────
 app.post('/api/mogak/notify', async (c) => {
 
   try {
@@ -138,14 +138,23 @@ app.post('/api/mogak/notify', async (c) => {
       return c.json({ success: false, error: '파라미터 오류' }, 400)
     }
 
+    // 1. config 읽기
     const row = await c.env.DB.prepare(
       "SELECT value FROM app_config WHERE key='kiosk_config'"
     ).first() as any
-
     const cfg = row?.value ? JSON.parse(row.value) : {}
 
-    if (!cfg['mogakgong_pending']) cfg['mogakgong_pending'] = {}
+    // 2. 중복 제출 방지: 오늘 이미 pending/confirmed 상태면 거부
+    const existing = cfg['mogakgong_pending']?.[studentKey]
+    if (existing && existing.status === 'pending') {
+      const ageMin = (Date.now() - (existing.timestamp || 0)) / 60000
+      if (ageMin < 1440) { // 24시간 내 중복
+        return c.json({ success: false, error: 'already_submitted', message: '이미 알림을 보냈어요!' })
+      }
+    }
 
+    // 3. pending 저장
+    if (!cfg['mogakgong_pending']) cfg['mogakgong_pending'] = {}
     cfg['mogakgong_pending'][studentKey] = {
       name,
       cat: cat || '',
@@ -158,6 +167,27 @@ app.post('/api/mogak/notify', async (c) => {
     await c.env.DB.prepare(
       "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
     ).bind(JSON.stringify(cfg)).run()
+
+    // 4. 슬랙 알림 발송
+    if (c.env.SLACK_WEBHOOK_URL) {
+      try {
+        const now = new Date(Date.now() + 9 * 3600 * 1000)
+        const timeStr = String(now.getUTCHours()).padStart(2,'0') + ':' + String(now.getUTCMinutes()).padStart(2,'0')
+        const missionList = (missions || []).map((m: any) => `• ${m.text}`).join('\n')
+        await fetch(c.env.SLACK_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            blocks: [
+              { type: 'header', text: { type: 'plain_text', text: '🔥 모각공 미션 완료 확인 요청', emoji: true } },
+              { type: 'section', text: { type: 'mrkdwn', text: `*👤 학생:* ${name}　*📚 수업:* ${cat || '-'}\n\n*✅ 완료한 미션:*\n${missionList || '없음'}` } },
+              { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${timeStr}　|　어드민 → 현황보기에서 확인 후 포인트 적립` }] },
+              { type: 'divider' },
+            ]
+          })
+        })
+      } catch (_) {}
+    }
 
     return c.json({ success: true })
 

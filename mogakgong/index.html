@@ -940,14 +940,25 @@ function updateState(){
         btn.textContent='선생님께 전송 중... ⏳';
         const completed = missions.filter((_,i)=>done[i]);
         // 포인트 즉시 지급 X → 선생님 확인 대기 상태로 저장
-        const ok = await requestTeacherConfirm(completed);
-        markSubmittedToday();
-        btn.textContent='✅ 선생님 확인 대기 중...';
-        spawnConfetti();
-        document.getElementById('overlay-points').textContent =
-          ok ? '⏳ 선생님이 확인하면 포인트가 적립돼요!'
-             : '⚠️ 전송 실패 — 선생님께 말씀해주세요';
-        setTimeout(()=>document.getElementById('overlay').classList.add('show'),400);
+        const result = await requestTeacherConfirm(completed);
+        if (result.success) {
+          markSubmittedToday(); // 성공할 때만 기록
+          btn.textContent='✅ 선생님 확인 대기 중...';
+          spawnConfetti();
+          document.getElementById('overlay-points').textContent = '⏳ 선생님이 확인하면 포인트가 적립돼요!';
+          setTimeout(()=>document.getElementById('overlay').classList.add('show'),400);
+        } else if (result.alreadySubmitted) {
+          markSubmittedToday();
+          btn.disabled=true;
+          btn.textContent='✅ 오늘 이미 완료 알림을 보냈어요!';
+        } else {
+          // 실패 시 재시도 가능하게
+          btn.disabled=false;
+          btn.textContent='선생님께 완료 알림 보내기 🔥';
+          spawnConfetti();
+          document.getElementById('overlay-points').textContent = '⚠️ 전송 실패 — 다시 눌러주세요';
+          setTimeout(()=>document.getElementById('overlay').classList.add('show'),400);
+        }
       };
     }
   } else {
@@ -1033,8 +1044,12 @@ async function requestTeacherConfirm(completedMissions) {
       })
     });
     const data = await res.json();
-    return data.success;
-  } catch(e) { console.error('알림 전송 오류:', e); return false; }
+    if (data.error === 'already_submitted') return { success: false, alreadySubmitted: true };
+    return { success: data.success };
+  } catch(e) {
+    console.error('알림 전송 오류:', e);
+    return { success: false };
+  }
 }
 
 async function submitToKiosk(completedMissions) {
