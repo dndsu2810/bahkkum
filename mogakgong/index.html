@@ -1098,37 +1098,56 @@ function getGreetLines() {
 }
 
 function typeGreeting(){
-  const el  = document.getElementById('bubble-typed');
-  const cur = document.getElementById('bcursor');
   const btn = document.getElementById('greet-btn');
-  // 엘리먼트 없으면 즉시 버튼 표시
-  if(!el || !btn){
-    if(btn) btn.classList.add('visible');
-    return;
-  }
-  const GREET_LINES = getGreetLines();
-  let lineIdx = 0, charIdx = 0;
-  let rendered = [];
+  // 안전장치: 4초 후에도 버튼 안 나타나면 강제로 표시
+  const safetyTimer = setTimeout(()=>{
+    if(btn && !btn.classList.contains('visible')) btn.classList.add('visible');
+  }, 4000);
 
-  function tick(){
-    if(lineIdx >= GREET_LINES.length){
-      if(cur) cur.style.display = 'none';
+  try {
+    const el  = document.getElementById('bubble-typed');
+    const cur = document.getElementById('bcursor');
+    if(!el || !btn){ clearTimeout(safetyTimer); if(btn) btn.classList.add('visible'); return; }
+
+    const GREET_LINES = getGreetLines();
+    if(!GREET_LINES || !GREET_LINES.length){
+      clearTimeout(safetyTimer);
       btn.classList.add('visible');
       return;
     }
-    const line = GREET_LINES[lineIdx];
-    if(charIdx < line.length){
-      if(rendered.length <= lineIdx) rendered.push('');
-      rendered[lineIdx] += line[charIdx];
-      el.innerHTML = rendered.map((l,i)=> i < rendered.length-1 ? l + '<br>' : l).join('');
-      charIdx++;
-      setTimeout(tick, 62);
-    } else {
-      lineIdx++; charIdx = 0;
-      setTimeout(tick, lineIdx < GREET_LINES.length ? 380 : 200);
+
+    let lineIdx = 0, charIdx = 0;
+    let rendered = [];
+
+    function tick(){
+      try {
+        if(lineIdx >= GREET_LINES.length){
+          clearTimeout(safetyTimer);
+          if(cur) cur.style.display = 'none';
+          btn.classList.add('visible');
+          return;
+        }
+        const line = GREET_LINES[lineIdx] || '';
+        if(charIdx < line.length){
+          if(rendered.length <= lineIdx) rendered.push('');
+          rendered[lineIdx] += line[charIdx];
+          el.innerHTML = rendered.map((l,i)=> i < rendered.length-1 ? l + '<br>' : l).join('');
+          charIdx++;
+          setTimeout(tick, 55);
+        } else {
+          lineIdx++; charIdx = 0;
+          setTimeout(tick, lineIdx < GREET_LINES.length ? 350 : 180);
+        }
+      } catch(e) {
+        clearTimeout(safetyTimer);
+        if(btn) btn.classList.add('visible');
+      }
     }
+    setTimeout(tick, 500);
+  } catch(e) {
+    clearTimeout(safetyTimer);
+    if(btn) btn.classList.add('visible');
   }
-  setTimeout(tick, 700);
 }
 
 function closeGreet(){
@@ -1140,10 +1159,13 @@ function closeGreet(){
   setTimeout(()=>{ ov.style.display = 'none'; }, 420);
 }
 
-// 오버레이 어디든 탭해도 닫히게 (버튼 표시 여부 무관)
+// 오버레이 어디 탭해도 닫히게 — 버튼 나온 후 or 2초 후
+let _greetStart = Date.now();
 document.getElementById('greet-overlay').addEventListener('click', ()=>{
   const btn = document.getElementById('greet-btn');
-  if(btn && btn.classList.contains('visible')) closeGreet();
+  const elapsed = Date.now() - _greetStart;
+  // 버튼 보이거나, 1.5초 이상 지났으면 닫기
+  if((btn && btn.classList.contains('visible')) || elapsed > 1500) closeGreet();
 });
 
 window.addEventListener('load', async ()=>{
