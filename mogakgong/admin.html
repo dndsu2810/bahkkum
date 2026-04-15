@@ -471,6 +471,25 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
   </div>
 </div>
 
+<!-- 별명 설정 모달 -->
+<div class="modal-ov" id="nick-modal" onclick="if(event.target===this)closeNickModal()">
+  <div class="mbox">
+    <div class="mbox-title">✏️ 별명 설정</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px" id="nick-modal-desc"></div>
+    <div class="mfield">
+      <label>별명 (비워두면 자동으로 성 제외 이름 사용)</label>
+      <input class="minp" id="nick-inp" placeholder="예: 서준, 하린, 민지..."
+             onkeydown="if(event.key==='Enter')saveNick()" oninput="updateNickPreview()"/>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px" id="nick-preview"></div>
+    </div>
+    <div class="mbtns">
+      <button class="btn btn-ghost btn-sm" onclick="clearNick()">기본값으로</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeNickModal()">취소</button>
+      <button class="btn btn-primary btn-sm" id="nick-save-btn" onclick="saveNick()">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 키오스크 학생 카테고리 배정 모달 -->
 <div class="modal-ov" id="kiosk-modal" onclick="if(event.target===this)closeKioskModal()">
   <div class="mbox">
@@ -543,6 +562,7 @@ let currentMissions=[];
 let missionDate='';      // 현재 선택된 학생의 날짜
 let stuDates={};         // {studentKey: 'YYYY_M_D'} 학생별 날짜 설정
 let _kioskTarget=null;
+let NICKNAMES={};  // {studentKey: '별명'}
 let _preOpen=false;
 
 // ─── 로그인 ─────────────────────────────────────────────────────────────────
@@ -660,6 +680,7 @@ async function loadStudents(){
       return s;
     });
     KIOSK_CATS=CFG.kiosk_cats||{};
+    NICKNAMES=CFG.mogak_nicknames||{};
   }catch{MOGAK_STUDENTS=[];KIOSK_CATS={};}
 
   const mogakNames=new Set(MOGAK_STUDENTS.map(s=>s.name));
@@ -673,6 +694,10 @@ async function loadStudents(){
 async function saveMogakStudents(){
   await getCFG();CFG.mogak_students=MOGAK_STUDENTS;await setCFG(CFG);
 }
+async function saveNicknames(){
+  await getCFG();CFG.mogak_nicknames=NICKNAMES;await setCFG(CFG);
+}
+
 async function saveKioskCatsData(){
   await getCFG();CFG.kiosk_cats=KIOSK_CATS;await setCFG(CFG);
 }
@@ -983,16 +1008,24 @@ function renderStudentsPanel(){
   } else {
     html+='<div style="display:flex;flex-wrap:wrap;margin-bottom:10px">';
     mogakStus.forEach(s=>{
+      const sKey=s.name+'_'+currentCat;
+      const nick=NICKNAMES[sKey]||'';
+      const nickBadge=nick?`<span style="font-size:11px;color:var(--muted);background:rgba(255,255,255,.06);border-radius:10px;padding:1px 6px">${esc(nick)}아</span>`:'';
       html+=`<div class="stu-chip">
-        ${esc(s.name)}
+        ${esc(s.name)} ${nickBadge}
+        <span class="stu-chip-edit" title="별명 설정" onclick="openNickModal('${esc(s.name)}','${esc(currentCat)}')">✏️</span>
         <span class="stu-chip-x" onclick="deleteStu('${esc(s.name)}','${esc(currentCat)}')">✕</span>
       </div>`;
     });
     kioskStus.forEach(s=>{
+      const sKey=s.name+'_'+currentCat;
+      const nick=NICKNAMES[sKey]||'';
+      const nickBadge=nick?`<span style="font-size:11px;color:var(--muted);background:rgba(255,255,255,.06);border-radius:10px;padding:1px 6px">${esc(nick)}아</span>`:'';
       const ptsBadge=!IS_ENGLISH[currentCat]?`<span style="font-size:11px;color:${color}">🏅${s.points}P</span>`:'';
       html+=`<div class="stu-chip" style="border-color:${color}30">
-        🖥️ ${esc(s.name)} ${ptsBadge}
-        <span class="stu-chip-edit" onclick="openKioskModal('${esc(s.name)}')">✏️</span>
+        🖥️ ${esc(s.name)} ${nickBadge} ${ptsBadge}
+        <span class="stu-chip-edit" title="별명 설정" onclick="openNickModal('${esc(s.name)}','${esc(currentCat)}')">✏️</span>
+        <span class="stu-chip-edit" onclick="openKioskModal('${esc(s.name)}')">⚙️</span>
       </div>`;
     });
     html+='</div>';
@@ -1051,6 +1084,66 @@ function openKioskModal(name){
   document.getElementById('kiosk-modal').classList.add('open');
 }
 function closeKioskModal(){document.getElementById('kiosk-modal').classList.remove('open');_kioskTarget=null;}
+// ─── 별명 설정 ───────────────────────────────────────────────────────────────
+let _nickTarget = {name:'', cat:''};
+
+function getDefaultNick(name){
+  return name.length >= 3 ? name.slice(1) : name;
+}
+
+function openNickModal(name, cat){
+  _nickTarget = {name, cat};
+  const sKey = name + '_' + cat;
+  const cur = NICKNAMES[sKey] || '';
+  const defNick = getDefaultNick(name);
+
+  document.getElementById('nick-modal-desc').textContent =
+    name + ' 학생을 어떻게 부를까요?';
+  const inp = document.getElementById('nick-inp');
+  inp.value = cur;
+  document.getElementById('nick-save-btn').style.background = CAT_COLOR[cat] || 'var(--fire)';
+  updateNickPreview();
+  document.getElementById('nick-modal').classList.add('open');
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 100);
+}
+
+function updateNickPreview(){
+  const inp = document.getElementById('nick-inp');
+  const prev = document.getElementById('nick-preview');
+  if(!inp || !prev) return;
+  const val = inp.value.trim();
+  const defNick = getDefaultNick(_nickTarget.name);
+  const callName = val || defNick;
+  prev.textContent = '→ 모닥이가 "안녕, ' + callName + '아!" 라고 불러요';
+}
+
+function closeNickModal(){
+  document.getElementById('nick-modal').classList.remove('open');
+}
+
+async function saveNick(){
+  const inp = document.getElementById('nick-inp');
+  if(!inp) return;
+  const val = inp.value.trim();
+  const sKey = _nickTarget.name + '_' + _nickTarget.cat;
+  if(val) NICKNAMES[sKey] = val;
+  else delete NICKNAMES[sKey];
+  await saveNicknames();
+  closeNickModal();
+  renderStudentsPanel();
+  const callName = val || getDefaultNick(_nickTarget.name);
+  toast('✅ ' + _nickTarget.name + ' → "' + callName + '아!" 로 설정됐어요');
+}
+
+async function clearNick(){
+  const sKey = _nickTarget.name + '_' + _nickTarget.cat;
+  delete NICKNAMES[sKey];
+  await saveNicknames();
+  closeNickModal();
+  renderStudentsPanel();
+  toast('🔄 ' + _nickTarget.name + ' 별명이 기본값으로 초기화됐어요');
+}
+
 // ─── 미루기 ──────────────────────────────────────────────────────────────────
 let _postponeTarget = '';  // 선택된 미루기 날짜 key
 

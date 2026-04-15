@@ -621,6 +621,11 @@ async function loadMissions(silent) {
   try {
     const res = await fetch(KIOSK_API + '/api/config');
     const cfg = await res.json();
+    // 별명 로드 (첫 번째 로드 시에만)
+    if (!STUDENT_NICKNAME) {
+      const nicknames = cfg.mogak_nicknames || {};
+      STUDENT_NICKNAME = nicknames[STUDENT_KEY] || '';
+    }
     const todayKey = getTodayKey();
     const loaded = cfg[todayKey]?.[getMissionKey()];
     const newMs = (loaded && loaded.length > 0) ? loaded : [];
@@ -834,6 +839,18 @@ const STUDENT_NAME = urlParams.get('name') || '지현';
 const STUDENT_CLASS = urlParams.get('class') || ''; // 수학 | 영어 | ''
 const STUDENT_KEY = STUDENT_NAME + (STUDENT_CLASS ? '_' + STUDENT_CLASS : '');
 
+// 별명 (config에서 로드, 없으면 성 제거한 이름)
+let STUDENT_NICKNAME = '';
+
+function getDefaultNickname(name) {
+  // 3글자 이상이면 첫 글자(성) 제거, 2글자 이하면 그대로
+  return name.length >= 3 ? name.slice(1) : name;
+}
+
+function getCallName() {
+  return STUDENT_NICKNAME || getDefaultNickname(STUDENT_NAME);
+}
+
 // 헤더 이름 즉시 반영
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('header-name');
@@ -913,13 +930,13 @@ const isFirstToday = !localStorage.getItem(todayKey);
 const GREET_LINES = isFirstToday
   ? [
       '오늘은 ' + MONTH + '월 ' + DAY + '일',
-      '안녕, ' + STUDENT_NAME + '아!',
+      '안녕, ' + getCallName() + '아!',
       '나는 모닥이야',
       '오늘도 나를 빛나게 해줘! ✨',
     ]
   : [
       '오늘은 ' + MONTH + '월 ' + DAY + '일',
-      '안녕, ' + STUDENT_NAME + '아!',
+      '안녕, ' + getCallName() + '아!',
       '오늘도 나를 빛나게 해줘! ✨',
     ];
 
