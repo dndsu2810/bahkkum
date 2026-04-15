@@ -927,23 +927,26 @@ const DAY   = gDate.getDate();
 const todayKey = 'modak_visited_' + STUDENT_KEY + '_' + gDate.getFullYear() + '_' + MONTH + '_' + DAY;
 const isFirstToday = !localStorage.getItem(todayKey);
 
-const GREET_LINES = isFirstToday
-  ? [
-      '오늘은 ' + MONTH + '월 ' + DAY + '일',
-      '안녕, ' + getCallName() + '!',
-      '나는 모닥이야',
-      '오늘도 나를 빛나게 해줘! ✨',
-    ]
-  : [
-      '오늘은 ' + MONTH + '월 ' + DAY + '일',
-      '안녕, ' + getCallName() + '!',
-      '오늘도 나를 빛나게 해줘! ✨',
-    ];
+function getGreetLines() {
+  return isFirstToday
+    ? [
+        '오늘은 ' + MONTH + '월 ' + DAY + '일',
+        '안녕, ' + getCallName() + '!',
+        '나는 모닥이야',
+        '오늘도 나를 빛나게 해줘! ✨',
+      ]
+    : [
+        '오늘은 ' + MONTH + '월 ' + DAY + '일',
+        '안녕, ' + getCallName() + '!',
+        '오늘도 나를 빛나게 해줘! ✨',
+      ];
+}
 
 function typeGreeting(){
   const el  = document.getElementById('bubble-typed');
   const cur = document.getElementById('bcursor');
   const btn = document.getElementById('greet-btn');
+  const GREET_LINES = getGreetLines();
   let lineIdx = 0, charIdx = 0;
   let rendered = [];
 
@@ -983,8 +986,9 @@ document.getElementById('greet-overlay').addEventListener('click', ()=>{
 
 window.addEventListener('load', async ()=>{
   document.getElementById('greet-overlay').classList.add('show');
-  typeGreeting();
+  // 별명 먼저 로드 후 인사말 시작
   await loadMissions(false);
+  typeGreeting();
   startPolling();
   loadKioskStudent();
 });
