@@ -95,7 +95,7 @@ app.post('/api/mogak/done', async (c) => {
 
     const { dateKey, studentKey, done } = await c.req.json()
 
-    if (!dateKey || !studentKey || !Array.isArray(done)) {
+    if (!dateKey || !studentKey || done === undefined) {
       return c.json({ success: false, error: '파라미터 오류' }, 400)
     }
 

@@ -933,21 +933,18 @@ function updateState(){
     } else {
       btn.disabled=false;btn.textContent='선생님께 완료 알림 보내기 🔥';
       btn.onclick=async()=>{
-        if(isSubmittedToday()) return; // 이중 클릭 방지
+        if(isSubmittedToday()) return;
         btn.disabled=true;
-        btn.textContent='포인트 지급 중... ⏳';
+        btn.textContent='선생님께 전송 중... ⏳';
         const completed = missions.filter((_,i)=>done[i]);
-        const result = await submitToKiosk(completed);
-        markSubmittedToday(); // 오늘 제출 완료 기록
-        btn.textContent='✅ 오늘 이미 완료 알림을 보냈어요!';
+        // 포인트 즉시 지급 X → 선생님 확인 대기 상태로 저장
+        const ok = await requestTeacherConfirm(completed);
+        markSubmittedToday();
+        btn.textContent='✅ 선생님 확인 대기 중...';
         spawnConfetti();
-        const earnedPts = completed.length * PT_PER_MISSION + PT_BONUS_ALL;
         document.getElementById('overlay-points').textContent =
-          result.noKiosk
-            ? '✅ 선생님께 완료 알림이 전송됐어요!'
-            : result.success
-            ? '+' + earnedPts + ' 포인트 지급 완료! 🏅'
-            : '⚠️ 포인트 연동 실패 (선생님께 말해주세요)';
+          ok ? '⏳ 선생님이 확인하면 포인트가 적립돼요!'
+             : '⚠️ 전송 실패 — 선생님께 말씀해주세요';
         setTimeout(()=>document.getElementById('overlay').classList.add('show'),400);
       };
     }
@@ -1020,6 +1017,28 @@ function updatePointsDisplay(pts) {
 }
 
 // 키오스크에 미션 완료 제출
+// 선생님 확인 대기 상태로 저장 (포인트 미적립)
+async function requestTeacherConfirm(completedMissions) {
+  try {
+    const res = await fetch(KIOSK_API + '/api/mogak/done', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        dateKey: 'mogakgong_pending',
+        studentKey: STUDENT_KEY,
+        done: {
+          name: STUDENT_NAME,
+          cat: STUDENT_CLASS,
+          missions: completedMissions,
+          timestamp: Date.now(),
+          status: 'pending'
+        }
+      })
+    });
+    return res.ok;
+  } catch(e) { return false; }
+}
+
 async function submitToKiosk(completedMissions) {
   // 영어반은 키오스크 포인트 연동 안 함
   if (STUDENT_CLASS === '영어') return { success: true, noKiosk: true };
