@@ -83,6 +83,45 @@ app.get('/api/config', async (c) => {
 
 
 
+
+// ── 모각공 학생 체크 상태 저장 (PW 없이 학생이 직접 저장) ──────────────────────
+app.post('/api/mogak/done', async (c) => {
+
+  try {
+
+    const { dateKey, studentKey, done } = await c.req.json()
+
+    if (!dateKey || !studentKey || !Array.isArray(done)) {
+      return c.json({ success: false, error: '파라미터 오류' }, 400)
+    }
+
+    // 기존 config 읽기
+    const row = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='kiosk_config'"
+    ).first() as any
+
+    const cfg = row?.value ? JSON.parse(row.value) : {}
+
+    // done 상태 업데이트
+    if (!cfg[dateKey]) cfg[dateKey] = {}
+    cfg[dateKey][studentKey] = done
+
+    // 저장
+    await c.env.DB.prepare(
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
+    ).bind(JSON.stringify(cfg)).run()
+
+    return c.json({ success: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
 // 관리자 설정 저장 (DB에 저장 → 모든 기기에서 즉시 반영)
 app.post('/api/admin/config', async (c) => {
 

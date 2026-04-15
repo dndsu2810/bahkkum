@@ -605,8 +605,40 @@ function getTodayKey() {
   return 'mogakgong_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
 }
 function getMissionKey() {
-  // 미션 키: 날짜 안에서 학생 식별 키 (이름_과목)
   return STUDENT_KEY;
+}
+function getDoneStoreKey() {
+  // 체크 상태 저장 키: mogakgong_done_YYYY_M_D
+  const d = new Date();
+  return 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+}
+
+async function saveDoneState() {
+  try {
+    // 전용 엔드포인트로 체크 상태 저장 (PW 불필요)
+    await fetch(KIOSK_API + '/api/mogak/done', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        dateKey: getDoneStoreKey(),
+        studentKey: STUDENT_KEY,
+        done: done.map(Boolean)
+      })
+    });
+  } catch(e) {}
+}
+
+async function loadDoneState() {
+  try {
+    const res = await fetch(KIOSK_API + '/api/config');
+    const cfg = await res.json();
+    const saved = cfg[getDoneStoreKey()]?.[STUDENT_KEY];
+    if (saved && Array.isArray(saved)) {
+      done = missions.map((_, i) => saved[i] || false);
+      return true;
+    }
+  } catch(e) {}
+  return false;
 }
 
 // 미션은 서버에서만 로드
@@ -631,19 +663,26 @@ async function loadMissions(silent) {
     const newMs = (loaded && loaded.length > 0) ? loaded : [];
 
     if (silent) {
-      // 폴링 모드 — 변경 있을 때만 업데이트
+      // 폴링 모드 — 미션 변경 또는 done 상태 변경 감지
       const newHash = missionHash(newMs);
-      if (newHash === _lastMissionHash) return; // 변화 없음
+      const doneFromServer = cfg[getDoneStoreKey()]?.[STUDENT_KEY];
+      const newDoneHash = JSON.stringify(doneFromServer || []);
+      const prevDoneHash = JSON.stringify(done);
+
+      if (newHash === _lastMissionHash && newDoneHash === prevDoneHash) return;
+
       _lastMissionHash = newHash;
-      // 완료 상태 유지하면서 미션 텍스트만 갱신
-      const prevDone = [...done];
       missions = newMs;
-      done = missions.map((_,i) => prevDone[i] || false);
+      // 서버 done 상태 우선, 없으면 현재 유지
+      if (doneFromServer && Array.isArray(doneFromServer)) {
+        done = missions.map((_, i) => doneFromServer[i] || false);
+      } else {
+        done = missions.map((_, i) => done[i] || false);
+      }
       document.getElementById('total-count').textContent = missions.length;
       buildMissionList();
-      // 완료 상태 복원
       done.forEach((d,i) => { if(d) applyDone(i); });
-      updateFireState();
+      updateState();
       showSyncBadge();
       return;
     }
@@ -654,9 +693,13 @@ async function loadMissions(silent) {
     if (!silent) missions = [];
   }
   if (!silent) {
-    done = new Array(missions.length).fill(false);
     document.getElementById('total-count').textContent = missions.length;
+    // done 상태 서버에서 로드
+    const hasSaved = await loadDoneState();
+    if (!hasSaved) done = new Array(missions.length).fill(false);
     buildMissionList();
+    done.forEach((d,i) => { if(d) applyDone(i); });
+    updateState();
   }
 }
 
@@ -679,6 +722,13 @@ function startPolling() {
 const d=new Date();
 document.getElementById('today-date').textContent=`${d.getMonth()+1}월 ${d.getDate()}일`;
 // total-count는 loadMissions()에서 설정
+
+function applyDone(i) {
+  const card = document.getElementById('card-'+i);
+  const chk = document.getElementById('chk-'+i);
+  if (card) card.classList.add('done');
+  if (chk) chk.textContent = '✓';
+}
 
 function buildMissionList() {
 const list=document.getElementById('mission-list');
@@ -704,6 +754,7 @@ function toggle(i){
   card.classList.toggle('done',done[i]);
   if(done[i]&&!was) flyLog(card);
   updateState();
+  saveDoneState(); // 서버에 체크 상태 저장
 }
 
 function flyLog(card){

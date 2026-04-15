@@ -102,10 +102,13 @@ html,body{height:100%;overflow:hidden;background:#0C0806;color:#F5EDE4;font-fami
 /* ─── MISSIONS ─── */
 .mission-list{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
 .m-item{display:flex;align-items:center;gap:14px;padding:14px 16px;
-  background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.08);border-radius:14px}
+  background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;
+  cursor:pointer;transition:background .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
+.m-item:active{transform:scale(.98)}
 .m-item.done{background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.2)}
 .m-check{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.2);
-  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px}
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;
+  transition:all .2s}
 .m-item.done .m-check{background:#22C55E;border-color:#22C55E;color:#fff}
 .m-body{flex:1}
 .m-text{font-size:14px;font-weight:700;line-height:1.3}
@@ -347,16 +350,20 @@ async function openDetail(id) {
     ? `<div class="hero-av-inner"><img src="${esc(s.photo_url)}" style="width:100%;height:100%;object-fit:cover"/></div>`
     : `<div class="hero-av-inner" style="font-size:38px;font-weight:900;color:${color}">${esc(s.name[0])}</div>`;
 
-  // 미션 완료 여부 체크 (localStorage에서)
-  const doneKey = 'modak_done_' + missionKey + '_' + todayKey;
-  let doneMask = [];
-  try { doneMask = JSON.parse(localStorage.getItem(doneKey) || '[]'); } catch {}
+  // done 상태는 서버에서 로드
+
+  // done 상태 서버에서 로드 (localStorage 제거 — 서버 우선)
+  let doneMaskServer = [];
+  try {
+    const doneKey = 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+    doneMaskServer = CFG[doneKey]?.[missionKey] || [];
+  } catch(e) {}
 
   const missionsHTML = missions.length
     ? missions.map((m, i) => {
-        const done = doneMask.includes(i);
-        return `<div class="m-item ${done?'done':''}">
-          <div class="m-check">${done ? '✓' : ''}</div>
+        const isDone = doneMaskServer[i] || false;
+        return `<div class="m-item ${isDone?'done':''}" data-idx="${i}" data-key="${esc(missionKey)}" onclick="toggleMission(this,${id})">
+          <div class="m-check">${isDone ? '✓' : ''}</div>
           <div class="m-body">
             <div class="m-text">${esc(m.text)}</div>
             ${m.hint ? `<div class="m-hint">${esc(m.hint)}</div>` : ''}
@@ -411,6 +418,35 @@ async function openDetail(id) {
   `;
 
   startTimer();
+}
+
+// ─── 미션 체크 토글 ─────────────────────────────────────────────────────────────
+async function toggleMission(el, studentId) {
+  resetTimer(); // 터치 시 타이머 리셋
+  const idx = parseInt(el.getAttribute('data-idx'));
+  const key = el.getAttribute('data-key');
+  const isDone = el.classList.contains('done');
+  const newDone = !isDone;
+
+  // UI 즉시 업데이트
+  el.classList.toggle('done', newDone);
+  const chk = el.querySelector('.m-check');
+  if (chk) chk.textContent = newDone ? '✓' : '';
+
+  // 현재 done 배열 재구성
+  const allItems = document.querySelectorAll('.m-item[data-key="' + key + '"]');
+  const doneArr = Array.from(allItems).map(item => item.classList.contains('done'));
+
+  // 서버에 저장
+  try {
+    const d = new Date();
+    const dateKey = 'mogakgong_done_' + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate();
+    await fetch(KIOSK + '/api/mogak/done', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ dateKey, studentKey: key, done: doneArr })
+    });
+  } catch(e) {}
 }
 
 // ─── 타이머 ───────────────────────────────────────────────────────────────────
