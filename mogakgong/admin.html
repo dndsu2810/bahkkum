@@ -940,7 +940,7 @@ function renderStudentsPanel(){
     mogakStus.forEach(s=>{
       const sKey=s.name+'_'+currentCat;
       const nick=NICKNAMES[sKey]||'';
-      const nickBadge=nick?`<span style="font-size:11px;color:var(--muted);background:rgba(255,255,255,.06);border-radius:10px;padding:1px 6px">${esc(nick)}아</span>`:'';
+      const nickBadge=nick?`<span style="font-size:11px;color:var(--muted);background:rgba(255,255,255,.06);border-radius:10px;padding:1px 6px">${esc(nick)}</span>`:'';
       html+=`<div class="stu-chip">
         ${esc(s.name)} ${nickBadge}
         <span class="stu-chip-edit" title="별명 설정" onclick="openNickModal('${esc(s.name)}','${esc(currentCat)}')">✏️</span>
@@ -950,7 +950,7 @@ function renderStudentsPanel(){
     kioskStus.forEach(s=>{
       const sKey=s.name+'_'+currentCat;
       const nick=NICKNAMES[sKey]||'';
-      const nickBadge=nick?`<span style="font-size:11px;color:var(--muted);background:rgba(255,255,255,.06);border-radius:10px;padding:1px 6px">${esc(nick)}아</span>`:'';
+      const nickBadge=nick?`<span style="font-size:11px;color:var(--muted);background:rgba(255,255,255,.06);border-radius:10px;padding:1px 6px">${esc(nick)}</span>`:'';
       const ptsBadge=!IS_ENGLISH[currentCat]?`<span style="font-size:11px;color:${color}">🏅${s.points}P</span>`:'';
       html+=`<div class="stu-chip" style="border-color:${color}30">
         🖥️ ${esc(s.name)} ${nickBadge} ${ptsBadge}
@@ -1044,7 +1044,7 @@ function updateNickPreview(){
   const val = inp.value.trim();
   const defNick = getDefaultNick(_nickTarget.name);
   const callName = val || defNick;
-  prev.textContent = '→ 모닥이가 "안녕, ' + callName + '아!" 라고 불러요';
+  prev.textContent = '→ 모닥이가 "안녕, ' + callName + '!" 라고 불러요';
 }
 
 function closeNickModal(){
@@ -1062,7 +1062,7 @@ async function saveNick(){
   closeNickModal();
   renderStudentsPanel();
   const callName = val || getDefaultNick(_nickTarget.name);
-  toast('✅ ' + _nickTarget.name + ' → "' + callName + '아!" 로 설정됐어요');
+  toast('✅ ' + _nickTarget.name + ' → "안녕, ' + callName + '!" 로 설정됐어요');
 }
 
 async function clearNick(){
