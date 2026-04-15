@@ -711,14 +711,17 @@ function missionHash(ms) {
 }
 
 async function loadMissions(silent) {
+  let cfg = null; // try 블록 밖에서 선언 — 스코프 버그 방지
   try {
     const res = await fetch(KIOSK_API + '/api/config');
-    const cfg = await res.json();
+    cfg = await res.json();
+
     // 별명 로드 (첫 번째 로드 시에만)
     if (!STUDENT_NICKNAME) {
       const nicknames = cfg.mogak_nicknames || {};
       STUDENT_NICKNAME = nicknames[STUDENT_KEY] || '';
     }
+
     const todayKey = getTodayKey();
     const loaded = cfg[todayKey]?.[getMissionKey()];
     const newMs = (loaded && loaded.length > 0) ? loaded : [];
@@ -734,7 +737,6 @@ async function loadMissions(silent) {
 
       _lastMissionHash = newHash;
       missions = newMs;
-      // 서버 done 상태 우선, 없으면 현재 유지
       if (doneFromServer && Array.isArray(doneFromServer)) {
         done = missions.map((_, i) => doneFromServer[i] || false);
       } else {
@@ -751,12 +753,12 @@ async function loadMissions(silent) {
     missions = newMs;
     _lastMissionHash = missionHash(missions);
   } catch(e) {
+    console.error('loadMissions 오류:', e);
     if (!silent) missions = [];
   }
   if (!silent) {
     document.getElementById('total-count').textContent = missions.length;
-    // done 상태 로드 (cfg 재사용 — 추가 fetch 불필요)
-    const hasSaved = await loadDoneState(cfg);
+    const hasSaved = await loadDoneState(cfg); // cfg 이제 접근 가능
     if (!hasSaved) done = new Array(missions.length).fill(false);
     buildMissionList();
     done.forEach((d,i) => { if(d) applyDone(i); });
