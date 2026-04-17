@@ -10,7 +10,11 @@ type Bindings = {
 
   DB: D1Database
 
-  SLACK_WEBHOOK_URL: string
+  SLACK_WEBHOOK_URL: string       // 기본 (수학) 채널
+
+  SLACK_WEBHOOK_MATH: string      // 수학 전용 채널 (선택)
+
+  SLACK_WEBHOOK_ENGLISH: string   // 영어 전용 채널 (선택)
 
   SLACK_BOT_TOKEN: string
 
@@ -1527,7 +1531,16 @@ async function sendSlackQueue(env: Bindings, d: any) {
 
 async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
 
-  if (!env.SLACK_WEBHOOK_URL) return
+  // 카테고리로 채널 분기
+  // 영어(초등영어, 중고등영어) → SLACK_WEBHOOK_ENGLISH
+  // 수학(초등수학, 중고등수학) → SLACK_WEBHOOK_MATH
+  // 미설정 시 기본 SLACK_WEBHOOK_URL로 폴백
+  const isEnglish = d.cat.includes('영어')
+  const webhookUrl = isEnglish
+    ? (env.SLACK_WEBHOOK_ENGLISH || env.SLACK_WEBHOOK_URL)
+    : (env.SLACK_WEBHOOK_MATH || env.SLACK_WEBHOOK_URL)
+
+  if (!webhookUrl) return
 
   const now = new Date(Date.now() + 9 * 3600 * 1000)
   const h = String(now.getUTCHours()).padStart(2, '0')
@@ -1538,9 +1551,10 @@ async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, mis
     ? d.missions.map(function(m: any) { return '• ' + (m.text || String(m)) }).join('\n')
     : '없음'
 
-  const text = '🔥 모각공 완료 확인 요청\n학생: ' + d.name + ' (' + d.cat + ')\n미션: ' + missionList + '\n⏰ ' + timeStr
+  const catIcon = isEnglish ? '📘' : '📐'
+  const text = catIcon + ' 모각공 완료 확인 요청\n학생: ' + d.name + ' (' + d.cat + ')\n미션:\n' + missionList + '\n⏰ ' + timeStr + '  |  어드민에서 확인 후 포인트 적립'
 
-  const res = await fetch(env.SLACK_WEBHOOK_URL, {
+  const res = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: text })
