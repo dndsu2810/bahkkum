@@ -192,7 +192,7 @@ app.post('/api/mogak/notify', async (c) => {
 
 
 // ── 모각공 슬랙 환경변수 확인 + 테스트 발송 ──────────────────────────────────
-app.get('/api/admin/mogak-slack-check', async (c) => {
+app.get('/api/mogak-slack-check', async (c) => {
 
   return c.json({
     SLACK_WEBHOOK_URL: !!c.env.SLACK_WEBHOOK_URL,
@@ -204,7 +204,7 @@ app.get('/api/admin/mogak-slack-check', async (c) => {
 
 })
 
-app.post('/api/admin/mogak-slack-test', async (c) => {
+app.post('/api/mogak-slack-test', async (c) => {
 
   const results: any = {}
 
