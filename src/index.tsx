@@ -235,6 +235,41 @@ app.post('/api/mogak-slack-test', async (c) => {
 })
 
 
+// ── 특정 키만 원자적으로 업데이트 (레이스 컨디션 방지) ─────────────────────────
+app.post('/api/admin/config-key', async (c) => {
+
+  try {
+
+    const body = await c.req.json()
+    const { key, value } = body
+
+    if (!key) return c.json({ success: false, error: 'key 필요' }, 400)
+
+    // 현재 config 읽기
+    const row = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='kiosk_config'"
+    ).first() as any
+
+    const cfg = row?.value ? JSON.parse(row.value) : {}
+
+    // 해당 키만 업데이트
+    cfg[key] = value
+
+    await c.env.DB.prepare(
+      "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
+    ).bind(JSON.stringify(cfg)).run()
+
+    return c.json({ success: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
+
 // 관리자 설정 저장 (DB에 저장 → 모든 기기에서 즉시 반영)
 app.post('/api/admin/config', async (c) => {
 

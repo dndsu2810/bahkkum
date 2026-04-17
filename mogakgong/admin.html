@@ -552,6 +552,13 @@ async function api(path,method='GET',body=null){
 async function getCFG(){const r=await fetch(KIOSK+'/api/config');CFG=await r.json();return CFG;}
 async function setCFG(cfg){await api('/api/admin/config','POST',cfg);}
 
+// 특정 키만 원자적으로 저장 (레이스 컨디션 방지)
+async function setKey(key, value){
+  await api('/api/admin/config-key','POST',{key, value});
+  // 로컬 CFG도 업데이트
+  CFG[key] = value;
+}
+
 // ─── 카테고리 선택 화면 ─────────────────────────────────────────────────────
 async function showCatSelect(){
   go('scr-cats');
@@ -645,14 +652,14 @@ async function loadStudents(){
 }
 
 async function saveMogakStudents(){
-  await getCFG();CFG.mogak_students=MOGAK_STUDENTS;await setCFG(CFG);
+  await setKey('mogak_students', MOGAK_STUDENTS);
 }
 async function saveNicknames(){
-  await getCFG();CFG.mogak_nicknames=NICKNAMES;await setCFG(CFG);
+  await setKey('mogak_nicknames', NICKNAMES);
 }
 
 async function saveKioskCatsData(){
-  await getCFG();CFG.kiosk_cats=KIOSK_CATS;await setCFG(CFG);
+  await setKey('kiosk_cats', KIOSK_CATS);
 }
 
 function getStudentsByCat(cat){return STUDENTS.filter(s=>s.cat===cat);}
@@ -731,7 +738,10 @@ async function loadTodayMissions(){
   try{await getCFG();ALL_MISSIONS=CFG[getTargetKey()]||{};}catch{ALL_MISSIONS={};}
 }
 async function saveTodayMissions(){
-  try{await getCFG();CFG[getTargetKey()]=ALL_MISSIONS;await setCFG(CFG);return true;}catch{return false;}
+  try{
+    await setKey(getTargetKey(), ALL_MISSIONS);
+    return true;
+  }catch{return false;}
 }
 
 // ─── 미션 입력 ───────────────────────────────────────────────────────────────
@@ -977,8 +987,7 @@ async function confirmStudent(stuKey, stuName){
 
   // 2. pending 상태 → confirmed 로 변경
   pending[stuKey]={...entry,status:'confirmed',confirmedAt:Date.now()};
-  CFG['mogakgong_pending']=pending;
-  await setCFG(CFG);
+  await setKey('mogakgong_pending', pending);
   loadOverview();
 }
 
@@ -992,7 +1001,7 @@ async function resetStudentDone(key, name) {
     await getCFG();
     if (CFG[doneKey] && CFG[doneKey][key]) {
       delete CFG[doneKey][key];
-      await setCFG(CFG);
+      await setKey(doneKey, CFG[doneKey]);
     }
   } catch(e) { console.error(e); }
 
@@ -1286,7 +1295,8 @@ async function confirmPostpone(){
     renderEdBody();
   }
 
-  await setCFG(CFG);
+  await setKey(targetKey, CFG[targetKey]);
+  if(!keepCurrent){ await setKey(curKey, CFG[curKey]||{}); }
   closePostpone();
 
   // 날짜 레이블
