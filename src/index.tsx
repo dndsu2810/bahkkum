@@ -191,6 +191,50 @@ app.post('/api/mogak/notify', async (c) => {
 })
 
 
+// ── 모각공 슬랙 환경변수 확인 + 테스트 발송 ──────────────────────────────────
+app.get('/api/admin/mogak-slack-check', async (c) => {
+
+  return c.json({
+    SLACK_WEBHOOK_URL: !!c.env.SLACK_WEBHOOK_URL,
+    SLACK_WEBHOOK_MATH: !!c.env.SLACK_WEBHOOK_MATH,
+    SLACK_WEBHOOK_ENGLISH: !!c.env.SLACK_WEBHOOK_ENGLISH,
+    mathUrl_preview: c.env.SLACK_WEBHOOK_MATH ? c.env.SLACK_WEBHOOK_MATH.slice(0, 40) + '...' : '없음',
+    englishUrl_preview: c.env.SLACK_WEBHOOK_ENGLISH ? c.env.SLACK_WEBHOOK_ENGLISH.slice(0, 40) + '...' : '없음',
+  })
+
+})
+
+app.post('/api/admin/mogak-slack-test', async (c) => {
+
+  const results: any = {}
+
+  try {
+    await sendMogakSlack(c.env, {
+      name: '📐 수학테스트',
+      cat: '초등수학',
+      missions: [{ text: '[채널테스트] 수학 채널 연결 확인' }]
+    })
+    results.math = 'OK'
+  } catch (e: any) {
+    results.math = 'FAIL: ' + e.message
+  }
+
+  try {
+    await sendMogakSlack(c.env, {
+      name: '📘 영어테스트',
+      cat: '초등영어',
+      missions: [{ text: '[채널테스트] 영어 채널 연결 확인' }]
+    })
+    results.english = 'OK'
+  } catch (e: any) {
+    results.english = 'FAIL: ' + e.message
+  }
+
+  return c.json({ success: true, results })
+
+})
+
+
 // 관리자 설정 저장 (DB에 저장 → 모든 기기에서 즉시 반영)
 app.post('/api/admin/config', async (c) => {
 
