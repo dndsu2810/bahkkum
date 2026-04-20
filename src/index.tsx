@@ -5690,4 +5690,150 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
 </html>`
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  API: 학원 허브 — 상담 기록 (consultations)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// 목록 조회 — 공개 (허브 페이지에서 미인증 열람)
+app.get('/api/consultations', async (c) => {
+  try {
+    const status = c.req.query('status') || ''   // 'pending' | 'done' | ''
+    let sql = 'SELECT id, student_name, scheduled_date, memo, done, completed_at, created_at FROM consultations'
+    const params: any[] = []
+    if (status === 'pending') sql += ' WHERE done=0'
+    else if (status === 'done') sql += ' WHERE done=1'
+    sql += ' ORDER BY done ASC, scheduled_date ASC, id ASC'
+    const rs = await c.env.DB.prepare(sql).bind(...params).all()
+    return c.json({ success: true, consultations: rs.results || [] })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message, consultations: [] }, 500)
+  }
+})
+
+// 등록
+app.post('/api/admin/consultations', async (c) => {
+  try {
+    const { student_name, scheduled_date, memo } = await c.req.json()
+    if (!student_name || !scheduled_date) {
+      return c.json({ success: false, error: '학생 이름과 날짜는 필수입니다' }, 400)
+    }
+    const r = await c.env.DB.prepare(
+      'INSERT INTO consultations (student_name, scheduled_date, memo, created_at) VALUES (?,?,?,?)'
+    ).bind(student_name, scheduled_date, memo || '', getKSTTimestamp()).run()
+    return c.json({ success: true, id: r.meta?.last_row_id })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 완료 토글
+app.post('/api/admin/consultations/:id/done', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const { done } = await c.req.json()
+    const doneVal = done ? 1 : 0
+    const completedAt = doneVal ? getKSTTimestamp() : null
+    await c.env.DB.prepare(
+      'UPDATE consultations SET done=?, completed_at=? WHERE id=?'
+    ).bind(doneVal, completedAt, id).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 메모 수정
+app.post('/api/admin/consultations/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const { student_name, scheduled_date, memo } = await c.req.json()
+    await c.env.DB.prepare(
+      'UPDATE consultations SET student_name=?, scheduled_date=?, memo=? WHERE id=?'
+    ).bind(student_name, scheduled_date, memo || '', id).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 삭제
+app.delete('/api/admin/consultations/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    await c.env.DB.prepare('DELETE FROM consultations WHERE id=?').bind(id).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  API: 학원 허브 — 비품 (supplies)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// 목록 조회 — 공개
+app.get('/api/supplies', async (c) => {
+  try {
+    const only = c.req.query('only') || ''    // 'restock' | ''
+    let sql = 'SELECT id, name, quantity, needs_restock, note, updated_at, created_at FROM supplies'
+    if (only === 'restock') sql += ' WHERE needs_restock=1'
+    sql += ' ORDER BY needs_restock DESC, name ASC'
+    const rs = await c.env.DB.prepare(sql).all()
+    return c.json({ success: true, supplies: rs.results || [] })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message, supplies: [] }, 500)
+  }
+})
+
+// 추가
+app.post('/api/admin/supplies', async (c) => {
+  try {
+    const { name, quantity, note } = await c.req.json()
+    if (!name) return c.json({ success: false, error: '항목명 필요' }, 400)
+    const r = await c.env.DB.prepare(
+      'INSERT INTO supplies (name, quantity, note, created_at, updated_at) VALUES (?,?,?,?,?)'
+    ).bind(name, Number.isFinite(+quantity) ? +quantity : 0, note || '', getKSTTimestamp(), getKSTTimestamp()).run()
+    return c.json({ success: true, id: r.meta?.last_row_id })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 수정 (수량, 구매필요, 메모)
+app.post('/api/admin/supplies/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const body = await c.req.json() as any
+
+    const fields: string[] = []
+    const values: any[] = []
+    if (body.name !== undefined)          { fields.push('name=?');          values.push(body.name) }
+    if (body.quantity !== undefined)      { fields.push('quantity=?');      values.push(+body.quantity || 0) }
+    if (body.needs_restock !== undefined) { fields.push('needs_restock=?'); values.push(body.needs_restock ? 1 : 0) }
+    if (body.note !== undefined)          { fields.push('note=?');          values.push(body.note || '') }
+    if (!fields.length) return c.json({ success: true })
+
+    fields.push('updated_at=?'); values.push(getKSTTimestamp())
+    values.push(id)
+
+    await c.env.DB.prepare(
+      'UPDATE supplies SET ' + fields.join(', ') + ' WHERE id=?'
+    ).bind(...values).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 삭제
+app.delete('/api/admin/supplies/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    await c.env.DB.prepare('DELETE FROM supplies WHERE id=?').bind(id).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
 export default app
