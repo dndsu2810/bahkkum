@@ -35,8 +35,14 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/static/*', serveStatic({ root: './' }))
 
 app.use('/api/*', cors({
-  origin: ['https://mogakgong.pages.dev', 'https://bakuum-kiosk.pages.dev'],
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  origin: (origin) => {
+    if (!origin) return origin
+    const allowed = ['https://mogakgong.pages.dev', 'https://bakuum-kiosk.pages.dev']
+    if (allowed.includes(origin)) return origin
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin
+    return null
+  },
+  allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'X-Admin-Password'],
 }))
 
