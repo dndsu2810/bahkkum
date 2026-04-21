@@ -273,6 +273,12 @@ body{
 .r-neutral:hover .room-rect{fill:#F1F6FD;stroke:var(--brand)}
 .r-neutral.active .room-rect{fill:#EAF2FD;stroke:var(--brand);filter:url(#room-glow-blue)}
 
+/* 게시판 (bulletin board) — 나무 프레임 스타일 */
+.r-board .room-rect.bulletin-frame{fill:url(#board-frame);stroke:#3E2C1A;stroke-width:2}
+.r-board:hover .room-rect.bulletin-frame{stroke:#D4A373;stroke-width:2.5}
+.r-board.active .room-rect.bulletin-frame{stroke:#D4A373;stroke-width:2.5;filter:url(#room-glow-board)}
+.r-board .bulletin-label{fill:#FEF3C7;font-weight:900;font-size:13px}
+
 /* Doors: small colored marks on walls */
 .door{fill:var(--hall-2);stroke:none;pointer-events:none}
 .door-trim{fill:var(--brand);opacity:.7;pointer-events:none}
@@ -586,7 +592,6 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
 }
 .pw-inp:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.14);background:#fff}
 .pw-inp.err{border-color:var(--red);background:#FEF2F2}
-.pw-err{font-size:11.5px;color:var(--red);margin-top:6px;min-height:14px;font-weight:600}
 .pw-btns{display:flex;gap:8px;margin-top:16px}
 .pw-btns button{
   flex:1;padding:12px;border-radius:10px;border:none;font-family:inherit;
@@ -596,6 +601,10 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
 .pw-btns .pw-cancel:hover{background:#E2E8F0}
 .pw-btns .pw-ok{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;box-shadow:var(--shadow-blue)}
 .pw-btns .pw-ok:hover{transform:translateY(-1px);box-shadow:0 14px 36px rgba(37,99,235,.32)}
+.pw-btns button:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
+.pw-hint{font-size:11px;color:var(--muted);margin-top:10px;text-align:center;line-height:1.5}
+.pw-err{font-size:11.5px;color:var(--red);margin-top:8px;font-weight:700;display:none;
+  background:#FEF2F2;border:1px solid #FECACA;padding:8px 10px;border-radius:8px;text-align:center}
 
 /* ─── TOAST ───────────────────────────────────────────────────────────────── */
 .toast{
@@ -717,6 +726,22 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
             <rect width="8" height="8" fill="#DBEAFE" opacity=".5"/>
             <circle cx="4" cy="4" r="0.8" fill="#93C5FD" opacity=".6"/>
           </pattern>
+          <!-- 게시판 코르크 패턴 -->
+          <pattern id="cork-pattern" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+            <rect width="6" height="6" fill="#D4A373"/>
+            <circle cx="1.5" cy="1.5" r="0.4" fill="#B08968" opacity=".6"/>
+            <circle cx="4.5" cy="3" r="0.3" fill="#BC8F5E" opacity=".5"/>
+            <circle cx="3" cy="5" r="0.35" fill="#A47551" opacity=".5"/>
+          </pattern>
+          <!-- 게시판 프레임 그라데이션 -->
+          <linearGradient id="board-frame" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#8B5A3C"/>
+            <stop offset="100%" stop-color="#5C3A22"/>
+          </linearGradient>
+          <!-- 게시판 glow -->
+          <filter id="room-glow-board" x="-15%" y="-15%" width="130%" height="130%">
+            <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#D4A373" flood-opacity=".5"/>
+          </filter>
         </defs>
 
         <!-- 건물 바닥 -->
@@ -769,43 +794,120 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
           <text class="room-sub" x="90" y="118">ENTRANCE</text>
         </g>
 
-        <!-- 강의실1 중고등수학·특강 -->
-        <g class="room r-hm" data-room="classroom1" tabindex="0">
-          <rect class="room-rect" x="183" y="3" width="814" height="134" rx="6"/>
+        <!-- 게시판 (입구 옆, 중고등수학 강의실과 입구 사이) -->
+        <g class="room r-board" data-room="bulletin" tabindex="0">
+          <rect class="room-rect bulletin-frame" x="183" y="3" width="180" height="134" rx="6"/>
           <g class="furniture">
-            <!-- 화이트보드 -->
-            <rect class="board" x="590" y="14" width="180" height="10" rx="1"/>
-            <!-- 책상 그리드 (2행) -->
-            <g>
-              <rect class="desk" x="220" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="226" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="260" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="266" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="300" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="306" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="340" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="346" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="380" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="386" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="420" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="426" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="460" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="466" y="58" width="16" height="6" rx="1"/>
+            <!-- 코르크 보드 -->
+            <rect x="193" y="13" width="160" height="96" rx="4" fill="url(#cork-pattern)" stroke="#8B5A3C" stroke-width="1.2"/>
+            <!-- 내부 테두리 -->
+            <rect x="194" y="14" width="158" height="94" rx="3" fill="none" stroke="#5C3A22" stroke-width=".6" opacity=".5"/>
+            <!-- 쪽지 1행 -->
+            <g transform="rotate(-4 224 40)">
+              <rect x="208" y="24" width="34" height="32" rx="1" fill="#FEF3C7" stroke="#F59E0B" stroke-width=".3" opacity=".95"/>
+              <line x1="213" y1="32" x2="237" y2="32" stroke="#D97706" stroke-width=".3" opacity=".5"/>
+              <line x1="213" y1="38" x2="237" y2="38" stroke="#D97706" stroke-width=".3" opacity=".5"/>
+              <line x1="213" y1="44" x2="234" y2="44" stroke="#D97706" stroke-width=".3" opacity=".5"/>
+              <circle cx="225" cy="26" r="1.8" fill="#DC2626"/>
+              <circle cx="225" cy="26" r="0.6" fill="#FCA5A5"/>
             </g>
-            <g>
-              <rect class="desk" x="800" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="806" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="840" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="846" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="880" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="886" y="58" width="16" height="6" rx="1"/>
-              <rect class="desk" x="920" y="42" width="28" height="14" rx="2"/>
-              <rect class="chair" x="926" y="58" width="16" height="6" rx="1"/>
+            <g transform="rotate(3 269 42)">
+              <rect x="252" y="26" width="34" height="32" rx="1" fill="#FCE7F3" stroke="#EC4899" stroke-width=".3" opacity=".95"/>
+              <line x1="257" y1="34" x2="281" y2="34" stroke="#DB2777" stroke-width=".3" opacity=".5"/>
+              <line x1="257" y1="40" x2="281" y2="40" stroke="#DB2777" stroke-width=".3" opacity=".5"/>
+              <line x1="257" y1="46" x2="278" y2="46" stroke="#DB2777" stroke-width=".3" opacity=".5"/>
+              <circle cx="269" cy="28" r="1.8" fill="#2563EB"/>
+              <circle cx="269" cy="28" r="0.6" fill="#93C5FD"/>
+            </g>
+            <g transform="rotate(-2 314 40)">
+              <rect x="297" y="24" width="34" height="32" rx="1" fill="#DBEAFE" stroke="#3B82F6" stroke-width=".3" opacity=".95"/>
+              <line x1="302" y1="32" x2="326" y2="32" stroke="#1D4ED8" stroke-width=".3" opacity=".5"/>
+              <line x1="302" y1="38" x2="326" y2="38" stroke="#1D4ED8" stroke-width=".3" opacity=".5"/>
+              <line x1="302" y1="44" x2="323" y2="44" stroke="#1D4ED8" stroke-width=".3" opacity=".5"/>
+              <circle cx="314" cy="26" r="1.8" fill="#059669"/>
+              <circle cx="314" cy="26" r="0.6" fill="#6EE7B7"/>
+            </g>
+            <!-- 쪽지 2행 -->
+            <g transform="rotate(2 224 82)">
+              <rect x="208" y="66" width="34" height="32" rx="1" fill="#D1FAE5" stroke="#10B981" stroke-width=".3" opacity=".95"/>
+              <line x1="213" y1="74" x2="237" y2="74" stroke="#047857" stroke-width=".3" opacity=".5"/>
+              <line x1="213" y1="80" x2="237" y2="80" stroke="#047857" stroke-width=".3" opacity=".5"/>
+              <line x1="213" y1="86" x2="234" y2="86" stroke="#047857" stroke-width=".3" opacity=".5"/>
+              <circle cx="225" cy="68" r="1.8" fill="#DC2626"/>
+              <circle cx="225" cy="68" r="0.6" fill="#FCA5A5"/>
+            </g>
+            <g transform="rotate(-3 269 84)">
+              <rect x="252" y="68" width="34" height="32" rx="1" fill="#FED7AA" stroke="#F97316" stroke-width=".3" opacity=".95"/>
+              <line x1="257" y1="76" x2="281" y2="76" stroke="#C2410C" stroke-width=".3" opacity=".5"/>
+              <line x1="257" y1="82" x2="281" y2="82" stroke="#C2410C" stroke-width=".3" opacity=".5"/>
+              <line x1="257" y1="88" x2="278" y2="88" stroke="#C2410C" stroke-width=".3" opacity=".5"/>
+              <circle cx="269" cy="70" r="1.8" fill="#F59E0B"/>
+              <circle cx="269" cy="70" r="0.6" fill="#FCD34D"/>
+            </g>
+            <g transform="rotate(4 314 82)">
+              <rect x="297" y="66" width="34" height="32" rx="1" fill="#EDE9FE" stroke="#8B5CF6" stroke-width=".3" opacity=".95"/>
+              <line x1="302" y1="74" x2="326" y2="74" stroke="#6D28D9" stroke-width=".3" opacity=".5"/>
+              <line x1="302" y1="80" x2="326" y2="80" stroke="#6D28D9" stroke-width=".3" opacity=".5"/>
+              <line x1="302" y1="86" x2="323" y2="86" stroke="#6D28D9" stroke-width=".3" opacity=".5"/>
+              <circle cx="314" cy="68" r="1.8" fill="#7C3AED"/>
+              <circle cx="314" cy="68" r="0.6" fill="#C4B5FD"/>
             </g>
           </g>
-          <text class="room-icon" x="590" y="70">📐</text>
-          <text class="room-name" x="590" y="100">강의실 1</text>
-          <text class="room-sub" x="590" y="118">중고등수학 · 특강</text>
+          <text class="room-name bulletin-label" x="273" y="125">📌 게시판</text>
+        </g>
+
+        <!-- 강의실1 중고등수학·특강 (사이즈 축소) -->
+        <g class="room r-hm" data-room="classroom1" tabindex="0">
+          <rect class="room-rect" x="369" y="3" width="628" height="134" rx="6"/>
+          <g class="furniture">
+            <!-- 화이트보드 (상단 중앙) -->
+            <rect class="board" x="613" y="14" width="140" height="10" rx="1"/>
+            <!-- 교탁 -->
+            <rect class="desk" x="670" y="28" width="26" height="10" rx="2" opacity=".85"/>
+            <!-- 좌측 책상 그룹 (4개) -->
+            <g>
+              <rect class="desk" x="420" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="426" y="62" width="16" height="6" rx="1"/>
+              <rect class="desk" x="460" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="466" y="62" width="16" height="6" rx="1"/>
+              <rect class="desk" x="500" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="506" y="62" width="16" height="6" rx="1"/>
+              <rect class="desk" x="540" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="546" y="62" width="16" height="6" rx="1"/>
+              <!-- 2행 -->
+              <rect class="desk" x="420" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="426" y="98" width="16" height="6" rx="1"/>
+              <rect class="desk" x="460" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="466" y="98" width="16" height="6" rx="1"/>
+              <rect class="desk" x="500" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="506" y="98" width="16" height="6" rx="1"/>
+              <rect class="desk" x="540" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="546" y="98" width="16" height="6" rx="1"/>
+            </g>
+            <!-- 우측 책상 그룹 (4개) -->
+            <g>
+              <rect class="desk" x="820" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="826" y="62" width="16" height="6" rx="1"/>
+              <rect class="desk" x="860" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="866" y="62" width="16" height="6" rx="1"/>
+              <rect class="desk" x="900" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="906" y="62" width="16" height="6" rx="1"/>
+              <rect class="desk" x="940" y="46" width="28" height="14" rx="2"/>
+              <rect class="chair" x="946" y="62" width="16" height="6" rx="1"/>
+              <!-- 2행 -->
+              <rect class="desk" x="820" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="826" y="98" width="16" height="6" rx="1"/>
+              <rect class="desk" x="860" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="866" y="98" width="16" height="6" rx="1"/>
+              <rect class="desk" x="900" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="906" y="98" width="16" height="6" rx="1"/>
+              <rect class="desk" x="940" y="82" width="28" height="14" rx="2"/>
+              <rect class="chair" x="946" y="98" width="16" height="6" rx="1"/>
+            </g>
+          </g>
+          <text class="room-icon" x="683" y="74">📐</text>
+          <text class="room-name" x="683" y="105">강의실 1</text>
+          <text class="room-sub" x="683" y="121">중고등수학 · 특강</text>
         </g>
 
         <!-- 상담실 -->
@@ -1035,16 +1137,17 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
 </main>
 
 <!-- 비밀번호 확인 모달 -->
-<div class="pw-ov" id="pwOv">
+<div class="pw-ov" id="pwOv" role="dialog" aria-modal="true" aria-labelledby="pwTitle">
   <div class="pw-box">
-    <div class="pw-title">🔒 비밀번호 확인</div>
-    <div class="pw-desc">수정/삭제 기능을 쓰려면 강사용 비밀번호가 필요해요.</div>
-    <input class="pw-inp" id="pwInp" type="password" maxlength="20" inputmode="numeric" placeholder="• • • •">
-    <div class="pw-err" id="pwErr"></div>
+    <div class="pw-title" id="pwTitle">🔒 비밀번호 확인</div>
+    <div class="pw-desc">수정·삭제 기능을 사용하려면 강사용 비밀번호가 필요해요.</div>
+    <input class="pw-inp" id="pwInp" type="password" maxlength="20" inputmode="numeric" autocomplete="current-password" placeholder="• • • •">
+    <div class="pw-err" id="pwErr" role="alert"></div>
     <div class="pw-btns">
       <button class="pw-cancel" type="button" id="pwCancel">취소</button>
       <button class="pw-ok" type="button" id="pwOk">확인</button>
     </div>
+    <div class="pw-hint">💡 비밀번호를 모르겠다면 원장님께 문의해주세요.</div>
   </div>
 </div>
 
@@ -1068,6 +1171,25 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
         actions:[
           { label:'📋 출결 관리 열기', href:ATTENDANCE_URL, primary:true, target:'_blank' },
           { label:'📝 출결 로그 보기', href:'admin.html' },
+        ],
+      }],
+    },
+    bulletin: {
+      icon:'📌', name:'게시판', color:null,
+      badge:'Notice Board',
+      desc:'강사·학생에게 공유할 공지, 시간표 변경, 이벤트를 한눈에 모아두세요. 쪽지를 붙여 놓듯 간단히 관리할 수 있어요.',
+      sections:[{
+        title:'운영 팁',
+        notes:[
+          '시간표 / 휴강 공지는 상단에 고정',
+          '학부모 공지는 슬랙·문자로 별도 발송 권장',
+          '이벤트·대회 안내 포스터는 하단 쪽지로 부착',
+        ],
+      },{
+        title:'바로가기',
+        actions:[
+          { label:'📣 공지 관리 열기', href:'admin.html', primary:true },
+          { label:'🔔 슬랙 채널 설정', href:'admin.html' },
         ],
       }],
     },
@@ -1175,32 +1297,78 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
   }
 
   // ─── 학생 집계 ───────────────────────────────────────────────────────────
+  // 여러 데이터 소스(명단·카테고리 매핑·오늘 미션·대기열·닉네임)에서 해당 카테고리의
+  // 학생을 최대한 모아서 보여준다. kiosk_cats가 비어 있어도 닉네임/오늘 미션 키에서
+  // 이름을 역추정하므로 담당 강의실에 배정이 없어도 현황이 비지 않도록 한다.
   function buildRoster(data, cat){
     const cfg = data.cfg || {};
     const raw = cfg.mogak_students || [];
     const kioskCats = cfg.kiosk_cats || {};
     const nicknames = cfg.mogak_nicknames || {};
-    const isEng = cat.indexOf('영어') >= 0;
+    const pending = cfg.mogakgong_pending || {};
+    const { missionKey, doneKey } = todayKeys();
+    const todayMissions = cfg[missionKey] || {};
+    const todayDone = cfg[doneKey] || {};
 
     const kioskByName = {};
     (data.kioskStudents||[]).forEach(s=>{ kioskByName[s.name] = s; });
 
-    const mogak = raw.map(s=>{
-      if(typeof s === 'string') return { name:s, cat:'초등수학' };
-      if(s.classes) return { name:s.name, cat: s.classes[0]==='영어'?'초등영어':(s.classes[0]||'초등수학') };
-      return { name:s.name, cat:s.cat };
-    }).filter(s => s.cat === cat);
+    const suffix = '_' + cat;
+    const stripSuffix = (k) => k.endsWith(suffix) ? k.slice(0, k.length - suffix.length) : null;
 
-    const mogakNames = new Set(mogak.map(s=>s.name));
-    const extras = isEng ? [] : (data.kioskStudents||[])
-      .filter(s => !mogakNames.has(s.name) && kioskCats[s.name] === cat)
-      .map(s => ({ name:s.name, cat, _kiosk:true }));
+    // 이름 → 출처 태그
+    const nameMap = new Map(); // name → { fromMogak, fromKiosk, fromMission, fromPending, fromNick }
 
-    const all = [...mogak, ...extras].map(s=>{
-      const k = kioskByName[s.name] || {};
-      const sKey = s.name + '_' + cat;
+    function mark(name, tag){
+      if(!name) return;
+      const cur = nameMap.get(name) || {};
+      cur[tag] = true;
+      nameMap.set(name, cur);
+    }
+
+    // 1) mogak_students 명단
+    raw.forEach(s=>{
+      let name, c;
+      if(typeof s === 'string'){ name = s; c = '초등수학'; }
+      else if(s.classes){ name = s.name; c = s.classes[0]==='영어'?'초등영어':(s.classes[0]||'초등수학'); }
+      else { name = s.name; c = s.cat; }
+      if(c === cat) mark(name, 'fromMogak');
+    });
+
+    // 2) kiosk_cats 매핑
+    Object.keys(kioskCats).forEach(name=>{
+      if(kioskCats[name] === cat) mark(name, 'fromKiosk');
+    });
+
+    // 3) 오늘 미션 키 역추정 (예: '홍길동_중고등수학')
+    Object.keys(todayMissions).forEach(k=>{
+      const n = stripSuffix(k);
+      if(n) mark(n, 'fromMission');
+    });
+
+    // 4) 오늘 완료 체크 역추정
+    Object.keys(todayDone).forEach(k=>{
+      const n = stripSuffix(k);
+      if(n) mark(n, 'fromDone');
+    });
+
+    // 5) 대기열 역추정
+    Object.keys(pending).forEach(k=>{
+      const n = stripSuffix(k);
+      if(n) mark(n, 'fromPending');
+    });
+
+    // 6) 닉네임 역추정
+    Object.keys(nicknames).forEach(k=>{
+      const n = stripSuffix(k);
+      if(n) mark(n, 'fromNick');
+    });
+
+    const all = Array.from(nameMap.keys()).map(name=>{
+      const k = kioskByName[name] || {};
+      const sKey = name + '_' + cat;
       return {
-        name: s.name,
+        name,
         cat,
         sKey,
         nick: nicknames[sKey] || '',
@@ -1444,48 +1612,92 @@ button.chk.restock.on{background:var(--fire);border-color:var(--fire)}
   const pwOv = document.getElementById('pwOv');
   const pwInp = document.getElementById('pwInp');
   const pwErr = document.getElementById('pwErr');
+  const pwOkBtn = document.getElementById('pwOk');
+  const pwCancelBtn = document.getElementById('pwCancel');
   let _pwResolve = null;
+  let _pwBusy = false;
 
-  function askPassword(){
+  function setPwError(msg){
+    pwErr.textContent = msg || '';
+    pwErr.style.display = msg ? 'block' : 'none';
+    pwInp.classList.toggle('err', !!msg);
+  }
+  function setPwBusy(busy){
+    _pwBusy = busy;
+    pwOkBtn.disabled = busy;
+    pwCancelBtn.disabled = busy;
+    pwInp.disabled = busy;
+    pwOkBtn.textContent = busy ? '확인 중…' : '확인';
+  }
+
+  function openPwModal(){
     return new Promise((resolve)=>{
-      pwInp.value = getPw() || '';
-      pwErr.textContent = '';
-      pwInp.classList.remove('err');
+      pwInp.value = '';
+      setPwError('');
+      setPwBusy(false);
       pwOv.classList.add('open');
       setTimeout(()=>pwInp.focus(), 60);
       _pwResolve = resolve;
     });
   }
-  function closePw(val){
+  function closePwModal(pw){
     pwOv.classList.remove('open');
-    if(_pwResolve){ _pwResolve(val); _pwResolve = null; }
+    setPwBusy(false);
+    if(_pwResolve){ _pwResolve(pw || ''); _pwResolve = null; }
   }
-  document.getElementById('pwCancel').addEventListener('click', ()=> closePw(''));
-  document.getElementById('pwOk').addEventListener('click', ()=>{
+
+  // 백엔드에 비밀번호 확인. 성공 시 true, 실패 시 false, 네트워크 오류 시 null.
+  async function verifyPwRemote(pw){
+    try{
+      const r = await fetch(KIOSK_API+'/api/admin/auth', { headers:{'X-Admin-Password':pw} });
+      if(r.status === 200){
+        const d = await r.json().catch(()=>null);
+        return !!(d && d.success);
+      }
+      if(r.status === 401) return false;
+      return null; // 알 수 없는 상태
+    }catch(_){ return null; }
+  }
+
+  async function tryPwSubmit(){
+    if(_pwBusy) return;
     const v = pwInp.value.trim();
-    if(!v){ pwErr.textContent = '비밀번호를 입력해주세요'; pwInp.classList.add('err'); return; }
-    closePw(v);
-  });
+    if(!v){ setPwError('비밀번호를 입력해주세요'); return; }
+
+    setPwBusy(true);
+    setPwError('');
+    const ok = await verifyPwRemote(v);
+    setPwBusy(false);
+
+    if(ok === true){
+      setPw(v);
+      closePwModal(v);
+      return;
+    }
+    if(ok === false){
+      setPwError('비밀번호가 일치하지 않아요. 다시 확인해주세요.');
+      pwInp.select();
+      return;
+    }
+    // 네트워크 오류
+    setPwError('인증 서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.');
+  }
+
+  pwCancelBtn.addEventListener('click', ()=> closePwModal(''));
+  pwOkBtn.addEventListener('click', tryPwSubmit);
   pwInp.addEventListener('keydown', e=>{
-    if(e.key==='Enter'){ e.preventDefault(); document.getElementById('pwOk').click(); }
-    if(e.key==='Escape'){ closePw(''); }
+    if(e.key==='Enter'){ e.preventDefault(); tryPwSubmit(); }
+    if(e.key==='Escape'){ closePwModal(''); }
   });
-  pwOv.addEventListener('click', e=>{ if(e.target===pwOv) closePw(''); });
+  pwInp.addEventListener('input', ()=>{ if(pwErr.textContent) setPwError(''); });
+  pwOv.addEventListener('click', e=>{ if(e.target===pwOv && !_pwBusy) closePwModal(''); });
 
   async function ensurePw(){
     let pw = getPw();
     if(pw) return pw;
-    pw = await askPassword();
-    if(!pw) return '';
-    // 검증
-    try{
-      const r = await fetch(KIOSK_API+'/api/admin/auth', { headers:{'X-Admin-Password':pw} });
-      const d = await r.json();
-      if(d.success){ setPw(pw); return pw; }
-    }catch(_){}
-    toast('비밀번호가 올바르지 않아요', 'err');
-    clearPw();
-    return '';
+    // 모달이 내부에서 검증을 수행하고, 성공한 비밀번호만 반환
+    pw = await openPwModal();
+    return pw || '';
   }
 
   async function adminFetch(path, method, body){
