@@ -189,6 +189,40 @@ app.post('/api/mogak/notify', async (c) => {
 })
 
 
+// ── 카카오워크 디버그 테스트 ─────────────────────────────────────────────────
+app.get('/api/kw-test', async (c) => {
+
+  const mathUrl = c.env.KAKAOWORK_CONV_MATH || ''
+  const engUrl  = c.env.KAKAOWORK_CONV_ENGLISH || ''
+
+  const results: any = { mathUrl: mathUrl ? mathUrl.slice(0,50)+'...' : '미설정', engUrl: engUrl ? engUrl.slice(0,50)+'...' : '미설정' }
+
+  if (mathUrl) {
+    try {
+      const r = await fetch(mathUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '📐 수학 카카오워크 테스트' })
+      })
+      results.math = { status: r.status, ok: r.ok, body: await r.text() }
+    } catch (e: any) { results.math = { error: e.message } }
+  }
+
+  if (engUrl) {
+    try {
+      const r = await fetch(engUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '📘 영어 카카오워크 테스트' })
+      })
+      results.english = { status: r.status, ok: r.ok, body: await r.text() }
+    } catch (e: any) { results.english = { error: e.message } }
+  }
+
+  return c.json(results)
+
+})
+
 // ── 모각공 슬랙 환경변수 확인 + 테스트 발송 ──────────────────────────────────
 app.get('/api/mogak-slack-check', async (c) => {
 
