@@ -1942,75 +1942,9 @@ async function saveNotion(env: Bindings, d: any) {
 // ── 요청사항 Slack ─────────────────────────────────────────────────────────────
 
 async function sendSlackRequest(env: Bindings, d: any) {
-
-  if (!env.SLACK_WEBHOOK_URL) return false
-
-  const photoNote = d.photoBase64 ? '\n📎 *사진 첨부됨* → 관리자 페이지에서 확인 가능' : ''
-
-  const blocks: any[] = [
-
-    { type: 'header', text: { type: 'plain_text', text: '📬 바꿈수학 - 선생님께 요청사항', emoji: true } },
-
-    { type: 'section', text: { type: 'mrkdwn', text: `*👤 학생:* ${d.name}\n*💬 메시지:*\n${d.message}${photoNote}` } },
-
-    { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${d.timestamp}` }] },
-
-    { type: 'divider' },
-
-  ]
-
-  // 카카오워크 알림
-  await sendKW(kwMath(env), '📬 선생님께 요청사항\n━━━━━━━━━━━━━━━━\n👤 학생: ' + d.name + '\n💬 메시지:\n' + d.message + (d.photoBase64 ? '\n📎 사진 첨부됨' : '') + '\n⏰ ' + d.timestamp)
-
-  if (!env.SLACK_WEBHOOK_URL) { return true }
-  const res = await fetch(env.SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }) })
-  if (!res.ok) throw new Error(`Slack ${res.status}`)
-
-  // Bot Token이 있으면 이미지도 Slack에 별도 업로드
-  if (d.photoBase64 && env.SLACK_BOT_TOKEN && env.SLACK_CHANNEL_ID) {
-
-    try {
-
-      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
-
-      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
-
-      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
-
-      const ext = mime.split('/')[1] || 'jpg'
-
-      const binStr = atob(imgData)
-
-      const binArr = new Uint8Array(binStr.length)
-
-      for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
-
-      const form = new FormData()
-
-      form.append('channels', env.SLACK_CHANNEL_ID)
-
-      form.append('filename', `request_${d.name}_${Date.now()}.${ext}`)
-
-      form.append('initial_comment', `📸 ${d.name} 학생의 요청사항 첨부 사진`)
-
-      form.append('file', new Blob([binArr], { type: mime }), `photo.${ext}`)
-
-      await fetch('https://slack.com/api/files.upload', {
-
-        method: 'POST',
-
-        headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
-
-        body: form,
-
-      })
-
-    } catch (_) {}
-
-  }
-
+  const photoNote = d.photoBase64 ? '\n📎 사진 첨부됨' : ''
+  await sendKW(kwMath(env), '📬 선생님께 요청사항\n━━━━━━━━━━━━━━━━\n👤 학생: ' + d.name + '\n💬 메시지:\n' + d.message + photoNote + '\n⏰ ' + d.timestamp)
   return true
-
 }
 
 
