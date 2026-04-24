@@ -11,8 +11,8 @@ type Bindings = {
   DB: D1Database
 
   // 카카오워크 웹훅
-  KAKAOWORK_WEBHOOK_MATH: string       // 수학 채팅방 웹훅 URL
-  KAKAOWORK_WEBHOOK_ENGLISH: string    // 영어 채팅방 웹훅 URL
+  KAKAOWORK_CONV_MATH: string       // 수학 채팅방 웹훅 URL
+  KAKAOWORK_CONV_ENGLISH: string    // 영어 채팅방 웹훅 URL
 
   NOTION_API_KEY: string
 
@@ -189,10 +189,10 @@ app.post('/api/mogak/notify', async (c) => {
 app.get('/api/mogak-slack-check', async (c) => {
 
   return c.json({
-    수학웹훅: !!c.env.KAKAOWORK_WEBHOOK_MATH,
-    영어웹훅: !!c.env.KAKAOWORK_WEBHOOK_ENGLISH,
-    수학웹훅_앞부분: c.env.KAKAOWORK_WEBHOOK_MATH ? c.env.KAKAOWORK_WEBHOOK_MATH.slice(0,40)+'...' : '미설정',
-    영어웹훅_앞부분: c.env.KAKAOWORK_WEBHOOK_ENGLISH ? c.env.KAKAOWORK_WEBHOOK_ENGLISH.slice(0,40)+'...' : '미설정',
+    수학웹훅: !!c.env.KAKAOWORK_CONV_MATH,
+    영어웹훅: !!c.env.KAKAOWORK_CONV_ENGLISH,
+    수학웹훅_앞부분: c.env.KAKAOWORK_CONV_MATH ? c.env.KAKAOWORK_CONV_MATH.slice(0,40)+'...' : '미설정',
+    영어웹훅_앞부분: c.env.KAKAOWORK_CONV_ENGLISH ? c.env.KAKAOWORK_CONV_ENGLISH.slice(0,40)+'...' : '미설정',
   })
 
 })
@@ -1569,10 +1569,10 @@ async function sendKakaoWork(webhookUrl: string, text: string): Promise<boolean>
 function getKakaoWebhook(env: Bindings, cat?: string): string {
 
   if (cat && cat.includes('영어')) {
-    return env.KAKAOWORK_WEBHOOK_ENGLISH || env.KAKAOWORK_WEBHOOK_MATH || ''
+    return env.KAKAOWORK_CONV_ENGLISH || env.KAKAOWORK_CONV_MATH || ''
   }
   // 수학 또는 기본 → 수학 웹훅
-  return env.KAKAOWORK_WEBHOOK_MATH || ''
+  return env.KAKAOWORK_CONV_MATH || ''
 
 }
 
