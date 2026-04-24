@@ -10,9 +10,13 @@ type Bindings = {
 
   DB: D1Database
 
-  // 카카오워크 웹훅
-  KAKAOWORK_CONV_MATH: string       // 수학 채팅방 웹훅 URL
-  KAKAOWORK_CONV_ENGLISH: string    // 영어 채팅방 웹훅 URL
+  KAKAOWORK_CONV_MATH: string     // 수학 카카오워크 웹훅 URL
+
+  KAKAOWORK_CONV_ENGLISH: string  // 영어 카카오워크 웹훅 URL
+
+  SLACK_BOT_TOKEN: string
+
+  SLACK_CHANNEL_ID: string
 
   NOTION_API_KEY: string
 
@@ -189,10 +193,11 @@ app.post('/api/mogak/notify', async (c) => {
 app.get('/api/mogak-slack-check', async (c) => {
 
   return c.json({
-    수학웹훅: !!c.env.KAKAOWORK_CONV_MATH,
-    영어웹훅: !!c.env.KAKAOWORK_CONV_ENGLISH,
-    수학웹훅_앞부분: c.env.KAKAOWORK_CONV_MATH ? c.env.KAKAOWORK_CONV_MATH.slice(0,40)+'...' : '미설정',
-    영어웹훅_앞부분: c.env.KAKAOWORK_CONV_ENGLISH ? c.env.KAKAOWORK_CONV_ENGLISH.slice(0,40)+'...' : '미설정',
+    SLACK_WEBHOOK_URL: !!c.env.SLACK_WEBHOOK_URL,
+    SLACK_WEBHOOK_MATH: !!c.env.SLACK_WEBHOOK_MATH,
+    SLACK_WEBHOOK_ENGLISH: !!c.env.SLACK_WEBHOOK_ENGLISH,
+    mathUrl_preview: c.env.SLACK_WEBHOOK_MATH ? c.env.SLACK_WEBHOOK_MATH.slice(0, 40) + '...' : '없음',
+    englishUrl_preview: c.env.SLACK_WEBHOOK_ENGLISH ? c.env.SLACK_WEBHOOK_ENGLISH.slice(0, 40) + '...' : '없음',
   })
 
 })
@@ -590,6 +595,11 @@ app.post('/api/admin/shop/schedule', async (c) => {
 
 // ── 상점 잠금해제 Slack 알림 ──────────────────────────────────────────────────
 async function sendShopUnlockSlack(env: Bindings, studentName: string) {
+  const now = new Date(Date.now() + 9*3600*1000)
+  const ts = String(now.getUTCHours()).padStart(2,'0') + ':' + String(now.getUTCMinutes()).padStart(2,'0')
+  await sendKW(kwMath(env), '🔓 상점 잠금해제 요청\n👤 학생: ' + studentName + '\n⏰ ' + ts)
+}
+
 // 상점 남은 재고 조회 (키오스크용)
 app.get('/api/shop/stock', async (c) => {
   try {
@@ -638,6 +648,7 @@ app.post('/api/admin/shop/restock', async (c) => {
     return c.json({ success: false, error: e.message }, 500)
   }
 })
+
 
 
 
@@ -1302,7 +1313,7 @@ app.get('/api/health', (c) => c.json({
 
   status: 'ok',
 
-  kakaowork: !!c.env.KAKAOWORK_BOT_TOKEN,
+  slack: !!c.env.SLACK_WEBHOOK_URL,
 
   notion: !!(c.env.NOTION_API_KEY && c.env.NOTION_DATABASE_ID),
 
@@ -1538,163 +1549,624 @@ app.get('/api/my-fines/:studentId', async (c) => {
 
 // ── 번호표 Slack 알림 ──────────────────────────────────────────────────────────
 
-// ════════════════════════════════════════════════════════════════════════════
-// 카카오워크 알림 함수들 (슬랙 대체)
-// ════════════════════════════════════════════════════════════════════════════
+// ── 카카오워크 웹훅 알림 ──────────────────────────────────────────────────────
 
-// 카카오워크 웹훅으로 메시지 전송
-async function sendKakaoWork(webhookUrl: string, text: string): Promise<boolean> {
+async function sendMogakKW(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
+  const webhook = kwCat(env, d.cat)
+  if (!webhook) return
+  const icon = d.cat.includes('영어') ? '📘' : '📐'
+  const now = new Date(Date.now() + 9*3600*1000)
+  const ts = String(now.getUTCHours()).padStart(2,'0') + ':' + String(now.getUTCMinutes()).padStart(2,'0')
+  const mList = d.missions.length > 0 ? d.missions.map((m:any) => '  • ' + (m.text||String(m))).join('\n') : '  없음'
+  const text = [icon + ' 모각공 완료 확인 요청', '━━━━━━━━━━━━━━━━', '👤 학생: ' + d.name, '📚 수업: ' + d.cat, '✅ 완료한 미션:', mList, '━━━━━━━━━━━━━━━━', '⏰ ' + ts + '  |  어드민 → 현황보기에서 확인 후 포인트 적립'].join('\n')
+  await sendKW(webhook, text)
+}
 
-  if (!webhookUrl) {
-    console.log('KakaoWork 웹훅 URL 미설정')
-    return false
-  }
+async function sendKW(url: string, text: string) {
+  if (!url) return
+  try {
+    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
+  } catch(e) { console.error('KakaoWork 전송 오류:', e) }
+}
+
+function kwMath(env: Bindings)    { return env.KAKAOWORK_CONV_MATH || '' }
+function kwEnglish(env: Bindings) { return env.KAKAOWORK_CONV_ENGLISH || env.KAKAOWORK_CONV_MATH || '' }
+function kwCat(env: Bindings, cat: string) { return cat.includes('영어') ? kwEnglish(env) : kwMath(env) }
+
+// ── 기존 Slack 함수 (슬랙 대신 카카오워크로 전송) ────────────────────────────
+
+async function sendSlackQueue(env: Bindings, d: any) {
+
+  const waitText = d.waiting === 0 ? '없음 (즉시 가능)' : d.waiting + '명 대기 중'
+  const text = '🎫 번호표 발급\n━━━━━━━━━━━━━━━━\n👤 학생: ' + d.studentName + '\n🔢 번호: ' + d.number + '번\n⏳ 대기: ' + waitText + '\n⏰ ' + d.ts
+  await sendKW(kwMath(env), text)
+  return true
+
+}
+
+
+
+// ── Slack ──────────────────────────────────────────────────────────────────────
+
+async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
+
+  // 카테고리로 채널 분기
+  // 영어(초등영어, 중고등영어) → SLACK_WEBHOOK_ENGLISH
+  // 수학(초등수학, 중고등수학) → SLACK_WEBHOOK_MATH
+  // 미설정 시 기본 SLACK_WEBHOOK_URL로 폴백
+  const isEnglish = d.cat.includes('영어')
+  const webhookUrl = isEnglish
+    ? (env.SLACK_WEBHOOK_ENGLISH || env.SLACK_WEBHOOK_URL)
+    : (env.SLACK_WEBHOOK_MATH || env.SLACK_WEBHOOK_URL)
+
+  if (!webhookUrl) return
+
+  const now = new Date(Date.now() + 9 * 3600 * 1000)
+  const h = String(now.getUTCHours()).padStart(2, '0')
+  const m = String(now.getUTCMinutes()).padStart(2, '0')
+  const timeStr = h + ':' + m
+
+  const missionList = d.missions.length > 0
+    ? d.missions.map(function(m: any) { return '• ' + (m.text || String(m)) }).join('\n')
+    : '없음'
+
+  const catIcon = isEnglish ? '📘' : '📐'
+  const text = catIcon + ' 모각공 완료 확인 요청\n학생: ' + d.name + ' (' + d.cat + ')\n미션:\n' + missionList + '\n⏰ ' + timeStr + '  |  어드민에서 확인 후 포인트 적립'
 
   const res = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text: text })
   })
 
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error('KakaoWork ' + res.status + ': ' + err)
+    const errText = await res.text()
+    throw new Error('Slack ' + res.status + ': ' + errText)
+  }
+
+}
+
+async function sendSlack(env: Bindings, d: any) {
+
+  if (!env.SLACK_WEBHOOK_URL) return false
+
+  const catEmoji: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
+
+  const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
+
+  const itemList = d.items.map((x) => `• ${x.icon} ${x.label} × ${x.qty}`).join('\n')
+
+  const costText = d.totalCost === 0 ? '무료' : d.totalCost < 0
+
+    ? `+${Math.abs(d.totalCost)} ${d.currency} 획득`
+
+    : `-${d.totalCost} ${d.currency} 차감`
+
+  const payload = {
+
+    blocks: [
+
+      { type: 'header', text: { type: 'plain_text', text: `바꿈수학 키오스크 ${catEmoji[d.category] || '📋'}`, emoji: true } },
+
+      { type: 'section', text: { type: 'mrkdwn', text: `*${catLabel[d.category] || d.category}* 기록\n\n*👤 학생:* ${d.name}\n*📋 항목:*\n${itemList}\n*🏅 합계:* ${costText}${d.comment ? '\n*💬 코멘트:* '+d.comment : ''}${d.photoBase64 ? '\n*📸 인증사진:* 첨부됨 (노션 확인)' : ''}` } },
+
+      { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${d.timestamp}` }] },
+
+      { type: 'divider' },
+
+    ],
+
+  }
+
+  // 카카오워크로 텍스트 알림
+  const catEmoji2: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
+  const catLabel2: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
+  const itemListKW = d.items.map((x: any) => '  • ' + x.icon + ' ' + x.label + ' × ' + x.qty).join('\n')
+  const costTextKW = d.totalCost === 0 ? '무료' : d.totalCost < 0 ? '+' + Math.abs(d.totalCost) + ' ' + d.currency + ' 획득' : '-' + d.totalCost + ' ' + d.currency + ' 차감'
+  const kwLines = [(catEmoji2[d.category] || '📋') + ' ' + (catLabel2[d.category] || d.category), '━━━━━━━━━━━━━━━━', '👤 학생: ' + d.name, '📋 항목:', itemListKW, '🏅 합계: ' + costTextKW]
+  if (d.comment) kwLines.push('💬 코멘트: ' + d.comment)
+  kwLines.push('⏰ ' + d.timestamp)
+  await sendKW(kwMath(env), kwLines.join('\n'))
+
+  if (!env.SLACK_WEBHOOK_URL) { return true }
+  const res = await fetch(env.SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  if (!res.ok) throw new Error(`Slack ${res.status}`)
+
+  // Bot Token이 있으면 인증사진도 Slack에 업로드
+  if (d.photoBase64 && env.SLACK_BOT_TOKEN && env.SLACK_CHANNEL_ID) {
+
+    try {
+
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+
+      const ext = mime.split('/')[1] || 'jpg'
+
+      const binStr = atob(imgData)
+
+      const binArr = new Uint8Array(binStr.length)
+
+      for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+
+      const form = new FormData()
+
+      form.append('channels', env.SLACK_CHANNEL_ID)
+
+      form.append('filename', `cert_${d.name}_${Date.now()}.${ext}`)
+
+      form.append('initial_comment', `📸 ${d.name} 학생의 인증 사진`)
+
+      form.append('file', new Blob([binArr], { type: mime }), `photo.${ext}`)
+
+      await fetch('https://slack.com/api/files.upload', {
+
+        method: 'POST',
+
+        headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+
+        body: form,
+
+      })
+
+    } catch (_) {}
+
   }
 
   return true
 
 }
 
-// 카테고리에 따라 웹훅 URL 선택
-function getKakaoWebhook(env: Bindings, cat?: string): string {
 
-  if (cat && cat.includes('영어')) {
-    return env.KAKAOWORK_CONV_ENGLISH || env.KAKAOWORK_CONV_MATH || ''
-  }
-  // 수학 또는 기본 → 수학 웹훅
-  return env.KAKAOWORK_CONV_MATH || ''
 
-}
+// ── Notion ─────────────────────────────────────────────────────────────────────
 
-// 번호표 알림
-async function sendSlackQueue(env: Bindings, d: any) {
+async function saveNotion(env: Bindings, d: any) {
 
-  const webhook = getKakaoWebhook(env)
-  const waitText = d.waiting === 0 ? '없음 (즉시 가능)' : d.waiting + '명 대기 중'
+  if (!env.NOTION_API_KEY || !env.NOTION_DATABASE_ID) return false
 
-  const text = [
-    '🎫 번호표 발급',
-    '━━━━━━━━━━━━━━━━',
-    '👤 학생: ' + d.studentName,
-    '🔢 번호: ' + d.number + '번',
-    '⏳ 대기: ' + waitText,
-    '⏰ ' + d.ts,
-  ].join('\n')
-
-  return sendKakaoWork(webhook, text)
-
-}
-
-// 구매/학습/벌금 알림
-async function sendSlack(env: Bindings, d: any) {
-
-  const webhook = getKakaoWebhook(env)
-  const catEmoji: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
   const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
 
-  const itemList = d.items.map((x: any) => '  • ' + x.icon + ' ' + x.label + ' × ' + x.qty).join('\n')
-  const costText = d.totalCost === 0 ? '무료'
-    : d.totalCost < 0 ? '+' + Math.abs(d.totalCost) + ' ' + d.currency + ' 획득'
-    : '-' + d.totalCost + ' ' + d.currency + ' 차감'
+  const itemList = d.items.map((x) => `${x.icon} ${x.label} × ${x.qty}${x.comment ? ' ('+x.comment+')' : ''}`).join(', ')
 
-  const lines = [
-    (catEmoji[d.category] || '📋') + ' ' + (catLabel[d.category] || d.category),
-    '━━━━━━━━━━━━━━━━',
-    '👤 학생: ' + d.name,
-    '📋 항목:',
-    itemList,
-    '🏅 합계: ' + costText,
-  ]
-  if (d.comment) lines.push('💬 코멘트: ' + d.comment)
-  if (d.photoBase64) lines.push('📸 인증사진: 관리자 페이지에서 확인')
-  lines.push('⏰ ' + d.timestamp)
+  const costText = d.totalCost === 0 ? '무료' : d.totalCost < 0
 
-  return sendKakaoWork(webhook, lines.join('\n'))
+    ? `+${Math.abs(d.totalCost)} ${d.currency}`
+
+    : `-${d.totalCost} ${d.currency}`
+
+
+
+  // 페이지 본문 블록: 코멘트 + 이미지
+
+  const children: any[] = []
+
+  if (d.comment) {
+
+    children.push({
+
+      object: 'block', type: 'callout',
+
+      callout: {
+
+        rich_text: [{ type: 'text', text: { content: `💬 ${d.comment}` } }],
+
+        icon: { emoji: '💬' }, color: 'blue_background'
+
+      }
+
+    })
+
+  }
+
+  if (d.photoBase64) {
+
+    // base64 이미지는 Notion external URL로 직접 삽입 불가 → 단락에 텍스트로 안내
+
+    // 실제 이미지: file_upload API 또는 외부 URL 필요
+
+    // → base64 자체를 data URI로 파일 블록에 넣으면 Notion이 거부하므로
+
+    //   대신 이미지가 첨부됐다는 안내 + items 각각의 comment에서 사진 정보 표시
+
+    children.push({
+
+      object: 'block', type: 'callout',
+
+      callout: {
+
+        rich_text: [{ type: 'text', text: { content: '📸 인증 사진이 첨부되었습니다 (키오스크 제출)' } }],
+
+        icon: { emoji: '📸' }, color: 'yellow_background'
+
+      }
+
+    })
+
+    // Notion File Upload API로 실제 이미지 업로드 시도
+
+    try {
+
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+
+      const ext = mime.split('/')[1] || 'jpg'
+
+      // Step1: 업로드 URL 발급
+
+      const uploadRes = await fetch('https://api.notion.com/v1/file_uploads', {
+
+        method: 'POST',
+
+        headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+
+        body: JSON.stringify({ name: `photo.${ext}`, content_type: mime })
+
+      })
+
+      if (uploadRes.ok) {
+
+        const uploadData = await uploadRes.json() as any
+
+        const uploadUrl = uploadData.upload_url
+
+        const fileId = uploadData.id
+
+        // Step2: 이미지 바이너리 업로드
+
+        const binStr = atob(imgData)
+
+        const binArr = new Uint8Array(binStr.length)
+
+        for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+
+        const uploadBinRes = await fetch(uploadUrl, {
+
+          method: 'PUT',
+
+          headers: { 'Content-Type': mime },
+
+          body: binArr
+
+        })
+
+        if (uploadBinRes.ok) {
+
+          // Step3: 업로드된 파일 ID로 이미지 블록 추가
+
+          children.push({
+
+            object: 'block', type: 'image',
+
+            image: { type: 'file_upload', file_upload: { id: fileId } }
+
+          })
+
+          // 안내 블록은 제거 (이미지 성공)
+
+          children.splice(children.findIndex((b) => b.callout?.icon?.emoji === '📸'), 1)
+
+        }
+
+      }
+
+    } catch (_) { /* 실패시 안내 텍스트만 남김 */ }
+
+  }
+
+
+
+  const payload: any = {
+
+    parent: { database_id: env.NOTION_DATABASE_ID },
+
+    properties: {
+
+      '학생 이름': { title: [{ text: { content: d.name } }] },
+
+      '항목': { rich_text: [{ text: { content: itemList } }] },
+
+      '금액': { rich_text: [{ text: { content: costText } }] },
+
+      '구분': { multi_select: [{ name: catLabel[d.category] || d.category }] },
+
+      '접수 일시': { date: { start: new Date().toISOString() } },
+
+      '상태': { select: { name: '접수 완료' } },
+
+    },
+
+  }
+
+  if (children.length > 0) payload.children = children
+
+
+
+  const res = await fetch('https://api.notion.com/v1/pages', {
+
+    method: 'POST',
+
+    headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+
+    body: JSON.stringify(payload),
+
+  })
+
+  if (!res.ok) { const t = await res.text(); throw new Error(`Notion ${res.status}: ${t}`) }
+
+  return true
 
 }
 
-// 요청사항 알림
+
+
+// ── 요청사항 Slack ─────────────────────────────────────────────────────────────
+
 async function sendSlackRequest(env: Bindings, d: any) {
 
-  const webhook = getKakaoWebhook(env)
-  const lines = [
-    '📬 선생님께 요청사항',
-    '━━━━━━━━━━━━━━━━',
-    '👤 학생: ' + d.name,
-    '💬 메시지:',
-    d.message,
+  if (!env.SLACK_WEBHOOK_URL) return false
+
+  const photoNote = d.photoBase64 ? '\n📎 *사진 첨부됨* → 관리자 페이지에서 확인 가능' : ''
+
+  const blocks: any[] = [
+
+    { type: 'header', text: { type: 'plain_text', text: '📬 바꿈수학 - 선생님께 요청사항', emoji: true } },
+
+    { type: 'section', text: { type: 'mrkdwn', text: `*👤 학생:* ${d.name}\n*💬 메시지:*\n${d.message}${photoNote}` } },
+
+    { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${d.timestamp}` }] },
+
+    { type: 'divider' },
+
   ]
-  if (d.photoBase64) lines.push('📎 사진 첨부됨 → 관리자 페이지에서 확인')
-  lines.push('⏰ ' + d.timestamp)
 
-  return sendKakaoWork(webhook, lines.join('\n'))
+  // 카카오워크 알림
+  await sendKW(kwMath(env), '📬 선생님께 요청사항\n━━━━━━━━━━━━━━━━\n👤 학생: ' + d.name + '\n💬 메시지:\n' + d.message + (d.photoBase64 ? '\n📎 사진 첨부됨' : '') + '\n⏰ ' + d.timestamp)
+
+  if (!env.SLACK_WEBHOOK_URL) { return true }
+  const res = await fetch(env.SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }) })
+  if (!res.ok) throw new Error(`Slack ${res.status}`)
+
+  // Bot Token이 있으면 이미지도 Slack에 별도 업로드
+  if (d.photoBase64 && env.SLACK_BOT_TOKEN && env.SLACK_CHANNEL_ID) {
+
+    try {
+
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+
+      const ext = mime.split('/')[1] || 'jpg'
+
+      const binStr = atob(imgData)
+
+      const binArr = new Uint8Array(binStr.length)
+
+      for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+
+      const form = new FormData()
+
+      form.append('channels', env.SLACK_CHANNEL_ID)
+
+      form.append('filename', `request_${d.name}_${Date.now()}.${ext}`)
+
+      form.append('initial_comment', `📸 ${d.name} 학생의 요청사항 첨부 사진`)
+
+      form.append('file', new Blob([binArr], { type: mime }), `photo.${ext}`)
+
+      await fetch('https://slack.com/api/files.upload', {
+
+        method: 'POST',
+
+        headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+
+        body: form,
+
+      })
+
+    } catch (_) {}
+
+  }
+
+  return true
 
 }
 
-// 모각공 완료 알림 (영어/수학 봇+채팅방 분리)
-async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
 
-  const webhook = getKakaoWebhook(env, d.cat)
-  if (!webhook) return
 
-  const isEnglish = d.cat.includes('영어')
-  const icon = isEnglish ? '📘' : '📐'
+// ── 요청사항 Notion ────────────────────────────────────────────────────────────
 
-  const missionList = d.missions.length > 0
-    ? d.missions.map((m: any) => '  • ' + (m.text || String(m))).join('\n')
-    : '  없음'
+async function saveNotionRequest(env: Bindings, d: any) {
 
-  const now = new Date(Date.now() + 9 * 3600 * 1000)
-  const timeStr = String(now.getUTCHours()).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0')
+  if (!env.NOTION_API_KEY || !env.NOTION_DATABASE_ID) return false
 
-  const text = [
-    icon + ' 모각공 완료 확인 요청',
-    '━━━━━━━━━━━━━━━━',
-    '👤 학생: ' + d.name,
-    '📚 수업: ' + d.cat,
-    '✅ 완료한 미션:',
-    missionList,
-    '━━━━━━━━━━━━━━━━',
-    '⏰ ' + timeStr + '  |  어드민 → 현황보기에서 확인 후 포인트 적립',
-  ].join('\n')
+  const children: any[] = [
 
-  await sendKakaoWork(webhook, text)
+    { object: 'block', type: 'callout',
+
+      callout: { rich_text: [{ type: 'text', text: { content: d.message } }], icon: { emoji: '💬' }, color: 'blue_background' } },
+
+  ]
+
+  if (d.photoBase64) {
+
+    // Notion File Upload API로 실제 이미지 업로드
+
+    let imgUploaded = false
+
+    try {
+
+      const imgData = d.photoBase64.replace(/^data:image\/\w+;base64,/, '')
+
+      const mimeMatch = d.photoBase64.match(/^data:(image\/\w+);base64,/)
+
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+
+      const ext = mime.split('/')[1] || 'jpg'
+
+      const uploadRes = await fetch('https://api.notion.com/v1/file_uploads', {
+
+        method: 'POST',
+
+        headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+
+        body: JSON.stringify({ name: `request_photo.${ext}`, content_type: mime })
+
+      })
+
+      if (uploadRes.ok) {
+
+        const uploadData = await uploadRes.json() as any
+
+        const binStr = atob(imgData)
+
+        const binArr = new Uint8Array(binStr.length)
+
+        for (let i = 0; i < binStr.length; i++) binArr[i] = binStr.charCodeAt(i)
+
+        const uploadBinRes = await fetch(uploadData.upload_url, {
+
+          method: 'PUT', headers: { 'Content-Type': mime }, body: binArr
+
+        })
+
+        if (uploadBinRes.ok) {
+
+          children.push({
+
+            object: 'block', type: 'image',
+
+            image: { type: 'file_upload', file_upload: { id: uploadData.id } }
+
+          })
+
+          imgUploaded = true
+
+        }
+
+      }
+
+    } catch (_) {}
+
+    if (!imgUploaded) {
+
+      children.push({
+
+        object: 'block', type: 'callout',
+
+        callout: { rich_text: [{ type: 'text', text: { content: '📸 사진 첨부됨 (업로드 실패 - 키오스크에서 직접 확인)' } }], icon: { emoji: '📸' }, color: 'yellow_background' }
+
+      })
+
+    }
+
+  }
+
+  const payload = {
+
+    parent: { database_id: env.NOTION_DATABASE_ID },
+
+    properties: {
+
+      '학생 이름': { title: [{ text: { content: d.name } }] },
+
+      '항목': { rich_text: [{ text: { content: d.message.slice(0, 100) } }] },
+
+      '금액': { rich_text: [{ text: { content: '요청사항' } }] },
+
+      '구분': { multi_select: [{ name: '요청사항' }] },
+
+      '접수 일시': { date: { start: new Date().toISOString() } },
+
+      '상태': { select: { name: '검토 중' } },
+
+    },
+
+    children,
+
+  }
+
+  const res = await fetch('https://api.notion.com/v1/pages', {
+
+    method: 'POST',
+
+    headers: { Authorization: `Bearer ${env.NOTION_API_KEY}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+
+    body: JSON.stringify(payload),
+
+  })
+
+  if (!res.ok) { const t = await res.text(); throw new Error(`Notion ${res.status}: ${t}`) }
+
+  return true
 
 }
 
-// 상점 잠금해제 알림
-async function sendShopUnlockSlack(env: Bindings, studentName: string) {
 
-  const webhook = getKakaoWebhook(env)
-  if (!webhook) return
 
-  const now = new Date(Date.now() + 9 * 3600 * 1000)
-  const timeStr = String(now.getUTCHours()).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0')
+// ── 기본 설정 ──────────────────────────────────────────────────────────────────
 
-  const text = '🔓 상점 잠금해제 요청\n━━━━━━━━━━━━━━━━\n👤 학생: ' + studentName + '\n⏰ ' + timeStr
+const DEFAULT_CONFIG = {
 
-  await sendKakaoWork(webhook, text)
+  currency: { unit: '포인트', symbol: '🏅', desc: '포인트를 모아서 간식이랑 교환해요!' },
+
+  menu: {
+
+    learn: [
+
+      { id: 'study',    icon: '📖', label: '자습 인증하기',        cost: 0, reward: 2, requirePhoto: true  },
+
+      { id: 'homework', icon: '✏️', label: '숙제 제출하기',        cost: 0, reward: 1, requirePhoto: false },
+
+      { id: 'question', icon: '🙋', label: '질문하기',             cost: 0, reward: 1, requirePhoto: false },
+
+      { id: 'record',   icon: '📝', label: '모르는 문제 기록하기', cost: 0, reward: 2, requirePhoto: true  },
+
+      { id: 'material', icon: '📄', label: '추가 학습지 요청',     cost: 0, reward: 0, requirePhoto: false },
+
+      { id: 'makeup',   icon: '📅', label: '보강 신청',            cost: 0, reward: 0, requirePhoto: false },
+
+      { id: 'consult',  icon: '💬', label: '상담 요청',            cost: 0, reward: 0, requirePhoto: false },
+
+    ],
+
+    fine: [
+
+      { id: 'helpme',     icon: '🆘', label: '지현쌤 Help me!', cost: 3, reward: 0, requirePhoto: false, fineType: 'point', unit: '포인트' },
+
+      { id: 'lostwork',   icon: '😰', label: '숙제 분실',        cost: 4, reward: 0, requirePhoto: false, fineType: 'point', unit: '포인트' },
+
+      { id: 'nohomework', icon: '🚫', label: '숙제 안함',        cost: 5, reward: 0, requirePhoto: false, fineType: 'point', unit: '포인트' },
+
+    ],
+
+    shop: [
+
+      { id: 'choco',      icon: '🍫', label: '초콜릿(달달구리)', cost: 3, reward: 0, requirePhoto: false, soldOut: false },
+
+      { id: 'jelly',      icon: '🍬', label: '젤리',             cost: 2, reward: 0, requirePhoto: false, soldOut: false },
+
+      { id: 'candy',      icon: '🍭', label: '사탕',             cost: 2, reward: 0, requirePhoto: false, soldOut: false },
+
+      { id: 'snack',      icon: '🍿', label: '과자',             cost: 3, reward: 0, requirePhoto: false, soldOut: false },
+
+      { id: 'saekkomdal', icon: '🍋', label: '새콤달콤',         cost: 2, reward: 0, requirePhoto: false, soldOut: false },
+
+      { id: 'vitaminc',   icon: '💊', label: '비타민C',          cost: 2, reward: 0, requirePhoto: false, soldOut: false },
+
+    ],
+
+  },
 
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// (구) Slack 함수들 — 카카오워크로 대체됨, 아래는 제거
-// ════════════════════════════════════════════════════════════════════════════
-
-
-// 아래 함수들은 위에서 카카오워크 버전으로 이미 정의됨
-
-// 구버전 Slack 함수들 제거됨
 
 
 app.get('/', (c) => c.html(MAIN_HTML))
@@ -5210,7 +5682,5 @@ const ADMIN_HTML = `<!DOCTYPE html>
 </body>
 
 </html>`
-
-}
 
 export default app
