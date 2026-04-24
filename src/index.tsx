@@ -170,12 +170,11 @@ app.post('/api/mogak/notify', async (c) => {
       "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
     ).bind(JSON.stringify(cfg)).run()
 
-    // 4. 슬랙 알림 발송 (기존 sendSlack 방식과 동일하게 env 직접 전달)
+    // 카카오워크 알림
     try {
-      await sendMogakSlack(c.env, { name, cat: cat || '-', missions: missions || [] })
-    } catch (slackErr: any) {
-      console.error('모각공 슬랙 오류:', slackErr?.message)
-      // 슬랙 실패해도 저장은 성공으로 처리
+      await sendMogakKW(c.env, { name, cat: cat || '-', missions: missions || [] })
+    } catch (kwErr: any) {
+      console.error('모각공 KW 오류:', kwErr?.message)
     }
 
     return c.json({ success: true })
@@ -241,7 +240,7 @@ app.post('/api/mogak-slack-test', async (c) => {
   const results: any = {}
 
   try {
-    await sendMogakSlack(c.env, {
+    await sendMogakKW(c.env, {
       name: '📐 수학테스트',
       cat: '초등수학',
       missions: [{ text: '[채널테스트] 수학 채널 연결 확인' }]
@@ -252,7 +251,7 @@ app.post('/api/mogak-slack-test', async (c) => {
   }
 
   try {
-    await sendMogakSlack(c.env, {
+    await sendMogakKW(c.env, {
       name: '📘 영어테스트',
       cat: '초등영어',
       missions: [{ text: '[채널테스트] 영어 채널 연결 확인' }]
