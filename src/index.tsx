@@ -10,11 +10,11 @@ type Bindings = {
 
   DB: D1Database
 
-  // 카카오워크 봇
-  KAKAOWORK_BOT_TOKEN: string     // 카카오워크 봇 토큰 (필수)
-  KAKAOWORK_CONV_DEFAULT: string  // 기본 채팅방 ID (수학/키오스크 공용)
-  KAKAOWORK_CONV_MATH: string     // 수학 전용 채팅방 ID (선택)
-  KAKAOWORK_CONV_ENGLISH: string  // 영어 전용 채팅방 ID (선택)
+  // 카카오워크 봇 (수학/영어 각각)
+  KAKAOWORK_BOT_TOKEN_MATH: string     // 수학 봇 토큰 (번호표/구매/모각공 수학)
+  KAKAOWORK_BOT_TOKEN_ENGLISH: string  // 영어 봇 토큰 (모각공 영어)
+  KAKAOWORK_CONV_MATH: string          // 수학 채팅방 ID
+  KAKAOWORK_CONV_ENGLISH: string       // 영어 채팅방 ID
 
   NOTION_API_KEY: string
 
@@ -191,13 +191,10 @@ app.post('/api/mogak/notify', async (c) => {
 app.get('/api/mogak-slack-check', async (c) => {
 
   return c.json({
-    KAKAOWORK_BOT_TOKEN: !!c.env.KAKAOWORK_BOT_TOKEN,
-    KAKAOWORK_CONV_DEFAULT: !!c.env.KAKAOWORK_CONV_DEFAULT,
-    KAKAOWORK_CONV_MATH: !!c.env.KAKAOWORK_CONV_MATH,
-    KAKAOWORK_CONV_ENGLISH: !!c.env.KAKAOWORK_CONV_ENGLISH,
-    defaultConv: c.env.KAKAOWORK_CONV_DEFAULT || '미설정',
-    mathConv: c.env.KAKAOWORK_CONV_MATH || '미설정 (기본 채팅방 사용)',
-    englishConv: c.env.KAKAOWORK_CONV_ENGLISH || '미설정 (기본 채팅방 사용)',
+    수학봇토큰: !!c.env.KAKAOWORK_BOT_TOKEN_MATH,
+    영어봇토큰: !!c.env.KAKAOWORK_BOT_TOKEN_ENGLISH,
+    수학채팅방: c.env.KAKAOWORK_CONV_MATH || '미설정',
+    영어채팅방: c.env.KAKAOWORK_CONV_ENGLISH || '미설정',
   })
 
 })
@@ -1550,7 +1547,10 @@ app.get('/api/my-fines/:studentId', async (c) => {
 // 카카오워크 메시지 전송 핵심 함수
 async function sendKakaoWork(token: string, convId: string, text: string): Promise<boolean> {
 
-  if (!token || !convId) return false
+  if (!token || !convId) {
+    console.log('KakaoWork 미설정 - token:' + !!token + ' convId:' + !!convId)
+    return false
+  }
 
   const res = await fetch('https://api.kakaowork.com/v1/messages.send', {
     method: 'POST',
@@ -1573,51 +1573,49 @@ async function sendKakaoWork(token: string, convId: string, text: string): Promi
 
 }
 
-// 카카오워크 채팅방 ID 선택 (카테고리 기반)
-function getKakaoConvId(env: Bindings, cat?: string): string {
+// 카테고리에 따라 봇 토큰 + 채팅방 선택
+function getKakaoConfig(env: Bindings, cat?: string): { token: string, convId: string } {
 
-  if (cat && cat.includes('영어')) {
-    return env.KAKAOWORK_CONV_ENGLISH || env.KAKAOWORK_CONV_DEFAULT || ''
+  const isEnglish = cat && cat.includes('영어')
+
+  if (isEnglish) {
+    return {
+      token: env.KAKAOWORK_BOT_TOKEN_ENGLISH || env.KAKAOWORK_BOT_TOKEN_MATH || '',
+      convId: env.KAKAOWORK_CONV_ENGLISH || '',
+    }
   }
-  if (cat && cat.includes('수학')) {
-    return env.KAKAOWORK_CONV_MATH || env.KAKAOWORK_CONV_DEFAULT || ''
+
+  // 수학 or 기본값 → 수학 봇
+  return {
+    token: env.KAKAOWORK_BOT_TOKEN_MATH || '',
+    convId: env.KAKAOWORK_CONV_MATH || '',
   }
-  return env.KAKAOWORK_CONV_DEFAULT || ''
 
 }
 
 // 번호표 알림
 async function sendSlackQueue(env: Bindings, d: any) {
 
-  if (!env.KAKAOWORK_BOT_TOKEN) return false
-
-  const convId = env.KAKAOWORK_CONV_DEFAULT || ''
-  if (!convId) return false
-
+  const { token, convId } = getKakaoConfig(env)
   const waitText = d.waiting === 0 ? '없음 (즉시 가능)' : d.waiting + '명 대기 중'
 
   const text = [
-    '🎫 [바꿈수학] 번호표 발급 알림',
+    '🎫 번호표 발급',
     '━━━━━━━━━━━━━━━━',
     '👤 학생: ' + d.studentName,
-    '🔢 발급 번호: ' + d.number + '번',
-    '⏳ 앞 대기: ' + waitText,
-    '📅 날짜: ' + d.date,
+    '🔢 번호: ' + d.number + '번',
+    '⏳ 대기: ' + waitText,
     '⏰ ' + d.ts,
   ].join('\n')
 
-  return sendKakaoWork(env.KAKAOWORK_BOT_TOKEN, convId, text)
+  return sendKakaoWork(token, convId, text)
 
 }
 
 // 구매/학습/벌금 알림
 async function sendSlack(env: Bindings, d: any) {
 
-  if (!env.KAKAOWORK_BOT_TOKEN) return false
-
-  const convId = env.KAKAOWORK_CONV_DEFAULT || ''
-  if (!convId) return false
-
+  const { token, convId } = getKakaoConfig(env)
   const catEmoji: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
   const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
 
@@ -1627,7 +1625,7 @@ async function sendSlack(env: Bindings, d: any) {
     : '-' + d.totalCost + ' ' + d.currency + ' 차감'
 
   const lines = [
-    (catEmoji[d.category] || '📋') + ' 바꿈수학 키오스크 — ' + (catLabel[d.category] || d.category),
+    (catEmoji[d.category] || '📋') + ' ' + (catLabel[d.category] || d.category),
     '━━━━━━━━━━━━━━━━',
     '👤 학생: ' + d.name,
     '📋 항목:',
@@ -1638,20 +1636,16 @@ async function sendSlack(env: Bindings, d: any) {
   if (d.photoBase64) lines.push('📸 인증사진: 관리자 페이지에서 확인')
   lines.push('⏰ ' + d.timestamp)
 
-  return sendKakaoWork(env.KAKAOWORK_BOT_TOKEN, convId, lines.join('\n'))
+  return sendKakaoWork(token, convId, lines.join('\n'))
 
 }
 
 // 요청사항 알림
 async function sendSlackRequest(env: Bindings, d: any) {
 
-  if (!env.KAKAOWORK_BOT_TOKEN) return false
-
-  const convId = env.KAKAOWORK_CONV_DEFAULT || ''
-  if (!convId) return false
-
+  const { token, convId } = getKakaoConfig(env)
   const lines = [
-    '📬 바꿈수학 — 선생님께 요청사항',
+    '📬 선생님께 요청사항',
     '━━━━━━━━━━━━━━━━',
     '👤 학생: ' + d.name,
     '💬 메시지:',
@@ -1660,17 +1654,15 @@ async function sendSlackRequest(env: Bindings, d: any) {
   if (d.photoBase64) lines.push('📎 사진 첨부됨 → 관리자 페이지에서 확인')
   lines.push('⏰ ' + d.timestamp)
 
-  return sendKakaoWork(env.KAKAOWORK_BOT_TOKEN, convId, lines.join('\n'))
+  return sendKakaoWork(token, convId, lines.join('\n'))
 
 }
 
-// 모각공 완료 알림 (영어/수학 채팅방 분리)
+// 모각공 완료 알림 (영어/수학 봇+채팅방 분리)
 async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
 
-  if (!env.KAKAOWORK_BOT_TOKEN) return
-
-  const convId = getKakaoConvId(env, d.cat)
-  if (!convId) return
+  const { token, convId } = getKakaoConfig(env, d.cat)
+  if (!token || !convId) return
 
   const isEnglish = d.cat.includes('영어')
   const icon = isEnglish ? '📘' : '📐'
@@ -1693,24 +1685,22 @@ async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, mis
     '⏰ ' + timeStr + '  |  어드민 → 현황보기에서 확인 후 포인트 적립',
   ].join('\n')
 
-  await sendKakaoWork(env.KAKAOWORK_BOT_TOKEN, convId, text)
+  await sendKakaoWork(token, convId, text)
 
 }
 
 // 상점 잠금해제 알림
 async function sendShopUnlockSlack(env: Bindings, studentName: string) {
 
-  if (!env.KAKAOWORK_BOT_TOKEN) return
-
-  const convId = env.KAKAOWORK_CONV_DEFAULT || ''
-  if (!convId) return
+  const { token, convId } = getKakaoConfig(env)
+  if (!token || !convId) return
 
   const now = new Date(Date.now() + 9 * 3600 * 1000)
   const timeStr = String(now.getUTCHours()).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0')
 
   const text = '🔓 상점 잠금해제 요청\n━━━━━━━━━━━━━━━━\n👤 학생: ' + studentName + '\n⏰ ' + timeStr
 
-  await sendKakaoWork(env.KAKAOWORK_BOT_TOKEN, convId, text)
+  await sendKakaoWork(token, convId, text)
 
 }
 
