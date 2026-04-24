@@ -10,9 +10,9 @@ type Bindings = {
 
   DB: D1Database
 
-  KAKAOWORK_CONV_MATH: string     // 수학 카카오워크 웹훅 URL
+  KAKAOWORK_WEBHOOK_MATH: string     // 수학 카카오워크 웹훅 URL
 
-  KAKAOWORK_CONV_ENGLISH: string  // 영어 카카오워크 웹훅 URL
+  KAKAOWORK_WEBHOOK_ENGLISH: string  // 영어 카카오워크 웹훅 URL
 
   SLACK_BOT_TOKEN: string
 
@@ -192,8 +192,8 @@ app.post('/api/mogak/notify', async (c) => {
 // ── 카카오워크 디버그 테스트 ─────────────────────────────────────────────────
 app.get('/api/kw-test', async (c) => {
 
-  const mathUrl = c.env.KAKAOWORK_CONV_MATH || ''
-  const engUrl  = c.env.KAKAOWORK_CONV_ENGLISH || ''
+  const mathUrl = c.env.KAKAOWORK_WEBHOOK_MATH || ''
+  const engUrl  = c.env.KAKAOWORK_WEBHOOK_ENGLISH || ''
 
   const results: any = { mathUrl: mathUrl ? mathUrl.slice(0,50)+'...' : '미설정', engUrl: engUrl ? engUrl.slice(0,50)+'...' : '미설정' }
 
@@ -1603,8 +1603,8 @@ async function sendKW(url: string, text: string) {
   } catch(e) { console.error('KakaoWork 전송 오류:', e) }
 }
 
-function kwMath(env: Bindings)    { return env.KAKAOWORK_CONV_MATH || '' }
-function kwEnglish(env: Bindings) { return env.KAKAOWORK_CONV_ENGLISH || env.KAKAOWORK_CONV_MATH || '' }
+function kwMath(env: Bindings)    { return env.KAKAOWORK_WEBHOOK_MATH || '' }
+function kwEnglish(env: Bindings) { return env.KAKAOWORK_WEBHOOK_ENGLISH || env.KAKAOWORK_WEBHOOK_MATH || '' }
 function kwCat(env: Bindings, cat: string) { return cat.includes('영어') ? kwEnglish(env) : kwMath(env) }
 
 // ── 기존 Slack 함수 (슬랙 대신 카카오워크로 전송) ────────────────────────────
