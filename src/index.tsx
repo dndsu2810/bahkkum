@@ -308,11 +308,34 @@ app.post('/api/admin/config', async (c) => {
 
     const body = await c.req.json()
 
+    // 기존 config 읽어서 mogak 데이터 보존 (병합 저장)
+    const row = await c.env.DB.prepare(
+      "SELECT value FROM app_config WHERE key='kiosk_config'"
+    ).first() as any
+
+    const existing = row?.value ? JSON.parse(row.value) : {}
+
+    // mogak 관련 키는 body에 없어도 보존
+    const PRESERVE_KEYS = [
+      'mogak_students', 'mogak_nicknames', 'kiosk_cats',
+      'mogakgong_pending', 'mogakgong_done',
+    ]
+    const merged: any = { ...body }
+    for (const key of PRESERVE_KEYS) {
+      if (existing[key] !== undefined && merged[key] === undefined) {
+        merged[key] = existing[key]
+      }
+    }
+    // mogakgong_ 날짜 키도 보존 (done, mission 데이터)
+    for (const key of Object.keys(existing)) {
+      if (key.startsWith('mogakgong_') && merged[key] === undefined) {
+        merged[key] = existing[key]
+      }
+    }
+
     await c.env.DB.prepare(
-
       "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
-
-    ).bind(JSON.stringify(body)).run()
+    ).bind(JSON.stringify(merged)).run()
 
     return c.json({ success: true })
 
