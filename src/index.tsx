@@ -2336,7 +2336,7 @@ const MAIN_HTML = `<!DOCTYPE html>
 
     .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(110px,16vw,160px),1fr));gap:clamp(8px,1.4vw,12px);}
 
-    .menu-btn{background:var(--white);border:2.5px solid var(--g200);border-radius:var(--r-xl);padding:clamp(13px,2vw,20px) clamp(9px,1.4vw,13px);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:clamp(5px,.9vw,9px);transition:all .22s;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.04);position:relative;overflow:hidden;}
+    .menu-btn{background:var(--white);border:2.5px solid var(--g200);border-radius:var(--r-xl);padding:clamp(14px,2vw,22px) clamp(12px,1.6vw,18px);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:all .22s;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.04);position:relative;overflow:hidden;}
 
     .menu-btn:active{transform:scale(.94) !important;}
 
@@ -2358,14 +2358,6 @@ const MAIN_HTML = `<!DOCTYPE html>
     #shopUnlockReqBtn:active{transform:translateY(0);}
 
     .menu-btn.sold-out:hover{transform:none;box-shadow:none;}
-
-    .menu-ic-wrap{width:clamp(50px,7.5vw,68px);height:clamp(50px,7.5vw,68px);border-radius:clamp(12px,1.8vw,18px);display:flex;align-items:center;justify-content:center;font-size:clamp(22px,3.5vw,32px);position:relative;}
-
-    .type-learn .menu-ic-wrap{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid rgba(34,197,94,.2);}
-
-    .type-fine  .menu-ic-wrap{background:var(--red-s);border:1.5px solid rgba(239,68,68,.18);}
-
-    .type-shop  .menu-ic-wrap{background:var(--purple-s);border:1.5px solid rgba(168,85,247,.2);}
 
     .menu-lbl{font-size:clamp(11px,1.5vw,14px);font-weight:800;color:var(--g800);line-height:1.25;}
 
