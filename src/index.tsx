@@ -1645,88 +1645,33 @@ async function sendSlackQueue(env: Bindings, d: any) {
 // ── Slack ──────────────────────────────────────────────────────────────────────
 
 async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, missions: any[] }) {
-
-  // 카테고리로 채널 분기
-  // 영어(초등영어, 중고등영어) → SLACK_WEBHOOK_ENGLISH
-  // 수학(초등수학, 중고등수학) → SLACK_WEBHOOK_MATH
-  // 미설정 시 기본 SLACK_WEBHOOK_URL로 폴백
-  const isEnglish = d.cat.includes('영어')
-  const webhookUrl = isEnglish
-    ? (env.SLACK_WEBHOOK_ENGLISH || env.SLACK_WEBHOOK_URL)
-    : (env.SLACK_WEBHOOK_MATH || env.SLACK_WEBHOOK_URL)
-
-  if (!webhookUrl) return
-
-  const now = new Date(Date.now() + 9 * 3600 * 1000)
-  const h = String(now.getUTCHours()).padStart(2, '0')
-  const m = String(now.getUTCMinutes()).padStart(2, '0')
-  const timeStr = h + ':' + m
-
-  const missionList = d.missions.length > 0
-    ? d.missions.map(function(m: any) { return '• ' + (m.text || String(m)) }).join('\n')
-    : '없음'
-
-  const catIcon = isEnglish ? '📘' : '📐'
-  const text = catIcon + ' 모각공 완료 확인 요청\n학생: ' + d.name + ' (' + d.cat + ')\n미션:\n' + missionList + '\n⏰ ' + timeStr + '  |  어드민에서 확인 후 포인트 적립'
-
-  const res = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: text })
-  })
-
-  if (!res.ok) {
-    const errText = await res.text()
-    throw new Error('Slack ' + res.status + ': ' + errText)
-  }
-
+  // sendMogakKW 로 위임
+  await sendMogakKW(env, d)
 }
 
 async function sendSlack(env: Bindings, d: any) {
 
-  if (!env.SLACK_WEBHOOK_URL) return false
-
-  const catEmoji: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
-
   const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
-
-  const itemList = d.items.map((x) => `• ${x.icon} ${x.label} × ${x.qty}`).join('\n')
-
-  const costText = d.totalCost === 0 ? '무료' : d.totalCost < 0
-
-    ? `+${Math.abs(d.totalCost)} ${d.currency} 획득`
-
-    : `-${d.totalCost} ${d.currency} 차감`
-
-  const payload = {
-
-    blocks: [
-
-      { type: 'header', text: { type: 'plain_text', text: `바꿈수학 키오스크 ${catEmoji[d.category] || '📋'}`, emoji: true } },
-
-      { type: 'section', text: { type: 'mrkdwn', text: `*${catLabel[d.category] || d.category}* 기록\n\n*👤 학생:* ${d.name}\n*📋 항목:*\n${itemList}\n*🏅 합계:* ${costText}${d.comment ? '\n*💬 코멘트:* '+d.comment : ''}${d.photoBase64 ? '\n*📸 인증사진:* 첨부됨 (노션 확인)' : ''}` } },
-
-      { type: 'context', elements: [{ type: 'mrkdwn', text: `⏰ ${d.timestamp}` }] },
-
-      { type: 'divider' },
-
-    ],
-
-  }
-
-  // 카카오워크로 텍스트 알림
-  const catEmoji2: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
-  const catLabel2: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
-  const itemListKW = d.items.map((x: any) => '  • ' + x.icon + ' ' + x.label + ' × ' + x.qty).join('\n')
-  const costTextKW = d.totalCost === 0 ? '무료' : d.totalCost < 0 ? '+' + Math.abs(d.totalCost) + ' ' + d.currency + ' 획득' : '-' + d.totalCost + ' ' + d.currency + ' 차감'
-  const kwLines = [(catEmoji2[d.category] || '📋') + ' ' + (catLabel2[d.category] || d.category), '━━━━━━━━━━━━━━━━', '👤 학생: ' + d.name, '📋 항목:', itemListKW, '🏅 합계: ' + costTextKW]
+  const catEmoji: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
+  const itemListKW = d.items.map((x: any) => '  • ' + x.label + ' × ' + x.qty).join('\n')
+  const costTextKW = d.totalCost === 0 ? '무료' : d.totalCost < 0
+    ? '+' + Math.abs(d.totalCost) + ' ' + d.currency + ' 획득'
+    : '-' + d.totalCost + ' ' + d.currency + ' 차감'
+  const kwLines = [
+    (catEmoji[d.category] || '📋') + ' ' + (catLabel[d.category] || d.category),
+    '━━━━━━━━━━━━━━━━',
+    '👤 학생: ' + d.name,
+    '📋 항목:',
+    itemListKW,
+    '🏅 합계: ' + costTextKW,
+  ]
   if (d.comment) kwLines.push('💬 코멘트: ' + d.comment)
   kwLines.push('⏰ ' + d.timestamp)
+
+  // 카카오워크 전송 (항상)
   await sendKW(kwMath(env), kwLines.join('\n'))
 
-  if (!env.SLACK_WEBHOOK_URL) { return true }
-  const res = await fetch(env.SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-  if (!res.ok) throw new Error(`Slack ${res.status}`)
+  return true
 
   // Bot Token이 있으면 인증사진도 Slack에 업로드
   if (d.photoBase64 && env.SLACK_BOT_TOKEN && env.SLACK_CHANNEL_ID) {
@@ -3644,7 +3589,6 @@ function renderMenu(){
 
       return '<div class="menu-btn type-'+ST.tab+' btn-menu-ext" data-url="'+url+'">'+
 
-        '<div class="menu-ic-wrap">'+m.icon+'</div>'+
 
         '<div class="menu-lbl">'+escHtml(m.label)+'</div>'+
 
@@ -3719,7 +3663,6 @@ function renderMenu(){
 
       photoBadge+
 
-      '<div class="menu-ic-wrap">'+m.icon+'</div>'+
 
       '<div class="menu-lbl">'+escHtml(m.label)+'</div>'+
 
