@@ -712,39 +712,27 @@ app.post('/api/admin/shop/restock', async (c) => {
 // 학생 목록 (포인트 + 벌금 유형별 집계 포함)
 
 app.get('/api/students', async (c) => {
-
   try {
-
+    // 수업관리 앱과 공유하는 과목 정보 테이블 (없으면 생성 — 명단이 항상 뜨도록 하는 안전장치)
+    await c.env.DB.prepare("CREATE TABLE IF NOT EXISTS class_student_meta (student_id TEXT PRIMARY KEY, online_id TEXT NOT NULL DEFAULT '', subjects TEXT NOT NULL DEFAULT '', english_band TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL DEFAULT 0)").run()
+    // 수학 학생만 표시: 과목 정보가 없거나(=기존 수학생) 'math'를 포함하면 표시, '영어 전용'만 제외
     const rows = await c.env.DB.prepare(`
-
       SELECT s.id, s.name, s.photo_url, s.points,
-
         COALESCE(SUM(CASE WHEN f.paid=0 THEN f.amount ELSE 0 END),0) AS unpaid_fines,
-
         COUNT(CASE WHEN f.paid=0 THEN 1 END) AS fine_count,
-
         COALESCE(SUM(CASE WHEN f.paid=0 AND f.fine_type='time' THEN f.amount ELSE 0 END),0) AS fine_time,
-
         COALESCE(SUM(CASE WHEN f.paid=0 AND f.fine_type='sheet' THEN f.amount ELSE 0 END),0) AS fine_sheet,
-
         COALESCE(SUM(CASE WHEN f.paid=0 AND f.fine_type='point' THEN f.amount ELSE 0 END),0) AS fine_point
-
       FROM students s
-
       LEFT JOIN fines f ON f.student_id = s.id
-
+      LEFT JOIN class_student_meta m ON m.student_id = CAST(s.id AS TEXT)
+      WHERE (m.subjects IS NULL OR m.subjects = '' OR m.subjects = '[]' OR m.subjects LIKE '%math%')
       GROUP BY s.id ORDER BY s.name
-
     `).all()
-
     return c.json({ success: true, students: rows.results })
-
   } catch (e: any) {
-
     return c.json({ success: false, error: e.message }, 500)
-
   }
-
 })
 
 
