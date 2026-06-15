@@ -2751,11 +2751,7 @@ const MAIN_HTML = `<!DOCTYPE html>
 
     <div class="tab-row" id="tabRow">
 
-      <button class="tab-btn active-learn" onclick="switchTab('learn')" id="tab-learn"><div class="tab-dot"></div>학습 활동</button>
-
-      <button class="tab-btn" onclick="switchTab('fine')" id="tab-fine"><div class="tab-dot"></div>벌금 항목</button>
-
-      <button class="tab-btn" onclick="switchTab('shop')" id="tab-shop"><div class="tab-dot"></div>🛍️ 보상 상점</button>
+      <button class="tab-btn active-shop" onclick="switchTab('shop')" id="tab-shop"><div class="tab-dot"></div>🛍️ 보상 상점</button>
 
     </div>
 
@@ -3418,7 +3414,7 @@ window.selectStudent=function(id){
 
   document.getElementById('confirmSn').textContent=s.name
 
-  updateCartBar();switchTab('learn');goTo('menu')
+  updateCartBar();switchTab('shop');goTo('menu')
 
 }
 
@@ -3431,15 +3427,6 @@ function updateBannerStats(s){
   const stats=document.getElementById('bannerStats')
 
   let html='<div class="stat-chip">'+c.symbol+' '+s.points+' '+c.unit+'</div>'
-
-  if(s.fine_point>0) html+='<div class="stat-chip red-chip">💸 벌금 '+s.fine_point+' '+c.unit+'</div>'
-
-  if(s.fine_time>0) html+='<div class="stat-chip orange-chip">⏰ 벌금 '+s.fine_time+'분</div>'
-
-  if(s.fine_sheet>0) html+='<div class="stat-chip orange-chip">📄 벌금 학습지 '+s.fine_sheet+'장</div>'
-
-  // 내 상태 확인 버튼 (벌금 있을 때만 강조)
-  html+='<div class="stat-chip status-chip" onclick="openMyStatus()" style="cursor:pointer;background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:#2563eb;">📊 내 상태</div>'
 
   stats.innerHTML=html
 
@@ -4102,7 +4089,7 @@ function renderDone(slackOk,notionOk,ts,tc){
 
 }
 
-window.continueOrder=function(){clearTimeout(autoTimer);ST.cart=[];updateCartBar();renderMenu();switchTab('learn');goTo('menu')}
+window.continueOrder=function(){clearTimeout(autoTimer);ST.cart=[];updateCartBar();renderMenu();switchTab('shop');goTo('menu')}
 
 function ssRow(l,v){return '<div class="ss-row"><span class="ss-lbl">'+l+'</span><span class="ss-val">'+v+'</span></div>'}
 
