@@ -653,7 +653,7 @@ app.post('/api/admin/shop/schedule', async (c) => {
 async function sendShopUnlockSlack(env: Bindings, studentName: string) {
   const now = new Date(Date.now() + 9*3600*1000)
   const ts = String(now.getUTCHours()).padStart(2,'0') + ':' + String(now.getUTCMinutes()).padStart(2,'0')
-  await sendKW(kwMath(env), '🔓 상점 잠금해제 요청\n👤 학생: ' + studentName + '\n⏰ ' + ts)
+  await sendKW(kwMath(env), '[상점 잠금해제] ' + studentName + '\n관리자 페이지에서 승인해주세요 · ' + ts)
 }
 
 // 상점 남은 재고 조회 (키오스크용)
@@ -1613,8 +1613,8 @@ async function sendMogakKW(env: Bindings, d: { name: string, cat: string, missio
   const icon = d.cat.includes('영어') ? '📘' : '📐'
   const now = new Date(Date.now() + 9*3600*1000)
   const ts = String(now.getUTCHours()).padStart(2,'0') + ':' + String(now.getUTCMinutes()).padStart(2,'0')
-  const mList = d.missions.length > 0 ? d.missions.map((m:any) => '  • ' + (m.text||String(m))).join('\n') : '  없음'
-  const text = [icon + ' 모각공 완료 확인 요청', '━━━━━━━━━━━━━━━━', '👤 학생: ' + d.name, '📚 수업: ' + d.cat, '✅ 완료한 미션:', mList, '━━━━━━━━━━━━━━━━', '⏰ ' + ts + '  |  어드민 → 현황보기에서 확인 후 포인트 적립'].join('\n')
+  const mList = d.missions.length > 0 ? d.missions.map((m:any) => '- ' + (m.text||String(m))).join('\n') : '- 없음'
+  const text = ['[모각공 완료] ' + d.name + ' · ' + d.cat, '완료한 미션:', mList, ts + ' · 어드민 현황보기에서 확인 후 포인트 적립'].join('\n')
   await sendKW(webhook, text)
 }
 
@@ -1634,7 +1634,7 @@ function kwCat(env: Bindings, cat: string) { return cat.includes('영어') ? kwE
 async function sendSlackQueue(env: Bindings, d: any) {
 
   const waitText = d.waiting === 0 ? '없음 (즉시 가능)' : d.waiting + '명 대기 중'
-  const text = '🎫 번호표 발급\n━━━━━━━━━━━━━━━━\n👤 학생: ' + d.studentName + '\n🔢 번호: ' + d.number + '번\n⏳ 대기: ' + waitText + '\n⏰ ' + d.ts
+  const text = '[번호표] ' + d.studentName + ' · ' + d.number + '번\n대기: ' + waitText + ' · ' + d.ts
   await sendKW(kwMath(env), text)
   return true
 
@@ -1652,21 +1652,17 @@ async function sendMogakSlack(env: Bindings, d: { name: string, cat: string, mis
 async function sendSlack(env: Bindings, d: any) {
 
   const catLabel: Record<string, string> = { learn: '학습 활동', fine: '벌금', shop: '보상 교환' }
-  const catEmoji: Record<string, string> = { learn: '✅', fine: '🚨', shop: '🛍️' }
-  const itemListKW = d.items.map((x: any) => '  • ' + x.label + ' × ' + x.qty).join('\n')
+  const itemListKW = d.items.map((x: any) => '- ' + x.label + ' × ' + x.qty).join('\n')
   const costTextKW = d.totalCost === 0 ? '무료' : d.totalCost < 0
     ? '+' + Math.abs(d.totalCost) + ' ' + d.currency + ' 획득'
     : '-' + d.totalCost + ' ' + d.currency + ' 차감'
   const kwLines = [
-    (catEmoji[d.category] || '📋') + ' ' + (catLabel[d.category] || d.category),
-    '━━━━━━━━━━━━━━━━',
-    '👤 학생: ' + d.name,
-    '📋 항목:',
+    '[' + (catLabel[d.category] || d.category) + '] ' + d.name,
     itemListKW,
-    '🏅 합계: ' + costTextKW,
+    '합계: ' + costTextKW,
   ]
-  if (d.comment) kwLines.push('💬 코멘트: ' + d.comment)
-  kwLines.push('⏰ ' + d.timestamp)
+  if (d.comment) kwLines.push('코멘트: ' + d.comment)
+  kwLines.push(d.timestamp)
 
   // 카카오워크 전송 (항상)
   await sendKW(kwMath(env), kwLines.join('\n'))
@@ -1909,8 +1905,8 @@ async function saveNotion(env: Bindings, d: any) {
 // ── 요청사항 Slack ─────────────────────────────────────────────────────────────
 
 async function sendSlackRequest(env: Bindings, d: any) {
-  const photoNote = d.photoBase64 ? '\n📎 사진 첨부됨' : ''
-  await sendKW(kwMath(env), '📬 선생님께 요청사항\n━━━━━━━━━━━━━━━━\n👤 학생: ' + d.name + '\n💬 메시지:\n' + d.message + photoNote + '\n⏰ ' + d.timestamp)
+  const photoNote = d.photoBase64 ? '\n(사진 첨부됨)' : ''
+  await sendKW(kwMath(env), '[요청사항] ' + d.name + '\n' + d.message + photoNote + '\n' + d.timestamp)
   return true
 }
 
@@ -2107,6 +2103,7 @@ const DEFAULT_CONFIG = {
 app.get('/', (c) => c.html(MAIN_HTML))
 
 app.get('/admin', (c) => c.html(ADMIN_HTML))
+app.get('/me', (c) => c.html(MY_HTML))
 
 
 
@@ -5606,6 +5603,214 @@ const ADMIN_HTML = `<!DOCTYPE html>
 <script src="/static/admin.js"></script>
 </body>
 
+</html>`
+
+// ── 학생 포인트 대시보드 (/me) ─────────────────────────────────────────────
+const MY_HTML = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>내 포인트 · 바꿈</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --blue:#29ABE2;--blue-d:#1a90c4;--blue-dd:#0f6a96;--blue-soft:#e8f6fd;
+    --gold:#f5a623;--gold-d:#e08e0b;--gold-soft:#fff7e6;
+    --white:#fff;
+    --g50:#f8fafc;--g100:#f1f5f9;--g200:#e2e8f0;--g400:#94a3b8;--g600:#475569;--g800:#1e293b;
+    --r-xl:28px;--r-lg:20px;--r-md:14px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html{font-size:16px;}
+  body{
+    font-family:'Noto Sans KR',sans-serif;color:var(--g800);
+    background:linear-gradient(160deg,#e6f4fc 0%,#f3fbff 45%,#ffffff 100%);
+    background-attachment:fixed;min-height:100vh;overflow-x:hidden;user-select:none;
+  }
+  .wrap{max-width:1100px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding:clamp(20px,3vw,40px);}
+
+  /* ── 공통 헤더 ── */
+  .top{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:clamp(18px,2.5vw,30px);}
+  .top .mark{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--blue-dd));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:18px;box-shadow:0 6px 16px rgba(41,171,226,.32);}
+  .top .name{font-weight:900;font-size:clamp(17px,2vw,20px);letter-spacing:-.3px;}
+  .top .name small{display:block;font-weight:500;font-size:11px;color:var(--g400);letter-spacing:0;margin-top:1px;}
+
+  /* ── 1단계: 이름 선택 ── */
+  #pickView{flex:1;display:flex;flex-direction:column;}
+  .pick-title{text-align:center;font-weight:900;font-size:clamp(22px,3.2vw,32px);letter-spacing:-.5px;margin-bottom:6px;}
+  .pick-sub{text-align:center;color:var(--g400);font-size:clamp(13px,1.6vw,15px);margin-bottom:clamp(18px,2.5vw,26px);}
+  .search-box{position:relative;max-width:440px;width:100%;margin:0 auto clamp(18px,2.5vw,26px);}
+  .search-box input{width:100%;padding:15px 18px 15px 48px;border:2px solid var(--g200);border-radius:var(--r-lg);font-size:16px;font-family:inherit;background:var(--white);outline:none;transition:border-color .15s,box-shadow .15s;}
+  .search-box input:focus{border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-soft);}
+  .search-box .ico{position:absolute;left:17px;top:50%;transform:translateY(-50%);color:var(--g400);font-size:19px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:clamp(10px,1.4vw,16px);}
+  .stu{background:var(--white);border:2px solid var(--g100);border-radius:var(--r-lg);padding:18px 12px;display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s;}
+  .stu:hover{transform:translateY(-3px);border-color:var(--blue-soft);box-shadow:0 10px 24px rgba(41,171,226,.14);}
+  .stu:active{transform:translateY(0) scale(.97);}
+  .stu .av{width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--blue-soft),#d4ecfa);color:var(--blue-dd);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px;overflow:hidden;}
+  .stu .av img{width:100%;height:100%;object-fit:cover;}
+  .stu .nm{font-weight:700;font-size:16px;letter-spacing:-.3px;}
+  .stu.hide{display:none;}
+  .empty{grid-column:1/-1;text-align:center;color:var(--g400);padding:40px 0;font-size:15px;}
+
+  /* ── 2단계: 포인트 ── */
+  #ptView{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;}
+  #ptView.on{display:flex;animation:rise .5s cubic-bezier(.2,.8,.25,1);}
+  @keyframes rise{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:translateY(0);}}
+  .back{position:absolute;top:0;left:0;background:var(--white);border:2px solid var(--g200);border-radius:999px;padding:11px 20px 11px 16px;font-family:inherit;font-weight:700;font-size:15px;color:var(--g600);cursor:pointer;display:flex;align-items:center;gap:7px;transition:border-color .12s,color .12s;}
+  .back:hover{border-color:var(--blue);color:var(--blue-d);}
+  .pt-av{width:clamp(86px,11vw,118px);height:clamp(86px,11vw,118px);border-radius:50%;background:linear-gradient(135deg,var(--blue-soft),#cfeafa);color:var(--blue-dd);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:clamp(34px,5vw,48px);margin-bottom:16px;overflow:hidden;box-shadow:0 12px 30px rgba(41,171,226,.2);}
+  .pt-av img{width:100%;height:100%;object-fit:cover;}
+  .pt-name{font-weight:700;font-size:clamp(18px,2.4vw,24px);color:var(--g600);letter-spacing:-.4px;margin-bottom:clamp(6px,1.2vw,14px);}
+  .pt-name b{color:var(--g800);font-weight:900;}
+  .pt-disc{position:relative;display:inline-flex;flex-direction:column;align-items:center;padding:clamp(24px,3.5vw,40px) clamp(40px,7vw,80px);border-radius:var(--r-xl);background:linear-gradient(160deg,#fffdf7,#fff6e3);box-shadow:0 20px 50px rgba(245,166,35,.18),inset 0 0 0 2px rgba(245,166,35,.12);}
+  .pt-disc::after{content:'';position:absolute;inset:0;border-radius:var(--r-xl);box-shadow:0 0 60px rgba(245,166,35,.22);opacity:0;animation:glow 2.6s ease-in-out infinite;pointer-events:none;}
+  @keyframes glow{0%,100%{opacity:.25;}50%{opacity:.7;}}
+  .pt-num{font-weight:900;font-size:clamp(64px,13vw,128px);line-height:.95;letter-spacing:-3px;background:linear-gradient(150deg,var(--gold),var(--gold-d));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-variant-numeric:tabular-nums;}
+  .pt-unit{font-weight:700;font-size:clamp(16px,2vw,21px);color:var(--gold-d);margin-top:6px;letter-spacing:6px;}
+  .pt-msg{margin-top:clamp(18px,2.5vw,28px);font-weight:700;font-size:clamp(16px,2.1vw,21px);color:var(--blue-dd);letter-spacing:-.3px;min-height:1.4em;}
+
+  /* ── 푸터 ── */
+  .credit{text-align:center;color:var(--g400);font-size:12px;font-weight:500;padding-top:clamp(16px,2vw,24px);opacity:.75;}
+  .credit b{color:var(--blue-d);font-weight:700;}
+
+  @media (max-width:520px){
+    .grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));}
+    .stu .av{width:50px;height:50px;font-size:21px;}
+    .back{padding:9px 15px 9px 12px;font-size:13px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">바</div>
+    <div class="name">바꿈영수학원<small>바라던 꿈을 이루다</small></div>
+  </div>
+
+  <!-- 1단계: 이름 선택 -->
+  <div id="pickView">
+    <div class="pick-title">내 포인트 확인하기</div>
+    <div class="pick-sub">이름을 누르면 지금까지 모은 포인트를 보여드려요</div>
+    <div class="search-box">
+      <span class="ico">검색</span>
+      <input id="search" type="text" placeholder="이름 찾기" oninput="filterStu(this.value)" autocomplete="off"/>
+    </div>
+    <div class="grid" id="grid">
+      <div class="empty">불러오는 중...</div>
+    </div>
+  </div>
+
+  <!-- 2단계: 포인트 -->
+  <div id="ptView">
+    <button class="back" onclick="goBack()">처음으로</button>
+    <div class="pt-av" id="ptAv"></div>
+    <div class="pt-name"><b id="ptName"></b> 님</div>
+    <div class="pt-disc">
+      <div class="pt-num" id="ptNum">0</div>
+      <div class="pt-unit">포인트</div>
+    </div>
+    <div class="pt-msg" id="ptMsg"></div>
+  </div>
+
+  <div class="credit">Made by <b>EZ쌤</b></div>
+</div>
+
+<script>
+  var STU=[];
+  var idleTimer=null;
+
+  function esc(s){var r=String(s);r=r.split('&').join('&amp;');r=r.split('<').join('&lt;');r=r.split('>').join('&gt;');r=r.split(String.fromCharCode(34)).join('&#34;');return r;}
+
+  function load(){
+    fetch('/api/students').then(function(r){return r.json();}).then(function(d){
+      if(d&&d.success){STU=d.students||[];render();}
+      else{document.getElementById('grid').innerHTML='<div class="empty">명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>';}
+    }).catch(function(){
+      document.getElementById('grid').innerHTML='<div class="empty">연결이 불안정해요. 잠시 후 다시 시도해 주세요.</div>';
+    });
+  }
+
+  function render(){
+    var g=document.getElementById('grid');
+    if(!STU.length){g.innerHTML='<div class="empty">등록된 학생이 없어요.</div>';return;}
+    g.innerHTML=STU.map(function(s){
+      var av=s.photo_url
+        ?'<div class="av"><img src="'+esc(s.photo_url)+'" alt="'+esc(s.name)+'"/></div>'
+        :'<div class="av">'+esc(s.name[0])+'</div>';
+      return '<button class="stu" data-nm="'+esc(s.name)+'" onclick="pick('+s.id+')">'+av+'<div class="nm">'+esc(s.name)+'</div></button>';
+    }).join('');
+  }
+
+  window.filterStu=function(q){
+    var kw=(q||'').trim();
+    document.querySelectorAll('#grid .stu').forEach(function(b){
+      b.classList.toggle('hide', !!kw && b.dataset.nm.indexOf(kw)===-1);
+    });
+  };
+
+  function msgFor(p){
+    if(p<=0) return '이제 포인트를 모아볼까요?';
+    if(p<50) return '좋은 출발이에요!';
+    if(p<150) return '차곡차곡 잘 쌓이고 있어요!';
+    if(p<300) return '꾸준함이 빛나고 있어요!';
+    if(p<600) return '대단해요, 상점도 구경해 볼까요?';
+    return '포인트 부자네요, 최고예요!';
+  }
+
+  function countUp(el,target){
+    var dur=900, start=performance.now();
+    function step(now){
+      var t=Math.min(1,(now-start)/dur);
+      var ease=1-Math.pow(1-t,3);
+      el.textContent=Math.round(target*ease).toLocaleString();
+      if(t<1) requestAnimationFrame(step);
+      else el.textContent=Number(target).toLocaleString();
+    }
+    requestAnimationFrame(step);
+  }
+
+  window.pick=function(id){
+    var s=STU.filter(function(x){return x.id===id;})[0];
+    if(!s) return;
+    var av=document.getElementById('ptAv');
+    av.innerHTML=s.photo_url?'<img src="'+esc(s.photo_url)+'" alt=""/>':esc(s.name[0]);
+    document.getElementById('ptName').textContent=s.name;
+    document.getElementById('ptMsg').textContent=msgFor(s.points);
+    document.getElementById('pickView').style.display='none';
+    var pv=document.getElementById('ptView');
+    pv.classList.add('on');
+    var num=document.getElementById('ptNum');
+    num.textContent='0';
+    countUp(num, s.points||0);
+    resetIdle();
+  };
+
+  window.goBack=function(){
+    clearTimeout(idleTimer);
+    document.getElementById('ptView').classList.remove('on');
+    document.getElementById('pickView').style.display='flex';
+    var sb=document.getElementById('search');
+    sb.value='';filterStu('');
+  };
+
+  // 공용 태블릿: 포인트 화면에서 25초 무동작이면 자동으로 처음으로
+  function resetIdle(){
+    clearTimeout(idleTimer);
+    idleTimer=setTimeout(function(){
+      if(document.getElementById('ptView').classList.contains('on')) goBack();
+    },25000);
+  }
+  document.getElementById('ptView').addEventListener('click',function(e){
+    if(document.getElementById('ptView').classList.contains('on')) resetIdle();
+  });
+
+  load();
+</script>
+</body>
 </html>`
 
 export default app
