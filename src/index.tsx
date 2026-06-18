@@ -24,6 +24,8 @@ type Bindings = {
 
   ADMIN_PASSWORD: string
 
+  EXTERNAL_POINTS_KEY: string     // 쏘이지(soez) → 키오스크 포인트 적립 연동용 서비스키
+
 }
 
 
@@ -33,7 +35,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/static/*', serveStatic({ root: './' }))
 
 app.use('/api/*', cors({
-  origin: ['https://mogakgong.pages.dev', 'https://bakuum-kiosk.pages.dev'],
+  origin: ['https://bakuum-kiosk.pages.dev'],
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'X-Admin-Password'],
 }))
@@ -90,180 +92,6 @@ app.get('/api/config', async (c) => {
 
 
 
-// ── 모각공 학생 체크 상태 저장 (PW 없이 학생이 직접 저장) ──────────────────────
-app.post('/api/mogak/done', async (c) => {
-
-  try {
-
-    const { dateKey, studentKey, done } = await c.req.json()
-
-    if (!dateKey || !studentKey || done === undefined) {
-      return c.json({ success: false, error: '파라미터 오류' }, 400)
-    }
-
-    // 기존 config 읽기
-    const row = await c.env.DB.prepare(
-      "SELECT value FROM app_config WHERE key='kiosk_config'"
-    ).first() as any
-
-    const cfg = row?.value ? JSON.parse(row.value) : {}
-
-    // done 상태 업데이트
-    if (!cfg[dateKey]) cfg[dateKey] = {}
-    cfg[dateKey][studentKey] = done
-
-    // 저장
-    await c.env.DB.prepare(
-      "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
-    ).bind(JSON.stringify(cfg)).run()
-
-    return c.json({ success: true })
-
-  } catch (e: any) {
-
-    return c.json({ success: false, error: e.message }, 500)
-
-  }
-
-})
-
-
-// ── 모각공 선생님 완료 알림 (슬랙 알림 + pending 저장) ──────────────────────────
-app.post('/api/mogak/notify', async (c) => {
-
-  try {
-
-    const body = await c.req.json()
-    const { studentKey, name, cat, missions, studentId } = body
-
-    if (!studentKey || !name) {
-      return c.json({ success: false, error: '파라미터 오류' }, 400)
-    }
-
-    // 1. config 읽기
-    const row = await c.env.DB.prepare(
-      "SELECT value FROM app_config WHERE key='kiosk_config'"
-    ).first() as any
-    const cfg = row?.value ? JSON.parse(row.value) : {}
-
-    // 2. 중복 제출 방지: 오늘 이미 pending/confirmed 상태면 거부
-    const existing = cfg['mogakgong_pending']?.[studentKey]
-    if (existing && existing.status === 'pending') {
-      const ageMin = (Date.now() - (existing.timestamp || 0)) / 60000
-      if (ageMin < 1440) { // 24시간 내 중복
-        return c.json({ success: false, error: 'already_submitted', message: '이미 알림을 보냈어요!' })
-      }
-    }
-
-    // 3. pending 저장
-    if (!cfg['mogakgong_pending']) cfg['mogakgong_pending'] = {}
-    cfg['mogakgong_pending'][studentKey] = {
-      name,
-      cat: cat || '',
-      missions: missions || [],
-      timestamp: Date.now(),
-      status: 'pending',
-      studentId: studentId || null
-    }
-
-    await c.env.DB.prepare(
-      "INSERT INTO app_config (key, value, updated_at) VALUES ('kiosk_config', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP"
-    ).bind(JSON.stringify(cfg)).run()
-
-    // 카카오워크 알림
-    try {
-      await sendMogakKW(c.env, { name, cat: cat || '-', missions: missions || [] })
-    } catch (kwErr: any) {
-      console.error('모각공 KW 오류:', kwErr?.message)
-    }
-
-    return c.json({ success: true })
-
-  } catch (e: any) {
-
-    return c.json({ success: false, error: e.message }, 500)
-
-  }
-
-})
-
-
-// ── 카카오워크 디버그 테스트 ─────────────────────────────────────────────────
-app.get('/api/kw-test', async (c) => {
-
-  const mathUrl = c.env.KAKAOWORK_WEBHOOK_MATH || ''
-  const engUrl  = c.env.KAKAOWORK_WEBHOOK_ENGLISH || ''
-
-  const results: any = { mathUrl: mathUrl ? mathUrl.slice(0,50)+'...' : '미설정', engUrl: engUrl ? engUrl.slice(0,50)+'...' : '미설정' }
-
-  if (mathUrl) {
-    try {
-      const r = await fetch(mathUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: '📐 수학 카카오워크 테스트' })
-      })
-      results.math = { status: r.status, ok: r.ok, body: await r.text() }
-    } catch (e: any) { results.math = { error: e.message } }
-  }
-
-  if (engUrl) {
-    try {
-      const r = await fetch(engUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: '📘 영어 카카오워크 테스트' })
-      })
-      results.english = { status: r.status, ok: r.ok, body: await r.text() }
-    } catch (e: any) { results.english = { error: e.message } }
-  }
-
-  return c.json(results)
-
-})
-
-// ── 모각공 슬랙 환경변수 확인 + 테스트 발송 ──────────────────────────────────
-app.get('/api/mogak-slack-check', async (c) => {
-
-  return c.json({
-    SLACK_WEBHOOK_URL: !!c.env.SLACK_WEBHOOK_URL,
-    SLACK_WEBHOOK_MATH: !!c.env.SLACK_WEBHOOK_MATH,
-    SLACK_WEBHOOK_ENGLISH: !!c.env.SLACK_WEBHOOK_ENGLISH,
-    mathUrl_preview: c.env.SLACK_WEBHOOK_MATH ? c.env.SLACK_WEBHOOK_MATH.slice(0, 40) + '...' : '없음',
-    englishUrl_preview: c.env.SLACK_WEBHOOK_ENGLISH ? c.env.SLACK_WEBHOOK_ENGLISH.slice(0, 40) + '...' : '없음',
-  })
-
-})
-
-app.post('/api/mogak-slack-test', async (c) => {
-
-  const results: any = {}
-
-  try {
-    await sendMogakKW(c.env, {
-      name: '📐 수학테스트',
-      cat: '초등수학',
-      missions: [{ text: '[채널테스트] 수학 채널 연결 확인' }]
-    })
-    results.math = 'OK'
-  } catch (e: any) {
-    results.math = 'FAIL: ' + e.message
-  }
-
-  try {
-    await sendMogakKW(c.env, {
-      name: '📘 영어테스트',
-      cat: '초등영어',
-      missions: [{ text: '[채널테스트] 영어 채널 연결 확인' }]
-    })
-    results.english = 'OK'
-  } catch (e: any) {
-    results.english = 'FAIL: ' + e.message
-  }
-
-  return c.json({ success: true, results })
-
-})
 
 
 // ── 특정 키만 원자적으로 업데이트 (레이스 컨디션 방지) ─────────────────────────
@@ -790,6 +618,67 @@ app.get('/api/students/:id', async (c) => {
 
 
 // 키오스크 제출 (포인트 자동 반영)
+
+// ── 쏘이지(soez) → 키오스크 포인트 미러링 ────────────────────────────────────
+// 쏘이지에서 수학 학생 적립/감점(+/-)이 발생하면 같은 금액을 키오스크에도 반영.
+// 인증: X-Service-Key 헤더 == EXTERNAL_POINTS_KEY. 이름으로 학생을 찾고,
+// 키오스크 로스터(=수학 학생)에 없는 이름은 무시(no-op). eventId로 멱등 처리(재전송 중복 방지).
+// 키오스크의 사용(상점·벌금 차감)은 쏘이지로 보내지 않음(단방향).
+app.post('/api/points/external', async (c) => {
+
+  try {
+
+    const key = c.req.header('X-Service-Key') || ''
+
+    if (!c.env.EXTERNAL_POINTS_KEY || key !== c.env.EXTERNAL_POINTS_KEY) {
+      return c.json({ success: false, error: 'unauthorized' }, 401)
+    }
+
+    const body = await c.req.json()
+    const name = (body.name || '').toString().trim()
+    const delta = Number(body.delta) || 0
+    const reason = (body.reason || '쏘이지 적립').toString().slice(0, 60)
+    const eventId = (body.eventId || '').toString().trim()
+
+    if (!name || !delta) return c.json({ success: false, error: '필수 값 누락' }, 400)
+
+    await c.env.DB.prepare(
+      'CREATE TABLE IF NOT EXISTS point_sync_seen (event_id TEXT PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
+    ).run()
+
+    if (eventId) {
+      const seen = await c.env.DB.prepare('SELECT event_id FROM point_sync_seen WHERE event_id=?').bind(eventId).first()
+      if (seen) return c.json({ success: true, matched: true, duplicate: true })
+    }
+
+    const stu = await c.env.DB.prepare('SELECT id FROM students WHERE name=?').bind(name).first() as any
+
+    if (!stu) {
+      if (eventId) await c.env.DB.prepare('INSERT OR IGNORE INTO point_sync_seen (event_id) VALUES (?)').bind(eventId).run()
+      return c.json({ success: true, matched: false })
+    }
+
+    const stmts = [
+      c.env.DB.prepare('UPDATE students SET points = points + ? WHERE id=?').bind(delta, stu.id),
+      c.env.DB.prepare(
+        'INSERT INTO point_history (student_id, delta, reason, category, created_at) VALUES (?,?,?,?,?)'
+      ).bind(stu.id, delta, reason, 'soez', getKSTTimestamp()),
+    ]
+    if (eventId) {
+      stmts.push(c.env.DB.prepare('INSERT OR IGNORE INTO point_sync_seen (event_id) VALUES (?)').bind(eventId))
+    }
+    await c.env.DB.batch(stmts)
+
+    return c.json({ success: true, matched: true })
+
+  } catch (e: any) {
+
+    return c.json({ success: false, error: e.message }, 500)
+
+  }
+
+})
+
 
 app.post('/api/submit', async (c) => {
 
