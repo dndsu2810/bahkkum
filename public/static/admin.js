@@ -27,39 +27,20 @@ var queueFilter='all'
 var reqFilter='all'
 var fineFilter='all'
 
-var PRESETS=[
-  {symbol:'P',unit:'포인트',desc:'포인트를 모아요!'},
-  {symbol:'🏅',unit:'메달',desc:'메달을 모아요!'},
-  {symbol:'🌟',unit:'별',desc:'별을 모아요!'},
-  {symbol:'💎',unit:'보석',desc:'보석을 모아요!'},
-  {symbol:'🪙',unit:'코인',desc:'코인을 모아요!'},
-  {symbol:'🍀',unit:'클로버',desc:'클로버를 모아요!'},
-  {symbol:'❤️',unit:'하트',desc:'하트를 모아요!'},
-  {symbol:'🔥',unit:'불꽃',desc:'불꽃을 모아요!'},
-]
-
 var DEFAULT_MENU={
-  learn:[
-    {id:'study',icon:'📖',label:'자습 인증하기',cost:0,reward:2,unit:'P',requirePhoto:true},
-    {id:'homework',icon:'✏️',label:'숙제 제출하기',cost:0,reward:1,unit:'P',requirePhoto:false},
-    {id:'question',icon:'🙋',label:'질문하기',cost:0,reward:1,unit:'P',requirePhoto:false},
-    {id:'record',icon:'📝',label:'모르는 문제 기록하기',cost:0,reward:2,unit:'P',requirePhoto:true},
-    {id:'material',icon:'📄',label:'추가 학습지 요청',cost:0,reward:0,unit:'P',requirePhoto:false},
-    {id:'makeup',icon:'📅',label:'보강 신청',cost:0,reward:0,unit:'P',requirePhoto:false},
-    {id:'consult',icon:'💬',label:'상담 요청',cost:0,reward:0,unit:'P',requirePhoto:false},
-  ],
+  learn:[],
   fine:[
-    {id:'helpme',icon:'🆘',label:'지현쌤 Help me!',cost:3,reward:0,unit:'P',requirePhoto:false},
-    {id:'lostwork',icon:'😰',label:'숙제 분실',cost:4,reward:0,unit:'P',requirePhoto:false},
-    {id:'nohomework',icon:'🚫',label:'숙제 안함',cost:5,reward:0,unit:'P',requirePhoto:false},
+    {id:'helpme',icon:'help',label:'지현쌤 Help me!',cost:3,reward:0,unit:'P',requirePhoto:false},
+    {id:'lostwork',icon:'lostwork',label:'숙제 분실',cost:4,reward:0,unit:'P',requirePhoto:false},
+    {id:'nohomework',icon:'nohomework',label:'숙제 안함',cost:5,reward:0,unit:'P',requirePhoto:false},
   ],
   shop:[
-    {id:'choco',icon:'🍫',label:'초콜릿(달달구리)',cost:3,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
-    {id:'jelly',icon:'🍬',label:'젤리',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
-    {id:'candy',icon:'🍭',label:'사탕',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
-    {id:'snack',icon:'🍿',label:'과자',cost:3,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
-    {id:'saekkomdal',icon:'🍋',label:'새콤달콤',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
-    {id:'vitaminc',icon:'💊',label:'비타민C',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
+    {id:'choco',icon:'choco',label:'초콜릿(달달구리)',cost:3,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
+    {id:'jelly',icon:'jelly',label:'젤리',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
+    {id:'candy',icon:'candy',label:'사탕',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
+    {id:'snack',icon:'snack',label:'과자',cost:3,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
+    {id:'saekkomdal',icon:'saekkomdal',label:'새콤달콤',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
+    {id:'vitaminc',icon:'vitaminc',label:'비타민C',cost:2,reward:0,unit:'P',requirePhoto:false,dailyLimit:0,monthlyStock:0},
   ]
 }
 
@@ -95,12 +76,9 @@ function switchMainTab(tab){
   document.querySelectorAll('.mtab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+tab))
   if(tab==='queue')loadQueue()
-  else if(tab==='requests')loadRequests()
   else if(tab==='orders')loadOrders()
   else if(tab==='students')renderStudents()
-  else if(tab==='fines')renderFines()
-  else if(tab==='menu')renderMenuItems('learn'),renderMenuItems('fine'),renderMenuItems('shop')
-  else if(tab==='currency')renderPresets(),updateCurPreview()
+  else if(tab==='menu')renderMenuItems('shop')
 }
 window.switchMainTab=switchMainTab
 
@@ -110,22 +88,14 @@ function initAdmin(){
   loadConfig()
   loadStudentsData()
   loadQueue()
-  loadRequests()
   loadOrders()
 }
 
 function loadConfig(){
   fetch('/api/config').then(function(r){return r.json()}).then(function(cfg){
     menuCfg=cfg.menu||JSON.parse(JSON.stringify(DEFAULT_MENU))
-    curCfg=cfg.currency||{unit:'포인트',symbol:'P',desc:''}
-    ;['learn','fine','shop'].forEach(function(t){
-      (menuCfg[t]||[]).forEach(function(m){if(!m.unit)m.unit=curCfg.symbol||'P'})
-    })
-    renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop')
-    document.getElementById('curUnit').value=curCfg.unit||'포인트'
-    document.getElementById('curSymbol').value=curCfg.symbol||'P'
-    document.getElementById('curDesc').value=curCfg.desc||''
-    updateCurPreview();renderPresets()
+    curCfg={unit:'포인트',symbol:'star',desc:'포인트를 모아 간식과 바꿔요'}
+    renderMenuItems('shop')
   }).catch(function(){
     menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))
   })
@@ -147,16 +117,8 @@ function loadStudentsData(){
     if(d.success){
       students=d.students
       renderStudents()
-      var unpaid=students.reduce(function(a,s){return a+(s.fine_count||0)},0)
-      document.getElementById('badge-fines').textContent=unpaid>0?unpaid:''
     }
   })
-  api('/api/admin/fines-all').then(d=>{
-    if(d.success){
-      allFines=d.fines
-      if(document.getElementById('tab-fines') && document.getElementById('tab-fines').classList.contains('active')){renderFines()}
-    }
-  }).catch(()=>{})
 }
 
 // ══ 번호표 ══
@@ -194,9 +156,9 @@ function renderQueueList(){
       '</div>'+
       '<span class="ticket-status-badge '+sc+'">'+sl+'</span>'+
       '<div class="ticket-actions">'+
-        (t.status==='waiting'?'<button class="btn btn-sm" style="background:var(--yellow-s);color:#92400e;border:1.5px solid #fcd34d;" data-qid="'+t.id+'" data-qst="answering" data-qaction="status"><i class="fas fa-comment"></i> 답변중</button>':'')+
-        (t.status==='answering'?'<button class="btn btn-green btn-sm" data-qid="'+t.id+'" data-qst="done" data-qaction="status"><i class="fas fa-check"></i> 완료</button>':'')+
-        (t.status==='done'?'<span style="font-size:11px;color:var(--g400);">재발급 가능</span>':'')+
+        (t.status!=='done'?'<button class="btn btn-sm" style="background:var(--yellow-s);color:#92400e;border:1.5px solid #fcd34d;" data-qid="'+t.id+'" data-qst="answering" data-qaction="status"><i class="fas fa-bullhorn"></i> '+(t.status==='answering'?'다시 호출':'호출')+'</button>':'')+
+        (t.status!=='done'?'<button class="btn btn-green btn-sm" data-qid="'+t.id+'" data-qst="done" data-qaction="status"><i class="fas fa-check"></i> 완료</button>':'')+
+        (t.status==='done'?'<button class="btn btn-gray btn-sm" data-qid="'+t.id+'" data-qst="waiting" data-qaction="status"><i class="fas fa-rotate-left"></i> 되돌리기</button>':'')+
       '</div>'+
     '</div>'
   }).join('')
@@ -204,10 +166,131 @@ function renderQueueList(){
 
 window.setQueueStatus=function(id,status){
   api('/api/admin/queue/'+id+'/status',{method:'POST',body:JSON.stringify({status:status})}).then(function(d){
-    if(d.success){toast('상태 변경 완료');loadQueue()}
+    if(d.success){toast(status==='answering'?'📢 호출 방송했어요':'상태 변경 완료');loadQueue()}
     else toast('오류: '+d.error)
   })
 }
+
+// 관리자 브라우저에서 바로 음성 출력 (ko-KR)
+var _admVoices=[], _admPrimed=false
+function admLoadVoices(){ try{_admVoices=window.speechSynthesis.getVoices()||[]}catch(e){} }
+if('speechSynthesis' in window){ try{window.speechSynthesis.onvoiceschanged=admLoadVoices}catch(e){} admLoadVoices() }
+// 오디오 잠금 해제(첫 사용자 제스처에서 무음 발화)
+function admPrime(){
+  if(_admPrimed||!('speechSynthesis' in window))return
+  try{ var u=new SpeechSynthesisUtterance(' ');u.volume=0;window.speechSynthesis.speak(u);_admPrimed=true;admLoadVoices() }catch(e){}
+}
+document.addEventListener('click',admPrime,{passive:true})
+document.addEventListener('keydown',admPrime,{passive:true})
+// ── 관리자 음성: 실제 MP3 재생(안정적) + speechSynthesis 폴백 ──
+// 서버 /api/tts 가 한국어 텍스트를 MP3로 내려줌 → speechSynthesis 의 "몇 번 후 멈춤" 버그 없음
+var _ttsAudio=null, _ttsQueue=[]
+function ttsChunks(text){
+  text=String(text).replace(/\s*\n\s*/g,'. ').replace(/\s+/g,' ').trim()
+  var out=[], max=170
+  while(text.length>max){
+    var cut=text.lastIndexOf(' ',max); if(cut<40)cut=max
+    out.push(text.slice(0,cut).trim()); text=text.slice(cut).trim()
+  }
+  if(text)out.push(text)
+  return out
+}
+function ttsNext(){
+  if(!_ttsQueue.length)return
+  var t=_ttsQueue.shift()
+  if(!_ttsAudio)_ttsAudio=new Audio()
+  _ttsAudio.onended=ttsNext
+  _ttsAudio.onerror=function(){ _ttsQueue=[]; speakSynth(t) }   // MP3 실패 → 브라우저 음성 폴백
+  _ttsAudio.src='/api/tts?text='+encodeURIComponent(t)
+  var p=_ttsAudio.play()
+  if(p&&p.catch)p.catch(function(){ _ttsQueue=[]; speakSynth(t) })
+}
+function speakLocal(text){
+  if(!text)return
+  try{ if(_ttsAudio){ _ttsAudio.pause() } }catch(e){}
+  _ttsQueue=ttsChunks(text)
+  ttsNext()
+}
+// speechSynthesis 폴백 (서버 TTS가 안 될 때만)
+if('speechSynthesis' in window){
+  setInterval(function(){ try{ var s=window.speechSynthesis; if(s.paused) s.resume() }catch(e){} }, 5000)
+}
+function speakSynth(text){
+  if(!('speechSynthesis' in window)||!text)return
+  try{
+    var synth=window.speechSynthesis
+    if(!_admVoices.length)admLoadVoices()
+    try{ synth.cancel() }catch(e){}
+    try{ synth.resume() }catch(e){}
+    setTimeout(function(){
+      try{
+        var u=new SpeechSynthesisUtterance(String(text))
+        u.lang='ko-KR';u.rate=0.98;u.pitch=1;u.volume=1
+        for(var i=0;i<_admVoices.length;i++){if(/ko/i.test(_admVoices[i].lang)){u.voice=_admVoices[i];break}}
+        synth.speak(u)
+      }catch(e){}
+    }, 90)
+  }catch(e){}
+}
+window.testVoice=function(){ speakLocal('소리 테스트. 잘 들리나요?') }
+
+// 키오스크 칠판에 쓰기 (관리자 기기에서 음성 + 키오스크 화면 표시)
+window.sendAnnounce=function(){
+  var el=document.getElementById('announceText'); var t=(el&&el.value||'').trim()
+  if(!t){toast('문구를 입력하세요');return}
+  speakLocal(t)   // 관리자에서 바로 음성
+  api('/api/admin/announce',{method:'POST',body:JSON.stringify({text:t,kind:'board'})}).then(function(d){
+    if(d.success){toast('🖍️ 칠판에 썼어요');el.value=''}
+    else toast('오류: '+(d.error||''))
+  })
+}
+// 키오스크 칠판 지우기
+window.clearBoard=function(){
+  api('/api/admin/announce',{method:'POST',body:JSON.stringify({kind:'clear'})}).then(function(d){
+    if(d.success){toast('🧽 칠판을 지웠어요')}
+    else toast('오류: '+(d.error||''))
+  })
+}
+
+// ── 전체화면 칠판 모드 ──
+window.openBoardMode=function(){
+  var bm=document.getElementById('boardMode'); if(!bm)return
+  admPrime()   // 오디오 잠금 해제 (버튼 클릭 = 사용자 제스처)
+  bm.style.display='flex'
+  var ta=document.getElementById('boardInput')
+  if(ta) setTimeout(function(){ta.focus()},60)
+}
+window.closeBoardMode=function(){
+  var bm=document.getElementById('boardMode'); if(bm)bm.style.display='none'
+}
+function commitBoard(){
+  var ta=document.getElementById('boardInput'); if(!ta)return
+  var t=(ta.value||'').trim()
+  if(!t){toast('내용을 입력하세요');return}
+  speakLocal(t)   // 관리자 기기에서 바로 음성
+  api('/api/admin/announce',{method:'POST',body:JSON.stringify({text:t,kind:'board'})}).then(function(d){
+    if(!d.success)toast('오류: '+(d.error||''))
+  })
+}
+// Enter=전송(음성), Alt+Enter=줄바꿈, Esc=닫기
+;(function(){
+  var ta=document.getElementById('boardInput'); if(!ta)return
+  ta.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      if(e.altKey){
+        e.preventDefault()
+        var s=ta.selectionStart,en=ta.selectionEnd,v=ta.value
+        ta.value=v.slice(0,s)+'\n'+v.slice(en)
+        ta.selectionStart=ta.selectionEnd=s+1
+      } else if(!e.shiftKey){
+        e.preventDefault()
+        commitBoard()
+      }
+    } else if(e.key==='Escape'){
+      closeBoardMode()
+    }
+  })
+})()
 
 function filterQueue(f,el){
   queueFilter=f
@@ -216,76 +299,6 @@ function filterQueue(f,el){
   renderQueueList()
 }
 window.filterQueue=filterQueue
-
-// ══ 요청사항 ══
-function loadRequests(){
-  api('/api/admin/requests').then(function(d){
-    if(!d.success)return
-    allRequests=d.requests
-    var pending=allRequests.filter(function(r){return r.status==='pending'}).length
-    document.getElementById('badge-requests').textContent=pending>0?pending:''
-    renderReqList()
-  })
-}
-window.loadRequests=loadRequests
-
-function renderReqList(){
-  var list=allRequests.filter(function(r){return reqFilter==='all'||r.status===reqFilter})
-  var el=document.getElementById('reqList')
-  if(list.length===0){el.innerHTML=emptyHtml('항목 없음');return}
-  el.innerHTML=list.map(function(r){
-    var sl={pending:'미확인',in_progress:'처리중',done:'완료'}[r.status]||r.status
-    var sc={pending:'pending',in_progress:'in_progress',done:'done'}[r.status]||'pending'
-    var tm=r.created_at?r.created_at.slice(0,16).replace('T',' '):''
-    return '<div class="req-item">'+
-      '<div class="req-av">'+esc(r.student_name[0])+'</div>'+
-      '<div class="req-body">'+
-        '<div class="req-top">'+
-          '<span class="req-name">'+esc(r.student_name)+'</span>'+
-          '<span class="req-time">'+tm+'</span>'+
-          (r.has_photo?'<span class="req-photo-badge"><i class="fas fa-image"></i> 사진</span>':'')+
-          '<span class="status-badge '+sc+'">'+sl+'</span>'+
-        '</div>'+
-        '<div class="req-msg">'+esc(r.message)+'</div>'+
-        (r.admin_note?'<div class="req-note"><i class="fas fa-pen-to-square"></i> '+esc(r.admin_note)+'</div>':'')+
-      '</div>'+
-      '<div class="req-actions">'+
-        (r.has_photo?'<button class="btn btn-blue btn-sm" data-rid="'+r.id+'" data-rname="'+esc(r.student_name)+'" data-raction="photo" title="사진 보기"><i class="fas fa-image"></i></button>':'')+
-        '<button class="btn btn-gray btn-sm" data-rid="'+r.id+'" data-rnote="'+esc(r.admin_note||'')+'" data-raction="note"><i class="fas fa-pen"></i></button>'+
-        (r.status!=='done'?'<button class="btn btn-green btn-sm" data-rid="'+r.id+'" data-raction="done"><i class="fas fa-check"></i></button>':'')+
-      '</div>'+
-    '</div>'
-  }).join('')
-}
-
-function filterReq(f,el){
-  reqFilter=f
-  document.querySelectorAll('#tab-requests .filter-btn').forEach(function(b){b.classList.remove('active')})
-  el.classList.add('active')
-  renderReqList()
-}
-window.filterReq=filterReq
-
-window.openNote=function(id,note){
-  curNoteReqId=id
-  document.getElementById('noteInp').value=note||''
-  document.getElementById('note-modal').classList.add('open')
-}
-
-window.saveNote=function(status){
-  if(!curNoteReqId)return
-  var note=document.getElementById('noteInp').value.trim()
-  api('/api/admin/requests/'+curNoteReqId+'/status',{method:'POST',body:JSON.stringify({status:status,adminNote:note})}).then(function(d){
-    if(d.success){toast('저장 완료');document.getElementById('note-modal').classList.remove('open');loadRequests()}
-    else toast('오류')
-  })
-}
-
-window.quickDoneReq=function(id){
-  api('/api/admin/requests/'+id+'/status',{method:'POST',body:JSON.stringify({status:'done'})}).then(function(d){
-    if(d.success){toast('완료 처리');loadRequests()}
-  })
-}
 
 // ══ 주문현황 ══
 function loadOrders(){
@@ -303,17 +316,17 @@ window.loadOrders=loadOrders
 function renderOrderList(){
   var el=document.getElementById('orderList')
   if(allOrders.length===0){el.innerHTML=emptyHtml('항목 없음');return}
-  var catEmoji={learn:'✅',fine:'🚨',shop:'🛍️'}
+  var catEmoji={learn:'학습',fine:'벌점',shop:'상점'}
   el.innerHTML=allOrders.map(function(o){
     var items=[]
     try{items=JSON.parse(o.items_json)}catch(e){}
-    var itemsTxt=items.map(function(x){return (x.icon||'')+' '+x.label+(x.qty>1?' x'+x.qty:'')}).join(' / ')
+    var itemsTxt=items.map(function(x){return x.label+(x.qty>1?' x'+x.qty:'')}).join(' / ')
     var costVal=o.total_cost
     var cc=costVal===0?'free':costVal<0?'gain':'loss'
     var ct=costVal===0?'무료':costVal<0?'+'+Math.abs(costVal)+' '+o.currency+' 획득':'-'+costVal+' '+o.currency+' 차감'
     var tm=o.created_at?o.created_at.slice(0,16).replace('T',' '):''
     return '<div class="order-item">'+
-      '<div class="order-cat '+o.category+'">'+(catEmoji[o.category]||'📋')+'</div>'+
+      '<div class="order-cat '+o.category+'">'+(catEmoji[o.category]||'기타')+'</div>'+
       '<div class="order-body">'+
         '<div class="order-top">'+
           '<span class="order-stu">'+esc(o.student_name)+'</span>'+
@@ -321,7 +334,7 @@ function renderOrderList(){
           (o.has_photo?'<span style="font-size:10px;background:var(--orange);color:white;padding:2px 6px;border-radius:100px;font-weight:800;">사진</span>':'')+
         '</div>'+
         '<div class="order-items-txt">'+esc(itemsTxt)+'</div>'+
-        (o.comment?'<div style="font-size:11px;color:var(--indigo);margin-top:2px;">💬 '+esc(o.comment)+'</div>':'')+
+        (o.comment?'<div style="font-size:11px;color:var(--indigo);margin-top:2px;">'+esc(o.comment)+'</div>':'')+
       '</div>'+
       '<div class="order-cost '+cc+'">'+ct+'</div>'+
     '</div>'
@@ -336,14 +349,9 @@ function renderStudents(){
     var av=s.photo_url
       ?'<img class="stu-av-sm" src="'+esc(s.photo_url)+'" alt=""/>'
       :'<div class="stu-av-txt">'+esc(s.name[0])+'</div>'
-    var fineBadges=''
-    if(s.fine_point>0)fineBadges+='<span style="font-size:10px;background:var(--red-s);color:var(--red);border:1px solid rgba(239,68,68,.25);border-radius:100px;padding:1px 5px;white-space:nowrap;">💸'+s.fine_point+'</span>'
-    if(s.fine_time>0)fineBadges+='<span style="font-size:10px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;border-radius:100px;padding:1px 5px;white-space:nowrap;">⏰'+s.fine_time+'분</span>'
-    if(s.fine_sheet>0)fineBadges+='<span style="font-size:10px;background:#fff7ed;color:#b45309;border:1px solid #fcd34d;border-radius:100px;padding:1px 5px;white-space:nowrap;">📄'+s.fine_sheet+'장</span>'
     return '<div class="stu-list-item" style="flex-wrap:wrap;">'+av+
       '<div class="stu-name-lbl">'+esc(s.name)+'</div>'+
-      '<span class="stu-pts-lbl">'+curCfg.symbol+' '+s.points+'</span>'+
-      fineBadges+
+      '<span class="stu-pts-lbl">'+s.points+'P</span>'+
       '<div style="display:flex;gap:4px;margin-left:auto;">'+
       '<button class="btn btn-gray btn-sm btn-icon" data-sid="'+s.id+'" data-sname="'+esc(s.name)+'" data-saction="hist"><i class="fas fa-clock-rotate-left"></i></button>'+
       '<button class="btn btn-gray btn-sm btn-icon" data-sid="'+s.id+'" data-sname="'+esc(s.name)+'" data-saction="adj"><i class="fas fa-plus-minus"></i></button>'+
@@ -409,54 +417,6 @@ window.showHist=function(id,name){
   })
 }
 
-// ══ 벌금 ══
-function renderFines(){
-  var el=document.getElementById('fineList')
-  var displayFines=allFines.filter(function(f){
-    if(fineFilter==='all')return !f.paid
-    if(fineFilter==='point')return !f.paid&&f.fine_type==='point'
-    if(fineFilter==='time')return !f.paid&&f.fine_type==='time'
-    if(fineFilter==='sheet')return !f.paid&&f.fine_type==='sheet'
-    return !f.paid
-  })
-  if(displayFines.length===0){el.innerHTML=emptyHtml('미납 벌금 없음 🎉');return}
-  function fineTypeStyle(t){
-    if(t==='time')return 'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;'
-    if(t==='sheet')return 'background:#fff7ed;color:#b45309;border:1px solid #fcd34d;'
-    return 'background:var(--red-s);color:var(--red);border:1px solid rgba(239,68,68,.25);'
-  }
-  function fineTypeLabel(f){
-    var icon=f.fine_type==='time'?'⏰':f.fine_type==='sheet'?'📄':'💸'
-    var unit=f.fine_type==='time'?'분':f.fine_type==='sheet'?'장':(f.unit||'포인트')
-    return icon+' '+f.amount+' '+unit
-  }
-  el.innerHTML=displayFines.map(function(f){
-    var typeLabel=fineTypeLabel(f)
-    var typeSt=fineTypeStyle(f.fine_type)
-    var isTS=(f.fine_type==='time'||f.fine_type==='sheet')
-    var confirmTip=isTS?'확인하면 즉시 삭제됩니다':'확인하면 완납 처리됩니다'
-    var dt=f.created_at?f.created_at.slice(0,10):''
-    return '<div class="stu-list-item" style="flex-wrap:wrap;gap:6px;">'+
-      '<div class="stu-av-txt" style="font-size:11px;width:30px;height:30px;flex-shrink:0;">'+esc((f.student_name||'?')[0])+'</div>'+
-      '<div style="flex:1;min-width:80px;">'+
-        '<div style="font-weight:800;font-size:13px;">'+esc(f.student_name||'')+'</div>'+
-        '<div style="font-size:11px;color:var(--g400);">'+esc(f.label||'')+(dt?' · '+dt:'')+'</div>'+
-      '</div>'+
-      '<span style="font-size:12px;font-weight:700;border-radius:100px;padding:2px 8px;'+typeSt+'">'+typeLabel+'</span>'+
-      '<button class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;font-size:11px;" title="'+confirmTip+'" data-fid="'+f.id+'" data-ftype="'+f.fine_type+'" data-faction="confirm">'+
-        (isTS?'✅ 확인 후 삭제':'✅ 완납처리')+
-      '</button>'+
-      '<button class="btn btn-sm" style="background:var(--red-s);color:var(--red);border:1px solid rgba(239,68,68,.3);font-size:11px;" data-fid="'+f.id+'" data-faction="delfine">🗑 삭제</button>'+
-    '</div>'
-  }).join('')
-}
-window.filterFine=function(f,el){
-  fineFilter=f
-  document.querySelectorAll('#tab-fines .filter-btn').forEach(function(b){b.classList.remove('active')})
-  el.classList.add('active')
-  renderFines()
-}
-
 // ══ 메뉴 설정 ══
 function renderMenuItems(type){
   var el=document.getElementById('menu'+type.charAt(0).toUpperCase()+type.slice(1)+'List')
@@ -471,15 +431,18 @@ function renderMenuItems(type){
       :'<input class="item-cost-inp" type="number" value="'+(m.cost||0)+'" onchange="menuCfg.'+type+'['+i+'].cost=+this.value" placeholder="비용"/>'
     var fineTypeField=isFine
       ?'<select class="item-unit-sel" onchange="menuCfg.fine['+i+'].fineType=this.value;menuCfg.fine['+i+'].unit=(this.value===\'time\'?\'분\':this.value===\'sheet\'?\'장\':curCfg.unit);renderMenuItems(\'fine\')" style="width:70px;font-size:12px;">'+
-        '<option value="point"'+(((m.fineType||'point')==='point')?' selected':'')+'>💸 포인트</option>'+
-        '<option value="time"'+((m.fineType==='time')?' selected':'')+'>⏰ 시간(분)</option>'+
-        '<option value="sheet"'+((m.fineType==='sheet')?' selected':'')+'>📄 학습지(장)</option>'+
+        '<option value="point"'+(((m.fineType||'point')==='point')?' selected':'')+'>포인트</option>'+
+        '<option value="time"'+((m.fineType==='time')?' selected':'')+'>시간(분)</option>'+
+        '<option value="sheet"'+((m.fineType==='sheet')?' selected':'')+'>학습지(장)</option>'+
       '</select>'
       :''
     var soldOutField=isShop
-      ?'<label style="font-size:11px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:3px;"><input type="checkbox" '+(m.soldOut?'checked':'')+' onchange="menuCfg.shop['+i+'].soldOut=this.checked;renderMenuItems(\'shop\')"/> 품절</label>'
+      ?'<label style="font-size:11px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="shop-soldout-cb" '+(m.soldOut?'checked':'')+' onchange="menuCfg.shop['+i+'].soldOut=this.checked;renderMenuItems(\'shop\')"/> 품절</label>'
       :''
-    // ★ 상점 전용: 하루 한도 + 월별 재고
+    var hiddenField=isShop
+      ?'<label style="font-size:11px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:3px;color:'+(m.hidden?'#b91c1c':'inherit')+';"><input type="checkbox" class="shop-hidden-cb" '+(m.hidden?'checked':'')+' onchange="menuCfg.shop['+i+'].hidden=this.checked;renderMenuItems(\'shop\')"/> 숨김</label>'
+      :''
+    // 상점 전용: 하루 한도 + 월별 재고
     var stockFields=isShop
       ?'<div style="display:flex;flex-direction:column;gap:2px;">'+
           '<input class="item-cost-inp shop-daily-limit" type="number" value="'+(m.dailyLimit||0)+'" min="0" title="하루 구매 한도 (0=무제한)" placeholder="일한도" style="width:56px;font-size:11px;" data-idx="'+i+'"/>'+
@@ -490,14 +453,13 @@ function renderMenuItems(type){
           '<span style="font-size:9px;color:var(--g400);text-align:center;">월재고</span>'+
         '</div>'
       :''
-    return '<div class="menu-item-row">'+
-      '<div class="item-icon-box" style="position:relative;">'+m.icon+(m.soldOut?'<span style="font-size:8px;background:#dc2626;color:white;border-radius:4px;padding:1px 3px;position:absolute;top:0;right:0;">품절</span>':'')+
-      '</div>'+
-      '<div class="item-label">'+esc(m.label)+'</div>'+
+    return '<div class="menu-item-row"'+(isShop&&m.hidden?' style="opacity:.55;"':'')+'>'+
+      '<div class="item-label">'+esc(m.label)+(isShop&&m.hidden?' <span style="font-size:10px;color:#b91c1c;font-weight:800;">(숨김)</span>':'')+'</div>'+
       valField+
-      (isFine?fineTypeField:'<input class="item-unit-sel" value="'+(m.unit||curCfg.symbol||'P')+'" onchange="menuCfg.'+type+'['+i+'].unit=this.value" placeholder="단위" style="width:60px;"/>')+
+      (isFine?fineTypeField:'')+
       (isLearn?'<label style="font-size:11px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:3px;"><input type="checkbox" '+(m.requirePhoto?'checked':'')+' onchange="menuCfg.'+type+'['+i+'].requirePhoto=this.checked"/> 사진</label>':'')+
       soldOutField+
+      hiddenField+
       stockFields+
       '<button class="item-del-btn" data-mtype="'+type+'" data-midx="'+i+'" data-maction="del"><i class="fas fa-trash"></i></button>'+
     '</div>'
@@ -511,46 +473,33 @@ window.delMenuItem=function(type,i){
 
 function addMenuItem(type){
   var pfx={learn:'nL',fine:'nF',shop:'nS'}[type]
-  var ic=(document.getElementById(pfx+'Ic').value||'').trim()||'[항목]'
+  var ic=(type==='shop'?'snack':type==='fine'?'nohomework':'study')
   var lbl=document.getElementById(pfx+'Lbl').value.trim()
   if(!lbl){toast('항목 이름 입력');return}
   var costEl=document.getElementById(type==='learn'?'nLRew':type==='fine'?'nFCost':'nSCost')
-  var unitEl=document.getElementById(pfx+'Unit')
   var cost=parseInt(costEl.value||'0')||0
-  var unit=(unitEl&&unitEl.value.trim())||curCfg.symbol||'P'
+  var unit=curCfg.unit||'포인트'
   var newId=type+'_'+Date.now()
-  if(type==='learn'){
-    var photo=document.getElementById('nLPhoto').checked||false
-    menuCfg.learn.push({id:newId,icon:ic,label:lbl,cost:0,reward:cost,unit:unit,requirePhoto:photo})
-  } else if(type==='fine'){
-    var ftEl=document.getElementById('nFType')
-    var ft=(ftEl?ftEl.value:'point')
-    var fineUnit=ft==='time'?'분':ft==='sheet'?'장':curCfg.unit
-    menuCfg.fine.push({id:newId,icon:ic,label:lbl,cost:cost,reward:0,unit:fineUnit,fineType:ft,requirePhoto:false})
-  } else {
-    // ★ 상점: 하루 한도, 월 재고 포함
+  {
+    // 상점: 하루 한도, 월 재고 포함
     var dlEl=document.getElementById('nSDailyLimit')
     var msEl=document.getElementById('nSMonthlyStock')
     menuCfg[type].push({
       id:newId,icon:ic,label:lbl,cost:cost,reward:0,unit:unit,
-      requirePhoto:false,soldOut:false,
+      requirePhoto:false,soldOut:false,hidden:false,
       dailyLimit:+(dlEl&&dlEl.value)||0,
       monthlyStock:+(msEl&&msEl.value)||0
     })
   }
-  document.getElementById(pfx+'Ic').value=''
   document.getElementById(pfx+'Lbl').value=''
   costEl.value=''
-  if(unitEl)unitEl.value=''
   renderMenuItems(type);toast('추가: '+lbl)
 }
 
-document.getElementById('addLearnBtn').addEventListener('click',function(){addMenuItem('learn')})
-document.getElementById('addFineBtn').addEventListener('click',function(){addMenuItem('fine')})
 document.getElementById('addShopBtn').addEventListener('click',function(){addMenuItem('shop')})
 
 document.getElementById('savemenuBtn').addEventListener('click',function(){
-  ;['learn','fine','shop'].forEach(function(t){
+  ;['shop'].forEach(function(t){
     var el=document.getElementById('menu'+t.charAt(0).toUpperCase()+t.slice(1)+'List')
     if(!el)return
     var rows=el.querySelectorAll('.menu-item-row')
@@ -561,19 +510,12 @@ document.getElementById('savemenuBtn').addEventListener('click',function(){
         if(t==='learn') menuCfg[t][i].reward=+(costInp.value)||0
         else menuCfg[t][i].cost=+(costInp.value)||0
       }
-      var unitInp=row.querySelector('.item-unit-sel')
-      if(unitInp && t!=='fine') menuCfg[t][i].unit=unitInp.value||curCfg.symbol||'P'
-      if(t==='fine'){
-        var ftSel=row.querySelector('select')
-        if(ftSel){
-          menuCfg[t][i].fineType=ftSel.value
-          menuCfg[t][i].unit=ftSel.value==='time'?'분':ftSel.value==='sheet'?'장':curCfg.unit
-        }
-      }
       if(t==='shop'){
-        var cb=row.querySelector('input[type="checkbox"]')
-        if(cb) menuCfg[t][i].soldOut=cb.checked
-        // ★ 하루 한도 / 월 재고 수집
+        var scb=row.querySelector('.shop-soldout-cb')
+        if(scb) menuCfg[t][i].soldOut=scb.checked
+        var hcb=row.querySelector('.shop-hidden-cb')
+        if(hcb) menuCfg[t][i].hidden=hcb.checked
+        // 하루 한도 / 월 재고 수집
         var dlInp=row.querySelector('.shop-daily-limit')
         var msInp=row.querySelector('.shop-monthly-stock')
         if(dlInp) menuCfg[t][i].dailyLimit=+(dlInp.value)||0
@@ -585,66 +527,16 @@ document.getElementById('savemenuBtn').addEventListener('click',function(){
       }
     })
   })
-  saveConfigToServer(function(){ toast('✅ 메뉴 저장 완료! 키오스크에 즉시 반영됩니다.') })
+  saveConfigToServer(function(){ toast('메뉴 저장 완료! 키오스크에 즉시 반영됩니다.') })
 })
 
 document.getElementById('resetmenuBtn').addEventListener('click',function(){
   if(!confirm('기본값으로 초기화? 저장된 설정이 모두 삭제됩니다.'))return
   menuCfg=JSON.parse(JSON.stringify(DEFAULT_MENU))
-  renderMenuItems('learn');renderMenuItems('fine');renderMenuItems('shop')
+  renderMenuItems('shop')
   saveConfigToServer(function(){ toast('기본값으로 초기화됨') })
 })
 
-// ══ 화폐 설정 ══
-function renderPresets(){
-  document.getElementById('presetGrid').innerHTML=PRESETS.map(function(p,i){
-    return '<button class="preset-btn" onclick="applyPreset('+i+')"><span class="pi">'+p.symbol+'</span>'+p.unit+'</button>'
-  }).join('')
-}
-window.applyPreset=function(i){
-  var p=PRESETS[i];curCfg.unit=p.unit;curCfg.symbol=p.symbol;curCfg.desc=p.desc
-  document.getElementById('curUnit').value=p.unit
-  document.getElementById('curSymbol').value=p.symbol
-  document.getElementById('curDesc').value=p.desc
-  updateCurPreview()
-}
-function updateCurPreview(){
-  document.getElementById('curPrevSymbol').textContent=document.getElementById('curSymbol').value||'P'
-  document.getElementById('curPrevUnit').textContent=document.getElementById('curUnit').value||'포인트'
-  document.getElementById('curPrevDesc').textContent=document.getElementById('curDesc').value||'설명이 여기 표시됩니다'
-}
-document.getElementById('curUnit').addEventListener('input',updateCurPreview)
-document.getElementById('curSymbol').addEventListener('input',updateCurPreview)
-document.getElementById('savecurBtn').addEventListener('click',function(){
-  curCfg.unit=document.getElementById('curUnit').value.trim()||'포인트'
-  curCfg.symbol=document.getElementById('curSymbol').value.trim()||'P'
-  curCfg.desc=document.getElementById('curDesc').value.trim()
-  saveConfigToServer(function(){ renderPresets();toast('✅ 화폐 설정 저장! 키오스크에 즉시 반영됩니다.') })
-})
-
-// ── 요청사항 사진 보기 모달 ──
-function openReqPhotoModal(rid, rname){
-  var modal=document.getElementById('req-photo-modal')
-  var title=document.getElementById('reqPhotoModalTitle')
-  var content=document.getElementById('reqPhotoModalContent')
-  if(!modal)return
-  title.textContent='📸 '+rname+' 님의 첨부 사진'
-  content.innerHTML='<div style="color:var(--g400);padding:20px;">로딩 중...</div>'
-  modal.classList.add('open')
-  api('/api/admin/requests/'+rid+'/photo').then(function(d){
-    if(d.success && d.photo){
-      content.innerHTML='<img src="'+d.photo+'" style="max-width:100%;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);"/>'
-    } else {
-      content.innerHTML='<div style="color:var(--g400);padding:20px;">사진을 불러올 수 없습니다.</div>'
-    }
-  }).catch(function(){
-    content.innerHTML='<div style="color:var(--red);padding:20px;">오류가 발생했습니다.</div>'
-  })
-}
-window.closeReqPhotoModal=function(){
-  var modal=document.getElementById('req-photo-modal')
-  if(modal) modal.classList.remove('open')
-}
 
 // ── 유틸 ──
 function esc(s){var r=String(s);r=r.split('&').join('&amp;');r=r.split('<').join('&lt;');r=r.split('>').join('&gt;');r=r.split(String.fromCharCode(34)).join('&#34;');return r}
@@ -660,14 +552,6 @@ document.addEventListener('click',function(e){
     if(btn.dataset.qaction==='status') setQueueStatus(id,st)
     return
   }
-  btn=e.target.closest('[data-raction]')
-  if(btn){
-    var rid=btn.dataset.rid
-    if(btn.dataset.raction==='note') openNote(rid, btn.dataset.rnote||'')
-    else if(btn.dataset.raction==='done') quickDoneReq(rid)
-    else if(btn.dataset.raction==='photo') openReqPhotoModal(rid, btn.dataset.rname||'')
-    return
-  }
   btn=e.target.closest('[data-saction]')
   if(btn){
     var sid=btn.dataset.sid, sname=btn.dataset.sname||''
@@ -676,30 +560,6 @@ document.addEventListener('click',function(e){
     else if(btn.dataset.saction==='photo') uploadPhoto(sid)
     else if(btn.dataset.saction==='schedule') openStudentSchedule(sid,sname)
     else if(btn.dataset.saction==='del') delStudent(sid,sname)
-    return
-  }
-  btn=e.target.closest('[data-faction]')
-  if(btn){
-    var fid=btn.dataset.fid, fname=btn.dataset.fname||''
-    if(btn.dataset.faction==='hist') showHist(fid,fname)
-    else if(btn.dataset.faction==='confirm'){
-      var ftype=btn.dataset.ftype||'point'
-      var tipMsg=ftype==='time'||ftype==='sheet'?'벌금을 확인하고 삭제할까요?':'완납 처리할까요?'
-      if(confirm(tipMsg)){
-        api('/api/admin/fines/'+fid+'/confirm',{method:'POST'}).then(function(d){
-          if(d.success){toast('처리 완료');loadStudentsData()}
-          else toast('오류: '+(d.error||''))
-        })
-      }
-    }
-    else if(btn.dataset.faction==='delfine'){
-      if(confirm('이 벌금을 삭제할까요?')){
-        api('/api/admin/fines/'+fid,{method:'DELETE'}).then(function(d){
-          if(d.success){toast('삭제됨');loadStudentsData()}
-          else toast('오류')
-        })
-      }
-    }
     return
   }
   btn=e.target.closest('[data-maction]')
@@ -773,7 +633,7 @@ window.saveStuSchedule=function(){
   stuSchedSlots=arr
   api('/api/admin/students/'+stuSchedId+'/schedule',{method:'POST',body:JSON.stringify({schedule:stuSchedSlots})}).then(function(d){
     if(d.success){
-      toast('✅ 시간표 저장됨!')
+      toast('시간표 저장됨!')
       document.getElementById('stu-sched-modal').classList.remove('open')
     } else {
       toast('저장 실패: '+(d.error||''))
@@ -798,7 +658,7 @@ function loadShopRequests(){
     }
     var html=''
     d.requests.forEach(function(r){
-      var statusLabel={pending:'⏳ 대기',approved:'✅ 승인',expired:'만료',rejected:'거절'}[r.status]||r.status
+      var statusLabel={pending:'대기',approved:'승인',expired:'만료',rejected:'거절'}[r.status]||r.status
       var statusColor={pending:'#f59e0b',approved:'#22c55e',expired:'#94a3b8',rejected:'#ef4444'}[r.status]||'#94a3b8'
       var dt=r.requested_at?r.requested_at.replace('T',' ').substring(0,16):''
       html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--g100);">'
@@ -818,7 +678,7 @@ function loadShopRequests(){
   })
 }
 
-// ★ 상점 상태 표시 (시간표 모드 포함)
+// 상점 상태 표시 (시간표 모드 포함)
 function loadShopStatus(){
   var el=document.getElementById('shopStatusBadge')
   var lockBtn=document.getElementById('adminLockBtn')
@@ -828,31 +688,31 @@ function loadShopStatus(){
     if(!d.success)return
     if(d.forceLocked){
       el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;'
-      el.textContent='🔒 관리자 강제 잠금 중 – 직접 풀기 전까지 유지'
-      if(lockBtn){lockBtn.textContent='🔒 잠금 중';lockBtn.disabled=true;lockBtn.style.opacity='0.5'}
+      el.textContent='관리자 강제 잠금 중 – 직접 풀기 전까지 유지'
+      if(lockBtn){lockBtn.textContent='잠금 중';lockBtn.disabled=true;lockBtn.style.opacity='0.5'}
       if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
     } else if(d.forceOpen){
       el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#f0fdf4;color:#15803d;border:1.5px solid #86efac;'
-      el.textContent='🟢 완전 오픈 중 – 잠금 전까지 계속 열림'
-      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      el.textContent='완전 오픈 중 – 잠금 전까지 계속 열림'
+      if(lockBtn){lockBtn.textContent='즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
       if(unlockBtn){unlockBtn.disabled=true;unlockBtn.style.opacity='0.5'}
     } else if(d.locked){
       el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;'
-      el.textContent='🔒 수업 시간 – 시간표에 따라 자동 잠금 중'
-      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      el.textContent='수업 시간 – 시간표에 따라 자동 잠금 중'
+      if(lockBtn){lockBtn.textContent='즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
       if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
     } else if(d.unlocked){
       var exp=d.expiresAt?new Date(d.expiresAt+'Z'):null
       var remain=exp?Math.max(0,Math.ceil((exp-Date.now())/60000)):0
       el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#fff7ed;color:#c2410c;border:1.5px solid #fdba74;'
-      el.textContent='🔓 임시 오픈 중 (약 '+remain+'분 남음)'
-      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      el.textContent='임시 오픈 중 (약 '+remain+'분 남음)'
+      if(lockBtn){lockBtn.textContent='즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
       if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
     } else {
-      // ★ 시간표 모드 – 수업 시간이 아닌 경우 자동으로 열림
+      // 시간표 모드 – 수업 시간이 아닌 경우 자동으로 열림
       el.style.cssText='padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#f0fdf4;color:#16a34a;border:1.5px solid #86efac;'
-      el.textContent='📅 시간표 모드 – 지금은 수업 시간이 아니라 상점 열림 ✅'
-      if(lockBtn){lockBtn.textContent='🔒 즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
+      el.textContent='시간표 모드 – 지금은 수업 시간이 아니라 상점 열림'
+      if(lockBtn){lockBtn.textContent='즉시 잠금';lockBtn.disabled=false;lockBtn.style.opacity='1'}
       if(unlockBtn){unlockBtn.disabled=false;unlockBtn.style.opacity='1'}
     }
   })
@@ -869,7 +729,7 @@ function openApproveModal(reqId, reqName){
   modal.id='approve-modal'
   modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px;'
   modal.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.18);">'+
-    '<div style="font-size:16px;font-weight:800;margin-bottom:6px;color:#0f172a;">✅ 요청 승인</div>'+
+    '<div style="font-size:16px;font-weight:800;margin-bottom:6px;color:#0f172a;">요청 승인</div>'+
     '<div style="font-size:13px;color:#64748b;margin-bottom:12px;"><b>'+esc(reqName)+'</b> 학생의 요청을 승인합니다.<br>몇 분간 상점을 열까요?</div>'+
     '<input id="approveMinsInp" type="number" value="10" min="1" max="180" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;font-weight:700;text-align:center;margin-bottom:14px;box-sizing:border-box;">'+
     '<div style="display:flex;gap:8px;">'+
@@ -886,12 +746,12 @@ window.doApproveUnlock=function(reqId,reqName){
   if(mins<=0)mins=10
   document.getElementById('approve-modal').remove()
   api('/api/admin/shop/unlock',{method:'POST',body:JSON.stringify({requestId:reqId,minutes:mins})}).then(function(d){
-    if(d.success){toast('✅ '+reqName+' 요청 승인! '+mins+'분간 상점 열립니다.');loadShopRequests();loadShopStatus()}
+    if(d.success){toast(reqName+' 요청 승인! '+mins+'분간 상점 열립니다.');loadShopRequests();loadShopStatus()}
     else toast('오류: '+(d.error||''))
   })
 }
 
-// ★ 열기 모달 (시간표 모드 탭 포함)
+// 열기 모달 (시간표 모드 탭 포함)
 function openUnlockModal(){
   var existing=document.getElementById('unlock-modal')
   if(existing)existing.remove()
@@ -900,12 +760,12 @@ function openUnlockModal(){
   modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px;'
   modal.innerHTML=
     '<div style="background:#fff;border-radius:18px;padding:0;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.22);overflow:hidden;">'+
-      '<div style="padding:20px 20px 0;font-size:17px;font-weight:800;color:#0f172a;">🔓 상점 열기</div>'+
+      '<div style="padding:20px 20px 0;font-size:17px;font-weight:800;color:#0f172a;">상점 열기</div>'+
       '<div style="display:flex;gap:0;padding:14px 20px 0;border-bottom:1.5px solid #f1f5f9;overflow-x:auto;">'+
-        '<button id="utab-timed" onclick="switchUnlockTab(\'timed\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2.5px solid #3b82f6;color:#3b82f6;white-space:nowrap;">⏱ 시간설정</button>'+
-        '<button id="utab-until" onclick="switchUnlockTab(\'until\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;white-space:nowrap;">🕐 시각지정</button>'+
-        '<button id="utab-sched" onclick="switchUnlockTab(\'sched\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;white-space:nowrap;">📅 시간표</button>'+
-        '<button id="utab-perm" onclick="switchUnlockTab(\'perm\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;white-space:nowrap;">♾ 완전오픈</button>'+
+        '<button id="utab-timed" onclick="switchUnlockTab(\'timed\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2.5px solid #3b82f6;color:#3b82f6;white-space:nowrap;">시간설정</button>'+
+        '<button id="utab-until" onclick="switchUnlockTab(\'until\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;white-space:nowrap;">시각지정</button>'+
+        '<button id="utab-sched" onclick="switchUnlockTab(\'sched\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;white-space:nowrap;">시간표</button>'+
+        '<button id="utab-perm" onclick="switchUnlockTab(\'perm\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;color:#94a3b8;white-space:nowrap;">완전오픈</button>'+
       '</div>'+
       '<div id="upanel-timed" style="padding:18px 20px;">'+
         '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">몇 분간 상점을 열까요?</div>'+
@@ -924,22 +784,22 @@ function openUnlockModal(){
       '</div>'+
       '<div id="upanel-sched" style="padding:18px 20px;display:none;">'+
         '<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:14px;font-size:13px;color:#166534;line-height:1.8;">'+
-          '📅 <b>시간표 모드로 전환</b><br>'+
+          '<b>시간표 모드로 전환</b><br>'+
           '강제 잠금/오픈이 모두 해제되고<br>'+
           '설정된 수업 시간표대로 자동 운영돼요.<br><br>'+
-          '🔒 수업 시간 중 → 자동 잠금<br>'+
-          '✅ 수업 시간 아닐 때 → 자동 열림<br><br>'+
+          '수업 시간 중 → 자동 잠금<br>'+
+          '수업 시간 아닐 때 → 자동 열림<br><br>'+
           '<div style="background:#dcfce7;border-radius:6px;padding:6px 10px;font-size:12px;">'+
-          '💡 학생별 개인 시간표가 있으면 그게 우선 적용돼요</div>'+
+          '학생별 개인 시간표가 있으면 그게 우선 적용돼요</div>'+
         '</div>'+
       '</div>'+
       '<div id="upanel-perm" style="padding:18px 20px;display:none;">'+
         '<div style="background:#fef9c3;border:1.5px solid #fde047;border-radius:10px;padding:12px 14px;font-size:13px;color:#854d0e;line-height:1.6;">'+
-          '⚠️ <b>완전 오픈</b> 모드입니다.<br>수업 시간표와 관계없이 상점이 항상 열립니다.<br>다시 잠금 버튼을 눌러야 닫힙니다.'+
+          '<b>완전 오픈</b> 모드입니다.<br>수업 시간표와 관계없이 상점이 항상 열립니다.<br>다시 잠금 버튼을 눌러야 닫힙니다.'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px;padding:0 20px 20px;">'+
-        '<button id="unlockConfirmBtn" onclick="doUnlockConfirm()" style="flex:1;padding:11px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;">✅ 적용</button>'+
+        '<button id="unlockConfirmBtn" onclick="doUnlockConfirm()" style="flex:1;padding:11px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;">적용</button>'+
         '<button onclick="document.getElementById(\'unlock-modal\').remove()" style="padding:11px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:10px;font-size:14px;cursor:pointer;">취소</button>'+
       '</div>'+
     '</div>'
@@ -948,7 +808,7 @@ function openUnlockModal(){
   document.getElementById('unlockUntilInp').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')
 }
 
-// ★ 탭 전환 (시간표 탭 포함)
+// 탭 전환 (시간표 탭 포함)
 window.switchUnlockTab=function(tab){
   var tabs=['timed','until','sched','perm']
   tabs.forEach(function(t){
@@ -965,7 +825,7 @@ window.setUnlockMins=function(m){
   if(inp)inp.value=m
 }
 
-// ★ 열기 확인 (시간표 모드 처리 포함)
+// 열기 확인 (시간표 모드 처리 포함)
 window.doUnlockConfirm=function(){
   var tab='timed'
   if(document.getElementById('upanel-until').style.display!=='none') tab='until'
@@ -996,10 +856,10 @@ window.doUnlockConfirm=function(){
   api('/api/admin/shop/direct-unlock',{method:'POST',body:JSON.stringify(body)}).then(function(d){
     if(d.success){
       var msg=body.mode==='permanent'
-        ?'🟢 완전 오픈! 잠금 버튼을 누를 때까지 유지됩니다.'
+        ?'완전 오픈! 잠금 버튼을 누를 때까지 유지됩니다.'
         :body.mode==='schedule'
-          ?'📅 시간표 모드로 전환! 수업 시간표에 따라 자동 운영됩니다.'
-          :'🔓 '+(body.minutes)+'분간 상점이 열렸습니다!'
+          ?'시간표 모드로 전환! 수업 시간표에 따라 자동 운영됩니다.'
+          :(body.minutes)+'분간 상점이 열렸습니다!'
       toast(msg)
       loadShopStatus()
       loadShopRequests()
@@ -1013,19 +873,19 @@ window.doDirectUnlock=function(){
   var existing=document.getElementById('unlock-modal')||document.getElementById('unlock-min-modal')
   if(existing)existing.remove()
   api('/api/admin/shop/direct-unlock',{method:'POST',body:JSON.stringify({mode:'timed',minutes:mins})}).then(function(d){
-    if(d.success){toast('🔓 '+mins+'분간 상점이 열렸습니다!');loadShopStatus();loadShopRequests()}
+    if(d.success){toast(mins+'분간 상점이 열렸습니다!');loadShopStatus();loadShopRequests()}
     else toast('오류: '+(d.error||''))
   })
 }
 
 window.adminLockShop=function(){
   api('/api/admin/shop/lock',{method:'POST'}).then(function(d){
-    if(d.success){toast('🔒 상점 잠금됨');loadShopStatus();loadShopRequests()}
+    if(d.success){toast('상점 잠금됨');loadShopStatus();loadShopRequests()}
     else toast('오류: '+(d.error||''))
   })
 }
 
-// ★ 재고 현황 조회
+// 재고 현황 조회
 function loadStockStatus(){
   var el=document.getElementById('shopStockInfo')
   if(!el)return
@@ -1063,13 +923,13 @@ function loadStockStatus(){
   })
 }
 
-// ★ 이번 달 재고 채우기
+// 이번 달 재고 채우기
 window.doRestock=function(){
   var monthKey=new Date().toISOString().slice(0,7)
   if(!confirm(monthKey+' 재고를 메뉴에 설정된 값으로 채울까요?\n(이미 설정된 재고는 초기화됩니다)'))return
   api('/api/admin/shop/restock',{method:'POST'}).then(function(d){
     if(d.success){
-      toast('✅ '+d.itemsRestocked+'개 상품 재고 채움! ('+d.monthKey+')')
+      toast(d.itemsRestocked+'개 상품 재고 채움! ('+d.monthKey+')')
       loadStockStatus()
     } else {
       toast('오류: '+(d.error||''))
@@ -1126,7 +986,7 @@ function collectScheduleFromDOM(){
 window.saveSchedule=function(){
   collectScheduleFromDOM()
   api('/api/admin/shop/schedule',{method:'POST',body:JSON.stringify({schedule:shopSchedule})}).then(function(d){
-    if(d.success)toast('✅ 시간표 저장! 즉시 반영됩니다.')
+    if(d.success)toast('시간표 저장! 즉시 반영됩니다.')
     else toast('오류: '+(d.error||''))
   })
 }
@@ -1142,7 +1002,7 @@ function loadScheduleFromServer(){
   }).catch(function(){renderScheduleSlots()})
 }
 
-// ★ shoplock 탭 활성화 시 재고 포함 전체 로드
+// shoplock 탭 활성화 시 재고 포함 전체 로드
 var _origSwitchMainTab=window.switchMainTab
 window.switchMainTab=function(tab){
   _origSwitchMainTab(tab)

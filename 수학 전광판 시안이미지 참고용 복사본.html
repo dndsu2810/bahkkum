@@ -1,0 +1,83 @@
+<div style="background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 1.25rem;">
+  <h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">학생 화면의 수학 전광판 칩과, 누르면 열리는 상세 전광판 모달</h2>
+
+  <div style="max-width:360px;margin:0 auto;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden">
+    <div style="background:#3F7CC2;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:500">초등영어</span>
+      <span style="font-size:12px;opacity:.9">김서연</span>
+    </div>
+    <div style="padding:14px 16px;display:flex;align-items:center;gap:9px;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <button id="board-chip" onclick="openBoard()" style="display:inline-flex;align-items:center;gap:7px;background:var(--color-background-warning);color:var(--color-text-warning);border:0.5px solid var(--color-border-secondary);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer">
+        <i class="ti ti-ball-baseball" style="font-size:16px" aria-hidden="true"></i> 수학 전광판
+      </button>
+      <span style="font-size:11px;color:var(--color-text-tertiary)">눌러서 열기</span>
+    </div>
+    <div style="padding:14px">
+      <div style="height:13px;border-radius:7px;background:var(--color-background-secondary);margin-bottom:9px"></div>
+      <div style="height:13px;width:70%;border-radius:7px;background:var(--color-background-secondary);margin-bottom:14px"></div>
+      <div style="height:50px;border-radius:10px;background:var(--color-background-secondary);margin-bottom:8px"></div>
+      <div style="height:50px;border-radius:10px;background:var(--color-background-secondary)"></div>
+    </div>
+  </div>
+
+  <div id="board-overlay" onclick="bgClose(event)" style="display:none;min-height:440px;margin-top:1rem;background:rgba(20,12,4,.55);border-radius:var(--border-radius-lg);align-items:center;justify-content:center;padding:1rem">
+    <div style="position:relative;width:100%;max-width:340px;background:var(--color-background-primary);border-radius:var(--border-radius-lg);padding:1.25rem">
+      <button onclick="closeBoard()" aria-label="닫기" style="position:absolute;top:8px;right:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:50%;cursor:pointer;color:var(--color-text-secondary)">
+        <i class="ti ti-x" style="font-size:16px" aria-hidden="true"></i>
+      </button>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-right:30px">
+        <div style="width:46px;height:46px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:#FCEBC9;border:2px solid #F2A900;border-radius:12px;color:#C8860A;font-weight:500;font-size:18px">서</div>
+        <div>
+          <p style="font-weight:500;font-size:17px;margin:0">김서연</p>
+          <p style="font-size:13px;color:var(--color-text-secondary);margin:0">수학 화·목 7시반</p>
+        </div>
+      </div>
+
+      <div style="background:#3A2A1A;border-radius:var(--border-radius-md);padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:92px;flex:0 0 auto"><span style="font-size:13px;font-weight:500;color:#FF8A4D">스트라이크</span><br><span style="font-size:10px;color:rgba(255,255,255,.55)">숙제 미제출</span></div>
+          <span style="width:18px;height:18px;border-radius:50%;background:#FF8A4D"></span>
+          <span style="width:18px;height:18px;border-radius:50%;background:#FF8A4D"></span>
+          <span style="width:18px;height:18px;border-radius:50%;background:#5A4630"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:11px">
+          <div style="width:92px;flex:0 0 auto"><span style="font-size:13px;font-weight:500;color:#5DD67F">볼</span><br><span style="font-size:10px;color:rgba(255,255,255,.55)">좋은 행동</span></div>
+          <span style="width:18px;height:18px;border-radius:50%;background:#34C759"></span>
+          <span style="width:18px;height:18px;border-radius:50%;background:#34C759"></span>
+          <span style="width:18px;height:18px;border-radius:50%;background:#34C759"></span>
+          <span style="width:18px;height:18px;border-radius:50%;background:#5A4630"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:11px">
+          <div style="width:92px;flex:0 0 auto"><span style="font-size:13px;font-weight:500;color:#FF6052">아웃</span><br><span style="font-size:10px;color:rgba(255,255,255,.55)">3개면 보충</span></div>
+          <span style="width:18px;height:18px;border-radius:50%;background:#FF6052"></span>
+          <span style="width:18px;height:18px;border-radius:50%;background:#5A4630"></span>
+          <span style="width:18px;height:18px;border-radius:50%;background:#5A4630"></span>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;background:var(--color-background-success);border-radius:var(--border-radius-md);padding:12px 14px;margin-top:14px">
+        <i class="ti ti-target-arrow" style="font-size:22px;color:var(--color-text-success)" aria-hidden="true"></i>
+        <span style="font-size:14px;font-weight:500;color:var(--color-text-success)">볼 1개만 더 모으면 아웃 하나가 사라져요!</span>
+      </div>
+
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:16px 0 8px">최근 기록</p>
+      <div style="display:flex;align-items:center;gap:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:9px 12px;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:500;color:var(--color-text-success);background:var(--color-background-success);padding:3px 8px;border-radius:20px">볼 +1</span>
+        <span style="font-size:13px">자진 등원 학습</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--color-text-tertiary)">6/22</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:9px 12px">
+        <span style="font-size:11px;font-weight:500;color:var(--color-text-danger);background:var(--color-background-danger);padding:3px 8px;border-radius:20px">S +1</span>
+        <span style="font-size:13px">숙제 미제출</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--color-text-tertiary)">6/18</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openBoard(){document.getElementById('board-overlay').style.display='flex';}
+    function closeBoard(){document.getElementById('board-overlay').style.display='none';}
+    function bgClose(e){if(e.target.id==='board-overlay')closeBoard();}
+  </script>
+</div>
