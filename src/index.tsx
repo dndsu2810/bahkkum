@@ -1023,6 +1023,11 @@ app.post('/api/submit', async (c) => {
     }
     const stu = await c.env.DB.prepare('SELECT * FROM students WHERE name=?').bind(name).first() as any
 
+    // 상점 구매: 포인트 잔액 부족이면 차단 (벌점/학습은 음수 허용이라 제외)
+    if (category === 'shop' && stu && totalCost > 0 && Number(stu.points) < totalCost) {
+      return c.json({ success: false, error: '포인트가 부족해요', code: 'insufficient_points', shortfall: totalCost - Number(stu.points), balance: Number(stu.points) }, 400)
+    }
+
     if (stu) {
 
       const delta = -(totalCost) // totalCost가 음수면 획득, 양수면 차감
@@ -1109,6 +1114,101 @@ app.post('/api/submit', async (c) => {
 
   }
 
+})
+
+
+
+// ── 포인트 교환 대출 (상점 포인트 부족 시) ─────────────────────────────────────
+// 부족분만큼 포인트를 빌려주고, 10포인트=1분(올림)으로 당일 추가 보충수업 의무를 만든다.
+// 미상환(repaid_at NULL) 대출이 3건이면 거부. 상환 처리는 키오스크 관리자에서 수동.
+async function ensurePointLoans(db: D1Database) {
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS point_loans (
+       id           INTEGER PRIMARY KEY AUTOINCREMENT,
+       student_id   INTEGER,
+       student_name TEXT NOT NULL,
+       points       INTEGER NOT NULL,
+       minutes      INTEGER NOT NULL,
+       created_at   TEXT DEFAULT CURRENT_TIMESTAMP,
+       repaid_at    TEXT
+     )`
+  ).run()
+}
+
+// 쏘이지 '수학 보충수업(class_supplement)'에 대출을 기록 (best-effort, 공유 서비스키).
+async function pushSoezSupplement(env: Bindings, d: { name: string, points: number, minutes: number, eventId: string }) {
+  if (!env.SOEZ_BASE_URL || !env.EXTERNAL_POINTS_KEY) return { ok: false, reason: 'not_configured' }
+  try {
+    const base = env.SOEZ_BASE_URL.replace(/\/+$/, '')
+    const r = await fetch(base + '/api/kiosk/supplement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Service-Key': env.EXTERNAL_POINTS_KEY },
+      body: JSON.stringify({ name: d.name, points: d.points, minutes: d.minutes, reason: '포인트 교환', eventId: d.eventId }),
+    })
+    const j: any = await r.json().catch(() => ({}))
+    return { ok: r.ok && j.ok !== false, status: r.status, body: j }
+  } catch (e: any) { return { ok: false, reason: String(e?.message || e) } }
+}
+
+app.post('/api/loan', async (c) => {
+  try {
+    const { name, need } = await c.req.json()
+    if (!name) return c.json({ success: false, error: '이름 필요' }, 400)
+    const stu = await c.env.DB.prepare('SELECT * FROM students WHERE name=?').bind(name).first() as any
+    if (!stu) return c.json({ success: false, error: '학생을 찾을 수 없어요' }, 404)
+
+    await ensurePointLoans(c.env.DB)
+    const openRow = await c.env.DB.prepare(
+      'SELECT COUNT(*) as cnt FROM point_loans WHERE student_id=? AND repaid_at IS NULL'
+    ).bind(stu.id).first() as any
+    if (Number(openRow?.cnt || 0) >= 3) {
+      return c.json({ success: false, code: 'loan_limit', error: '미상환 대출이 3건이라 더 빌릴 수 없어요. 보충수업을 먼저 끝내주세요.' }, 400)
+    }
+
+    const points = Number(stu.points) || 0
+    const shortfall = Math.max(0, Math.ceil(Number(need) || 0) - points)
+    if (shortfall <= 0) return c.json({ success: true, credited: 0, balance: points }) // 이미 충분
+
+    const minutes = Math.ceil(shortfall / 10)
+    // 1) 포인트 크레딧 (부족분)
+    await c.env.DB.prepare('UPDATE students SET points = points + ? WHERE id=?').bind(shortfall, stu.id).run()
+    await c.env.DB.prepare(
+      'INSERT INTO point_history (student_id, delta, reason, category, created_at) VALUES (?,?,?,?,?)'
+    ).bind(stu.id, shortfall, `포인트 교환 대출(${minutes}분 당일보충)`, 'loan', getKSTTimestamp()).run()
+    // 2) 대출 기록 (미상환)
+    const ins = await c.env.DB.prepare(
+      'INSERT INTO point_loans (student_id, student_name, points, minutes) VALUES (?,?,?,?)'
+    ).bind(stu.id, name, shortfall, minutes).run()
+    const loanId = (ins as any).meta?.last_row_id
+    // 3) 쏘이지 수학 보충수업에 기록 (사유: 포인트 교환)
+    const soez = await pushSoezSupplement(c.env, { name, points: shortfall, minutes, eventId: 'loan_' + loanId })
+    // 4) 수학 카카오워크 알림
+    const ts = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+    await sendKW(kwMath(c.env), `[포인트 교환 대출] ${name}\n${shortfall}P 대출 → 오늘 ${minutes}분 추가 보충수업\n사유: 포인트 교환 · ${ts}`)
+
+    return c.json({ success: true, credited: shortfall, minutes, balance: points + shortfall, soez: soez.ok === true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// 관리자: 대출 현황 조회 (미상환 먼저)
+app.get('/api/admin/loans', async (c) => {
+  await ensurePointLoans(c.env.DB)
+  const rows = await c.env.DB.prepare(
+    'SELECT * FROM point_loans ORDER BY (repaid_at IS NOT NULL), created_at DESC LIMIT 100'
+  ).all()
+  return c.json({ success: true, loans: rows.results })
+})
+
+// 관리자: 대출 상환 처리 (보충수업 완료 후)
+app.post('/api/admin/loans/:id/repay', async (c) => {
+  const id = c.req.param('id')
+  await ensurePointLoans(c.env.DB)
+  await c.env.DB.prepare(
+    'UPDATE point_loans SET repaid_at=? WHERE id=? AND repaid_at IS NULL'
+  ).bind(getKSTTimestamp(), id).run()
+  return c.json({ success: true })
 })
 
 
@@ -2740,6 +2840,21 @@ const MAIN_HTML = `<!DOCTYPE html>
 
 
 
+<!-- 포인트 부족 → 대출 모달 -->
+<div class="modal-ov" id="loan-modal">
+  <div class="modal-box">
+    <div class="modal-title" style="margin-bottom:13px"><span data-ic="star" data-sz="22"></span>포인트가 부족해요</div>
+    <div id="loanBody" style="font-size:15px;line-height:1.7;color:var(--ink);margin-bottom:10px"></div>
+    <div style="font-size:12px;color:var(--g400);line-height:1.6;margin-bottom:14px">대출하면 부족한 포인트를 빌리고, 그만큼 <b>오늘 추가 보충수업</b>을 해야 해요.<br>10포인트 = 1분 · 미상환 최대 3건까지</div>
+    <div class="modal-btns">
+      <button class="btn-mc" onclick="closeLoan()"><span data-ic="close" data-sz="15" style="margin-right:4px;display:inline-block;vertical-align:-2px"></span>취소</button>
+      <button class="btn-mok" id="loanOk" onclick="doLoan()"><span data-ic="star" data-sz="17"></span><span id="loanTxt">대출하고 주문하기</span></button>
+    </div>
+  </div>
+</div>
+
+
+
 <script>
 
 (function(){
@@ -3723,6 +3838,32 @@ window.openConfirm=function(){
 
 window.closeConfirm=function(){document.getElementById('confirm-modal').classList.remove('open')}
 
+// 포인트 부족 시 대출 제안 (부족분만큼 자동 대출 → 10포인트=1분 당일 보충수업)
+window.closeLoan=function(){document.getElementById('loan-modal').classList.remove('open')}
+function offerLoan(need,shortfall){
+  ST.loanNeed=need
+  const min=Math.ceil((shortfall||0)/10)
+  document.getElementById('loanBody').innerHTML='지금 <b>'+shortfall+' '+CFG.currency.unit+'</b>이 부족해요.<br>대출하면 <b>'+shortfall+' '+CFG.currency.unit+'</b>을 빌리고, 오늘 <b>'+min+'분</b> 추가 보충수업을 하게 돼요.'
+  const b=document.getElementById('loanOk');b.disabled=false;document.getElementById('loanTxt').textContent='대출하고 주문하기'
+  document.getElementById('loan-modal').classList.add('open')
+}
+window.doLoan=async function(){
+  if(ST.submitting)return;ST.submitting=true
+  const b=document.getElementById('loanOk');b.disabled=true;document.getElementById('loanTxt').textContent='대출 중...'
+  try{
+    const res=await fetch('/api/loan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:ST.student.name,need:ST.loanNeed})})
+    const data=await res.json()
+    if(!res.ok||!data||data.success===false){
+      document.getElementById('loanTxt').textContent='대출하고 주문하기';b.disabled=false;ST.submitting=false
+      toast((data&&data.error)?data.error:'대출에 실패했어요.')
+      return
+    }
+    if(ST.student&&data.credited){ST.student.points+=data.credited}
+    closeLoan();ST.submitting=false
+    doSubmit() // 포인트가 채워졌으니 원래 주문 재전송
+  }catch(err){document.getElementById('loanTxt').textContent='대출하고 주문하기';b.disabled=false;ST.submitting=false;toast('대출 전송 실패. 다시 시도해주세요.')}
+}
+
 function calcTotal(){
 
   return ST.cart.reduce((a,x)=>{
@@ -3806,8 +3947,10 @@ window.doSubmit=async function(){
       ST.sessionOrders.pop();ST.sessionBalance-=tc
       const sp2=btn.querySelector('.spinner');if(sp2)sp2.remove()
       document.getElementById('confirmTxt').textContent='제출하기';btn.disabled=false
-      toast((data&&data.error)?data.error:'주문 처리에 실패했어요. 다시 시도해주세요.')
       ST.submitting=false
+      // 포인트 부족(상점): 대출 옵션 제공
+      if(data&&data.code==='insufficient_points'){offerLoan(tc,data.shortfall);return}
+      toast((data&&data.error)?data.error:'주문 처리에 실패했어요. 다시 시도해주세요.')
       return
     }
 
@@ -4973,6 +5116,14 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
     </button>
 
+    <button class="mtab" data-tab="loans" onclick="switchMainTab('loans')">
+
+      <i class="fas fa-hand-holding-dollar"></i> 대출
+
+      <span class="badge red" id="badge-loans" style="display:none;">0</span>
+
+    </button>
+
   </nav>
 
 
@@ -5102,6 +5253,34 @@ const ADMIN_HTML = `<!DOCTYPE html>
         <div class="card-body">
 
           <div id="orderList"><div style="color:var(--g400);text-align:center;padding:20px;">로딩 중...</div></div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+
+    <!-- ══ 대출 탭 ══ -->
+
+    <div class="tab-panel" id="tab-loans">
+
+      <div class="card">
+
+        <div class="card-head">
+
+          <div class="card-title"><i class="fas fa-hand-holding-dollar"></i> 포인트 교환 대출</div>
+
+          <button class="btn btn-blue btn-sm" onclick="loadLoans()"><i class="fas fa-rotate"></i> 새로고침</button>
+
+        </div>
+
+        <div class="card-body">
+
+          <div style="font-size:12px;color:var(--g400);margin-bottom:10px;">미상환 대출은 학생당 최대 3건. 당일 보충수업(10P=1분) 완료 후 <b>상환</b>을 눌러주세요. 상환하면 다시 대출할 수 있어요.</div>
+
+          <div id="loanList"><div style="color:var(--g400);text-align:center;padding:20px;">로딩 중...</div></div>
 
         </div>
 
@@ -5327,7 +5506,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
     style="flex:1;width:100%;resize:none;border:none;outline:none;border-radius:14px;background:#2f4a3a;background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);background-size:20px 20px;color:#f7f7f0;font-family:'Gaegu',cursive;font-weight:700;font-size:clamp(32px,6vw,72px);line-height:1.3;text-align:center;padding:clamp(20px,4vh,60px) clamp(16px,3vw,40px);box-sizing:border-box;caret-color:#f7f7f0;"></textarea>
 </div>
 
-<script src="/static/admin.js?v=20260624e"></script>
+<script src="/static/admin.js?v=20260715a"></script>
 </body>
 
 </html>`

@@ -79,6 +79,7 @@ function switchMainTab(tab){
   else if(tab==='orders')loadOrders()
   else if(tab==='students')renderStudents()
   else if(tab==='menu')renderMenuItems('shop')
+  else if(tab==='loans')loadLoans()
 }
 window.switchMainTab=switchMainTab
 
@@ -89,6 +90,7 @@ function initAdmin(){
   loadStudentsData()
   loadQueue()
   loadOrders()
+  loadLoans()
 }
 
 function loadConfig(){
@@ -340,6 +342,56 @@ function renderOrderList(){
     '</div>'
   }).join('')
 }
+
+// ══ 포인트 교환 대출 ══
+var allLoans=[]
+function loadLoans(){
+  api('/api/admin/loans').then(function(d){
+    if(!d.success)return
+    allLoans=d.loans||[]
+    renderLoans()
+    updateLoanBadge()
+  })
+}
+window.loadLoans=loadLoans
+
+function updateLoanBadge(){
+  var open=allLoans.filter(function(l){return !l.repaid_at}).length
+  var b=document.getElementById('badge-loans')
+  if(!b)return
+  if(open>0){b.textContent=open;b.style.display=''}else{b.style.display='none'}
+}
+
+function renderLoans(){
+  var el=document.getElementById('loanList')
+  if(!allLoans.length){el.innerHTML=emptyHtml('대출 내역 없음');return}
+  el.innerHTML=allLoans.map(function(l){
+    var open=!l.repaid_at
+    var tm=l.created_at?String(l.created_at).slice(0,16).replace('T',' '):''
+    var rtm=l.repaid_at?String(l.repaid_at).slice(0,16).replace('T',' '):''
+    return '<div class="order-item">'+
+      '<div class="order-cat '+(open?'fine':'learn')+'">'+(open?'미상환':'상환')+'</div>'+
+      '<div class="order-body">'+
+        '<div class="order-top">'+
+          '<span class="order-stu">'+esc(l.student_name)+'</span>'+
+          '<span class="order-time">'+tm+'</span>'+
+        '</div>'+
+        '<div class="order-items-txt">'+l.points+' 포인트 대출 · 당일 보충 '+l.minutes+'분'+(rtm?' · 상환 '+rtm:'')+'</div>'+
+      '</div>'+
+      (open
+        ? '<button class="btn btn-green btn-sm" onclick="repayLoan('+l.id+')"><i class="fas fa-check"></i> 상환</button>'
+        : '<div class="order-cost gain">완료</div>')+
+    '</div>'
+  }).join('')
+}
+
+function repayLoan(id){
+  if(!confirm('이 대출을 상환 처리할까요? (보충수업 완료 확인)'))return
+  api('/api/admin/loans/'+id+'/repay',{method:'POST'}).then(function(d){
+    if(d&&d.success){loadLoans()}else{alert('상환 처리 실패')}
+  })
+}
+window.repayLoan=repayLoan
 
 // ══ 학생 관리 ══
 function renderStudents(){
